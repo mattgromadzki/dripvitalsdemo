@@ -9,7 +9,7 @@ export default function ModulesLayout({ children }: { children: ReactNode }) {
       <Topbar />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto emr-content">{children}</main>
       </div>
     </AuthGuard>
   );
