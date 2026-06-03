@@ -18,7 +18,8 @@ const AV = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#ef4444", "#0ea5e9", "#
 function avatar(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0; return { initial: (name.trim()[0] || "?").toUpperCase(), color: AV[h % AV.length] }; }
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 const day = (iso: string) => { const d = new Date(iso), t = new Date(); return d.toDateString() === t.toDateString() ? "Today" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
-const tick = (s: string) => (s === "delivered" ? "✓✓" : s === "failed" ? "✕" : "✓");
+const statusLabel = (s: string) =>
+  s === "delivered" ? "Delivered" : s === "failed" ? "Failed" : s === "queued" ? "Sending…" : "Sent";
 type Tab = "conversations" | "contacts" | "campaigns";
 
 export default function SmsPage() {
@@ -27,6 +28,7 @@ export default function SmsPage() {
   const startThread = useSms((s) => s.startThread);
   const addOutgoing = useSms((s) => s.addOutgoing);
   const ingestInbound = useSms((s) => s.ingestInbound);
+  const applyStatuses = useSms((s) => s.applyStatuses);
   const markRead = useSms((s) => s.markRead);
   const leads = useLeads((s) => s.leads);
   const addLead = useLeads((s) => s.add);
@@ -49,12 +51,13 @@ export default function SmsPage() {
             if (m?.from && m?.body) ingestInbound(m.sid, m.from, m.body, m.receivedAt);
           });
         }
+        if (!stopped && d?.statuses) applyStatuses(d.statuses);
       } catch { /* ignore transient network errors */ }
     }
     poll();
     const t = setInterval(poll, 5000);
     return () => { stopped = true; clearInterval(t); };
-  }, [ingestInbound]);
+  }, [ingestInbound, applyStatuses]);
 
   // conversation state
   const [selId, setSelId] = useState<string | null>(threads[0]?.id ?? null);
@@ -158,7 +161,7 @@ export default function SmsPage() {
                 {sel.patientId && <a href={`/patients/${sel.patientId}`} className="btn btn-ghost btn-sm">Open chart →</a>}
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-4 bg-surface-2/40 flex flex-col gap-2">
-                {sel.messages.map((m) => (<div key={m.id} className={`max-w-[72%] ${m.direction === "out" ? "self-end items-end" : "self-start items-start"} flex flex-col`}><div className={`px-3 py-2 rounded-2xl text-[13px] leading-snug ${m.direction === "out" ? "bg-brand text-white rounded-br-sm" : "bg-surface border border-border rounded-bl-sm"}`}>{m.body}</div><div className="text-[10px] text-ink-muted mt-0.5 px-1">{time(m.createdAt)}{m.direction === "out" ? ` · ${tick(m.status)}` : ""}</div></div>))}
+                {sel.messages.map((m) => (<div key={m.id} className={`max-w-[72%] ${m.direction === "out" ? "self-end items-end" : "self-start items-start"} flex flex-col`}><div className={`px-3 py-2 rounded-2xl text-[13px] leading-snug ${m.direction === "out" ? "bg-brand text-white rounded-br-sm" : "bg-surface border border-border rounded-bl-sm"}`}>{m.body}</div><div className="text-[10px] text-ink-muted mt-0.5 px-1">{time(m.createdAt)}{m.direction === "out" ? ` · ${statusLabel(m.status)}` : ""}</div></div>))}
                 {sel.messages.length === 0 && <div className="m-auto text-ink-muted text-[12px]">Start the conversation below.</div>}
               </div>
               <div className="border-t border-border p-2.5">

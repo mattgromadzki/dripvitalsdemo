@@ -52,3 +52,25 @@ export async function listInbound(limit = 200): Promise<InboundSms[]> {
   }
   return mem.slice(0, limit);
 }
+
+// ── Delivery status (outbound) ────────────────────────────────────────────
+// Twilio posts status updates (queued → sent → delivered / failed) per message,
+// keyed by MessageSid. We keep the latest status for each SID so the UI can
+// show the ✓ / ✓✓ / ✕ ticks.
+const STATUS_KEY = "sms:status";
+let memStatus: Record<string, string> = {};
+
+export async function setStatus(sid: string, status: string): Promise<void> {
+  const r = redis();
+  if (r) await r.hset(STATUS_KEY, { [sid]: status });
+  else memStatus[sid] = status;
+}
+
+export async function getStatuses(): Promise<Record<string, string>> {
+  const r = redis();
+  if (r) {
+    const all = await r.hgetall<Record<string, string>>(STATUS_KEY);
+    return all || {};
+  }
+  return memStatus;
+}

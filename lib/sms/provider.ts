@@ -11,7 +11,9 @@ export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
   const c = getSmsCreds();
   if (c.accountSid && c.authToken && c.from) {
     try {
-      const body = new URLSearchParams({ To: input.to, From: c.from, Body: input.body });
+      const params: Record<string, string> = { To: input.to, From: c.from, Body: input.body };
+      if (input.statusCallback) params.StatusCallback = input.statusCallback; // Twilio posts delivery updates here
+      const body = new URLSearchParams(params);
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${c.accountSid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + Buffer.from(`${c.accountSid}:${c.authToken}`).toString("base64"), "Content-Type": "application/x-www-form-urlencoded" },

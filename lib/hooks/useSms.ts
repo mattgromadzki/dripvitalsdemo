@@ -27,6 +27,7 @@ interface State {
   addOutgoing: (threadId: string, body: string, status: SmsStatus, providerId?: string) => void;
   addIncoming: (threadId: string, body: string) => void;
   ingestInbound: (sid: string, from: string, body: string, createdAt: string) => void;
+  applyStatuses: (map: Record<string, string>) => void;
   markRead: (threadId: string) => void;
 }
 const norm = (p: string) => "+" + p.replace(/[^\d]/g, "").replace(/^1?/, "1");
@@ -48,6 +49,23 @@ export const useSms = create<State>((set) => ({
     seq: s.seq + 1,
   })),
   markRead: (threadId) => set((s) => ({ threads: s.threads.map((t) => t.id === threadId ? { ...t, unread: 0 } : t) })),
+
+  // Update outgoing messages' delivery status from Twilio status callbacks,
+  // matched by the Twilio MessageSid stored as providerId.
+  applyStatuses: (map) => set((s) => {
+    if (!map || Object.keys(map).length === 0) return {};
+    let any = false;
+    const threads = s.threads.map((t) => {
+      let changed = false;
+      const messages = t.messages.map((m) => {
+        const next = m.direction === "out" && m.providerId ? map[m.providerId] : undefined;
+        if (next && next !== m.status) { changed = true; any = true; return { ...m, status: next as SmsMessage["status"] }; }
+        return m;
+      });
+      return changed ? { ...t, messages } : t;
+    });
+    return any ? { threads } : {};
+  }),
 
   // Merge a webhook-received reply into the right thread (matched by phone),
   // creating a thread if none exists. De-duplicated by Twilio MessageSid so
