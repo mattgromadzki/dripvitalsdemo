@@ -7,6 +7,7 @@ import { toast } from "@/lib/hooks/useToast";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
 import { useChatReads, unreadForPid } from "@/lib/hooks/useChatReads";
+import { sendChat, pullAllChat } from "@/lib/chat/client";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { seedRecordFromPatient } from "@/lib/data/portalRecords";
 
@@ -42,6 +43,14 @@ export default function PatientChatPage() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [hydrate, hydrateSeen]);
+
+  // Sync all chat threads from the shared server every few seconds so messages
+  // from patients (on their own devices) appear here across the patient list.
+  useEffect(() => {
+    pullAllChat();
+    const t = setInterval(pullAllChat, 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const rows = useMemo(() => patients.map((p) => {
     const msgs = records[p.id]?.messages ?? [];
@@ -84,14 +93,14 @@ export default function PatientChatPage() {
   function send() {
     const t = draft.trim();
     if (!t || !activePid) return;
-    addMessage(activePid, { from: "care", text: t, time: "Just now" });
+    sendChat(activePid, { from: "care", text: t, time: "Just now" });
     setDraft("");
   }
   function attach(file: File) {
     if (!activePid || !file) return;
     const kind: "image" | "pdf" = file.type.startsWith("image/") ? "image" : "pdf";
     const reader = new FileReader();
-    reader.onload = () => addMessage(activePid, { from: "care", text: "", time: "Just now", attachment: { name: file.name, kind, url: String(reader.result) } });
+    reader.onload = () => sendChat(activePid, { from: "care", text: "", time: "Just now", attachment: { name: file.name, kind, url: String(reader.result) } });
     reader.readAsDataURL(file);
   }
 

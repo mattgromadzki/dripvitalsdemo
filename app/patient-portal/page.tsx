@@ -6,6 +6,7 @@ import { useShop } from "@/lib/hooks/useShop";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
+import { sendChat, pullChat } from "@/lib/chat/client";
 import { seedRecordFromPatient, emptyRecord, formatShotDate } from "@/lib/data/portalRecords";
 import type { ShotEntry } from "@/lib/data/portalRecords";
 import { SHOP_CATEGORY_LABEL } from "@/lib/data/shopProducts";
@@ -98,6 +99,14 @@ export default function PatientPortalPage() {
   }, [hydrate]);
   useEffect(() => { if (pid) ensureSeeded(pid, seed); }, [pid, seed, ensureSeeded]);
 
+  // Sync chat with the shared server so provider replies arrive across devices.
+  useEffect(() => {
+    if (!pid) return;
+    pullChat(pid);
+    const t = setInterval(() => pullChat(pid), 5000);
+    return () => clearInterval(t);
+  }, [pid]);
+
   const record = records[pid] ?? seed;
   const fullName = me ? `${me.first} ${me.last}` : "Patient";
   const initials = me ? `${me.first[0]}${me.last[0]}` : "PT";
@@ -173,7 +182,7 @@ export default function PatientPortalPage() {
   function sendMessage() {
     const text = draft.trim();
     if (!text || !pid) return;
-    addMessage(pid, { from: "patient", text, time: "Just now" });
+    sendChat(pid, { from: "patient", text, time: "Just now" });
     setDraft("");
   }
 
@@ -182,7 +191,7 @@ export default function PatientPortalPage() {
     const kind: "image" | "pdf" = file.type.startsWith("image/") ? "image" : "pdf";
     const reader = new FileReader();
     reader.onload = () => {
-      addMessage(pid, { from: "patient", text: "", time: "Just now", attachment: { name: file.name, kind, url: String(reader.result) } });
+      sendChat(pid, { from: "patient", text: "", time: "Just now", attachment: { name: file.name, kind, url: String(reader.result) } });
     };
     reader.readAsDataURL(file);
   }

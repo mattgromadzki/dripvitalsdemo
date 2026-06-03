@@ -39,6 +39,7 @@ interface PortalRecordsState {
   addShot: (pid: string, entry: Omit<ShotEntry, "id">) => void;
   addWeight: (pid: string, entry: Omit<WeightEntry, "id">) => void;
   addMessage: (pid: string, entry: Omit<MsgEntry, "id">) => void;
+  ingestRemote: (pid: string, msg: MsgEntry) => void;
 }
 
 export const usePortalRecords = create<PortalRecordsState>((set, get) => ({
@@ -77,6 +78,17 @@ export const usePortalRecords = create<PortalRecordsState>((set, get) => ({
     const r = get().records;
     const rec = r[pid] ?? emptyRecord();
     const next = { ...r, [pid]: { ...rec, messages: [...rec.messages, { id: uid("msg"), ...entry }] } };
+    save(next);
+    set({ records: next });
+  },
+
+  // Merge a message that came from the shared server (by id), deduped so polls
+  // and our own optimistic echoes don't create duplicates.
+  ingestRemote: (pid, msg) => {
+    const r = get().records;
+    const rec = r[pid] ?? emptyRecord();
+    if (rec.messages.some((m) => m.id === msg.id)) return;
+    const next = { ...r, [pid]: { ...rec, messages: [...rec.messages, msg] } };
     save(next);
     set({ records: next });
   },
