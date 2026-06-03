@@ -1,0 +1,1413 @@
+"use client";
+
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import type { ReactNode, CSSProperties } from "react";
+import { useShop } from "@/lib/hooks/useShop";
+import { usePatients } from "@/lib/hooks/usePatients";
+import { getPatientExtra } from "@/lib/data/patientExtras";
+import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
+import { seedRecordFromPatient, emptyRecord, formatShotDate } from "@/lib/data/portalRecords";
+import type { ShotEntry } from "@/lib/data/portalRecords";
+import { SHOP_CATEGORY_LABEL } from "@/lib/data/shopProducts";
+import type { ShopProduct, ShopCategory } from "@/lib/types";
+import { validateAddress } from "@/lib/usps/validateAddress";
+import { fetchSuggestions } from "@/lib/usps/autocomplete";
+import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@/lib/usps/types";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   DripVitals Patient Portal (v2)
+
+   A self-contained, patient-facing app: login + six tabs (Home, Chat,
+   Treatments, Shots, Shop, Account). All styling is the scoped `.dv-portal`
+   stylesheet in globals.css (ported 1:1 from the mockup). The Shop tab reads
+   the SAME catalog the admin Shop module manages — published products only —
+   so anything an admin publishes shows up here automatically.
+   ───────────────────────────────────────────────────────────────────────── */
+
+type Page = "home" | "chat" | "treatments" | "shots" | "visits" | "shop" | "account";
+type TxTab = "current" | "dose" | "orders" | "subscription";
+type AcctTab = "profile" | "billing" | "phi";
+type ModalType =
+  | "refill" | "pause" | "cancel" | "logWeight" | "logShot"
+  | "editProfile" | "editAddress" | "deletePhi" | null;
+
+const PAGE_TITLES: Record<Page, string> = {
+  home: "Home", chat: "Chat", treatments: "Treatments",
+  shots: "Shots", visits: "Visits & Reminders", shop: "Shop", account: "Account",
+};
+
+const GENERIC_BENEFITS = [
+  "Personalized by a licensed provider",
+  "Discreet, free shipping to your door",
+  "Adjustments at any time, no extra cost",
+  "Cancel or pause your subscription anytime",
+];
+const HOW_IT_WORKS = [
+  { t: "Complete intake", d: "Answer a few questions about your goals and health history." },
+  { t: "Provider review", d: "A licensed provider reviews your case within 24 hours." },
+  { t: "Discreet delivery", d: "Your treatment ships straight to your door in plain packaging." },
+  { t: "Ongoing support", d: "Message your care team anytime and adjust your plan as needed." },
+];
+const WHATS_INCLUDED = [
+  "Initial provider consultation",
+  "Personalized treatment plan",
+  "Free 2-day shipping",
+  "24/7 messaging with your care team",
+  "Free dose adjustments throughout treatment",
+  "No commitment — cancel anytime",
+];
+
+// Dose-logging dropdown options (used by the "Add dose" modal).
+const MEDICATIONS = [
+  "Compounded Semaglutide", "Compounded Tirzepatide", "Ozempic®", "Wegovy®",
+  "Mounjaro®", "Zepbound®", "NAD+ Injection", "Sermorelin Injection",
+];
+const DOSAGE_UNITS = ["mg", "mL", "units"];
+const INJECTION_SITES = [
+  "Stomach - Upper Left", "Stomach - Upper Right", "Stomach - Lower Left", "Stomach - Lower Right",
+  "Thigh - Left", "Thigh - Right", "Arm - Left", "Arm - Right",
+];
+
+interface ChatMsg { from: "mine" | "them"; text: string; time: string; attachment?: { name: string; kind: "image" | "pdf"; url: string }; }
+
+export default function PatientPortalPage() {
+  const allProducts = useShop((s) => s.products);
+
+  // The logged-in patient (demo: the first EMR patient). Using a real EMR
+  // patient is what lets staff open this same person in Patient View and see
+  // exactly what they entered here.
+  const patients = usePatients((s) => s.patients);
+  const me = patients[0];
+  const pid = me?.id ?? "";
+  const extra = useMemo(() => (me ? getPatientExtra(me) : null), [me]);
+  const seed = useMemo(() => (me && extra ? seedRecordFromPatient(me, extra) : emptyRecord()), [me, extra]);
+
+  const records = usePortalRecords((s) => s.records);
+  const hydrate = usePortalRecords((s) => s.hydrate);
+  const ensureSeeded = usePortalRecords((s) => s.ensureSeeded);
+  const addShot = usePortalRecords((s) => s.addShot);
+  const addWeight = usePortalRecords((s) => s.addWeight);
+  const addMessage = usePortalRecords((s) => s.addMessage);
+
+  // Load persisted entries, then seed this patient if first-seen.
+  useEffect(() => { hydrate(); }, [hydrate]);
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === "dv_portal_records_v2") hydrate(); };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [hydrate]);
+  useEffect(() => { if (pid) ensureSeeded(pid, seed); }, [pid, seed, ensureSeeded]);
+
+  const record = records[pid] ?? seed;
+  const fullName = me ? `${me.first} ${me.last}` : "Patient";
+  const initials = me ? `${me.first[0]}${me.last[0]}` : "PT";
+
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [page, setPage] = useState<Page>("home");
+  const [txTab, setTxTab] = useState<TxTab>("current");
+  const [acctTab, setAcctTab] = useState<AcctTab>("profile");
+
+  const [threadOpen, setThreadOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const [shopFilter, setShopFilter] = useState<"all" | ShopCategory>("all");
+  const [shopSearch, setShopSearch] = useState("");
+  const [pdpId, setPdpId] = useState<string | null>(null);
+
+  const [modal, setModal] = useState<ModalType>(null);
+  const [weightDraft, setWeightDraft] = useState("");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [bookedVisit, setBookedVisit] = useState<string | null>(null);
+  const [doseReminder, setDoseReminder] = useState(true);
+  const [refillReminder, setRefillReminder] = useState(true);
+
+  // Chat thread + current weight, derived from the shared record.
+  const chatMessages: ChatMsg[] = record.messages.map((m) => ({
+    from: m.from === "patient" ? "mine" : "them",
+    text: m.text,
+    time: m.time,
+    attachment: m.attachment,
+  }));
+  const currentWeight = record.weights.length
+    ? String(record.weights[record.weights.length - 1].lbs)
+    : me ? String(me.wt) : "197";
+
+  // ── Toasts ──────────────────────────────────────────────────────────────
+  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const toastSeq = useRef(0);
+  const toast = useCallback((text: string) => {
+    const id = ++toastSeq.current;
+    setToasts((t) => [...t, { id, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2700);
+  }, []);
+
+  // ── Shop catalog (published only, sorted) ─────────────────────────────────
+  const published = useMemo(
+    () => allProducts.filter((p) => p.published).sort((a, b) => a.sort - b.sort),
+    [allProducts],
+  );
+  const shopList = useMemo(() => {
+    const q = shopSearch.trim().toLowerCase();
+    return published
+      .filter((p) => shopFilter === "all" || p.cat === shopFilter)
+      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q));
+  }, [published, shopFilter, shopSearch]);
+  const pdpProduct = useMemo(
+    () => (pdpId ? published.find((p) => p.id === pdpId) ?? null : null),
+    [pdpId, published],
+  );
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  function nav(p: Page) {
+    setPage(p);
+    setThreadOpen(false);
+    setPdpId(null);
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }
+
+  function doLogin() {
+    setLoggedIn(true);
+    nav("home");
+  }
+
+  function sendMessage() {
+    const text = draft.trim();
+    if (!text || !pid) return;
+    addMessage(pid, { from: "patient", text, time: "Just now" });
+    setDraft("");
+  }
+
+  function attachFile(file: File) {
+    if (!pid || !file) return;
+    const kind: "image" | "pdf" = file.type.startsWith("image/") ? "image" : "pdf";
+    const reader = new FileReader();
+    reader.onload = () => {
+      addMessage(pid, { from: "patient", text: "", time: "Just now", attachment: { name: file.name, kind, url: String(reader.result) } });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function saveWeight() {
+    if (!weightDraft) { toast("Please enter a number"); return; }
+    if (pid) addWeight(pid, { date: new Date().toLocaleDateString(), lbs: Number(weightDraft) });
+    setWeightDraft("");
+    setModal(null);
+    toast(`Weight logged: ${weightDraft} lbs`);
+  }
+
+  function handleAddShot(entry: Omit<ShotEntry, "id">) {
+    if (pid) addShot(pid, entry);
+    setModal(null);
+    toast("Dose logged successfully");
+  }
+
+  // ── Login screen ──────────────────────────────────────────────────────────
+  if (!loggedIn) {
+    return (
+      <div className="dv-portal">
+        <div id="login-view" className="login-page">
+          <div className="login-left">
+            <div className="login-brand">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="DripVitals" style={{ height: 64, width: "auto", marginBottom: 12 }} />
+              <div className="login-brand-sub">Patient Portal</div>
+            </div>
+            <div className="login-h">Sign in to your DripVitals account</div>
+            <input className="login-input" type="email" defaultValue="mike@example.com" placeholder="Email address" />
+            <input className="login-input" type="password" defaultValue="••••••••" placeholder="Password" />
+            <button className="login-btn" onClick={doLogin}>Continue</button>
+            <div className="login-helpers">
+              Need help signing in?{" "}
+              <a href="#" onClick={(e) => { e.preventDefault(); toast("Reset email would be sent"); }}>Reset password</a> ·{" "}
+              <a href="#" onClick={(e) => { e.preventDefault(); toast("Help center opened"); }}>Help center</a>
+            </div>
+            <div className="login-foot">© 2026 DripVitals · Terms · Privacy</div>
+          </div>
+          <div className="login-right">
+            <div className="login-pattern" />
+            <div className="login-quote">
+              <div className="login-quote-text">&ldquo;Personalized care delivered to your door — review your plan, message your provider, and track your progress.&rdquo;</div>
+              <div className="login-quote-by">— The DripVitals care team</div>
+            </div>
+          </div>
+        </div>
+        <ToastStack toasts={toasts} />
+      </div>
+    );
+  }
+
+  // ── Portal shell ────────────────────────────────────────────────────────
+  return (
+    <div className="dv-portal">
+      <div id="portal-view" className="portal">
+        <aside className="sidebar">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="DripVitals" style={{ width: 150, height: "auto", maxWidth: "100%", marginBottom: 24, marginLeft: 2 }} />
+          <NavBtn active={page === "home"} onClick={() => nav("home")} ico="🏠">Home</NavBtn>
+          <NavBtn active={page === "chat"} onClick={() => nav("chat")} ico="💬" badge={3}>Chat</NavBtn>
+          <NavBtn active={page === "treatments"} onClick={() => nav("treatments")} ico="💊">Treatments</NavBtn>
+          <NavBtn active={page === "shots"} onClick={() => nav("shots")} ico="💉">Shots</NavBtn>
+          <NavBtn active={page === "visits"} onClick={() => nav("visits")} ico="📅">Visits</NavBtn>
+          <NavBtn active={page === "shop"} onClick={() => nav("shop")} ico="🛍️">Shop</NavBtn>
+          <div className="sidebar-foot">
+            <NavBtn active={page === "account"} onClick={() => nav("account")} ico="👤">Manage account</NavBtn>
+            <NavBtn active={false} onClick={() => nav("home")} ico="🌐">Homepage</NavBtn>
+            <NavBtn active={false} onClick={() => toast("Help center opens in a new tab")} ico="❔">Help Center</NavBtn>
+            <button className="nav-link" onClick={() => setLoggedIn(false)} style={{ color: "var(--red)" }}>
+              <span className="ico">↩</span> Sign out
+            </button>
+          </div>
+        </aside>
+
+        <main className="main">
+          <div className="main-head">
+            <h1 className="main-title">{PAGE_TITLES[page]}</h1>
+            <div className="main-actions">
+              <button className="bell-btn" onClick={() => nav("chat")} title="Notifications">🔔</button>
+              <button className="avatar-btn" onClick={() => nav("account")} title="Account">{initials}</button>
+            </div>
+          </div>
+
+          <div className="main-body">
+            {page === "home" && <HomePage nav={nav} weight={currentWeight} openModal={setModal} />}
+            {page === "chat" && (
+              <ChatPage
+                threadOpen={threadOpen}
+                openThread={() => setThreadOpen(true)}
+                closeThread={() => setThreadOpen(false)}
+                messages={chatMessages}
+                draft={draft}
+                setDraft={setDraft}
+                send={sendMessage}
+                onAttach={attachFile}
+              />
+            )}
+            {page === "treatments" && <TreatmentsPage tab={txTab} setTab={setTxTab} openModal={setModal} toast={toast} />}
+            {page === "shots" && <ShotsPage openModal={setModal} shots={record.shots} />}
+            {page === "visits" && <VisitsPage booked={bookedVisit} setBooked={setBookedVisit} doseReminder={doseReminder} setDoseReminder={setDoseReminder} refillReminder={refillReminder} setRefillReminder={setRefillReminder} toast={toast} />}
+            {page === "shop" && (
+              pdpProduct
+                ? <ProductDetail product={pdpProduct} related={published.filter((r) => r.cat === pdpProduct.cat && r.id !== pdpProduct.id).slice(0, 3)} onBack={() => setPdpId(null)} onOpen={setPdpId} toast={toast} />
+                : <ShopPage list={shopList} count={shopList.length} filter={shopFilter} setFilter={setShopFilter} search={shopSearch} setSearch={setShopSearch} onOpen={setPdpId} />
+            )}
+            {page === "account" && <AccountPage tab={acctTab} setTab={setAcctTab} theme={theme} setTheme={setTheme} openModal={setModal} toast={toast} fullName={fullName} initials={initials} />}
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile tabbar */}
+      <div className="mob-tabbar">
+        {(["home", "chat", "treatments", "shots", "visits"] as Page[]).map((p) => (
+          <button key={p} className={`mob-tab ${page === p ? "active" : ""}`} onClick={() => nav(p)}>
+            <div className="mob-tab-ico">{p === "home" ? "🏠" : p === "chat" ? "💬" : p === "treatments" ? "💊" : p === "shots" ? "💉" : "📅"}</div>
+            {p === "treatments" ? "Plan" : p === "visits" ? "Visits" : p[0].toUpperCase() + p.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {modal && (
+        <PortalModal type={modal} onClose={() => setModal(null)} toast={toast}
+          weightDraft={weightDraft} setWeightDraft={setWeightDraft} saveWeight={saveWeight} onAddShot={handleAddShot} />
+      )}
+      <ToastStack toasts={toasts} />
+    </div>
+  );
+}
+
+/* ── Navigation button ── */
+function NavBtn({ active, onClick, ico, badge, children }: { active: boolean; onClick: () => void; ico: string; badge?: number; children: ReactNode }) {
+  return (
+    <button className={`nav-link ${active ? "active" : ""}`} onClick={onClick}>
+      <span className="ico">{ico}</span> {children}
+      {badge != null && <span className="badge">{badge}</span>}
+    </button>
+  );
+}
+
+/* ── HOME ── */
+function HomePage({ nav, weight, openModal }: { nav: (p: Page) => void; weight: string; openModal: (m: ModalType) => void }) {
+  return (
+    <section className="page active">
+      <div className="hero">
+        <div className="hero-inner">
+          <div>
+            <div className="hero-title">3-Month Semaglutide</div>
+            <div className="hero-sub">0.5–1.0mg / week · Active subscription</div>
+            <div className="hero-meta">
+              <HeroMeta lbl="Next dose" val="Sunday, Jun 7" />
+              <HeroMeta lbl="Next shipment" val="In 18 days" />
+              <HeroMeta lbl="Renews" val="Sep 12, 2026" />
+            </div>
+            <div style={{ marginTop: 18 }}>
+              <button className="btn btn-primary" onClick={() => nav("treatments")}>View plan details →</button>
+            </div>
+          </div>
+          <div className="hero-vial">💉</div>
+        </div>
+      </div>
+
+      <div className="row three">
+        <StatCard lbl="Starting weight" val={<>215 <span style={{ fontSize: 14, color: "var(--muted)" }}>lbs</span></>} />
+        <StatCard lbl="Current weight" val={<>{weight} <span style={{ fontSize: 14, color: "var(--muted)" }}>lbs</span></>} trend="↓ 18 lbs (8.4%)" />
+        <StatCard lbl="Goal" val={<>180 <span style={{ fontSize: 14, color: "var(--muted)" }}>lbs</span></>} trend="17 lbs to go" />
+      </div>
+
+      <div className="row two">
+        <div className="card">
+          <div className="card-h">Quick actions</div>
+          <QaCard ico="💉" title="Log this week's shot" desc="Next dose due Sunday, Jun 7" onClick={() => nav("shots")} />
+          <QaCard ico="⚖️" title="Log this week's weight" desc="Last logged: May 24" onClick={() => openModal("logWeight")} />
+          <QaCard ico="💬" title="Message your care team" desc="Average response: 2 hours" onClick={() => nav("chat")} />
+        </div>
+        <div className="card">
+          <div className="card-h">Recent activity</div>
+          <div className="timeline">
+            <TimelineItem dot="done" title="Shot logged · 0.5mg" desc="Left thigh · May 24" />
+            <TimelineItem dot="done" title="Weight logged · 197 lbs" desc="May 24" />
+            <TimelineItem dot="done" title="Refill #2 shipped" desc="Arrives Jun 5" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroMeta({ lbl, val }: { lbl: string; val: string }) {
+  return (
+    <div className="hero-meta-item">
+      <div className="hero-meta-lbl">{lbl}</div>
+      <div className="hero-meta-val">{val}</div>
+    </div>
+  );
+}
+function StatCard({ lbl, val, trend }: { lbl: string; val: ReactNode; trend?: string }) {
+  return (
+    <div className="stat-card">
+      <div className="stat-lbl">{lbl}</div>
+      <div className="stat-val">{val}</div>
+      {trend && <div className="stat-trend">{trend}</div>}
+    </div>
+  );
+}
+function QaCard({ ico, title, desc, onClick }: { ico: string; title: string; desc: string; onClick: () => void }) {
+  return (
+    <button className="qa-card" style={{ width: "100%", textAlign: "left" }} onClick={onClick}>
+      <div className="qa-icon">{ico}</div>
+      <div className="qa-body">
+        <div className="qa-title">{title}</div>
+        <div className="qa-desc">{desc}</div>
+      </div>
+      <div className="qa-arrow">→</div>
+    </button>
+  );
+}
+function TimelineItem({ dot, title, desc, date }: { dot: string; title: string; desc: string; date?: string }) {
+  return (
+    <div className="timeline-item">
+      <div className={`timeline-dot ${dot === "done" ? "done" : dot === "now" ? "now" : ""}`}>
+        {dot === "done" ? "✓" : dot === "now" ? "●" : dot}
+      </div>
+      <div className="timeline-body">
+        <div className="timeline-title">{title}</div>
+        <div className="timeline-desc">{desc}</div>
+      </div>
+      {date && <div className="timeline-date">{date}</div>}
+    </div>
+  );
+}
+
+/* ── CHAT ── */
+function ChatPage({ threadOpen, openThread, closeThread, messages, draft, setDraft, send, onAttach }: {
+  threadOpen: boolean; openThread: () => void; closeThread: () => void;
+  messages: ChatMsg[]; draft: string; setDraft: (s: string) => void; send: () => void; onAttach: (f: File) => void;
+}) {
+  return (
+    <section className="page active">
+      {!threadOpen ? (
+        <div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "1.4px", color: "var(--muted)", fontWeight: 600, marginBottom: 24 }}>SUPPORT</div>
+          <div className="chat-empty">
+            <div className="chat-empty-ico">💬</div>
+            <div className="chat-empty-title">Start a conversation</div>
+            <div className="chat-empty-desc">Have a question about billing, shipping, your account, or your treatment? Our support team is here to help.</div>
+          </div>
+          <div className="chat-picker">
+            <div className="chat-picker-h">Send message to:</div>
+            <div className="chat-picker-btns" style={{ gridTemplateColumns: "1fr", maxWidth: 300, margin: "0 auto" }}>
+              <button className="chat-target" onClick={openThread}>
+                <span className="chat-target-ico">💬</span>
+                <span className="chat-target-name">Support</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <button className="btn btn-secondary" onClick={closeThread} style={{ marginBottom: 16 }}>← Back</button>
+          <div className="thread-head">
+            <div className="msg-ava team">CT</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>Support</div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)" }}>DripVitals Care Team</div>
+            </div>
+          </div>
+          <div className="thread-body">
+            {messages.map((m, i) => (
+              <div key={i} className={`thread-msg ${m.from === "mine" ? "mine" : ""}`}>
+                <div className="thread-bubble">
+                  {m.attachment && (m.attachment.kind === "image"
+                    ? <img src={m.attachment.url} alt={m.attachment.name} style={{ maxWidth: 200, borderRadius: 10, display: "block", marginBottom: m.text ? 6 : 0 }} />
+                    : <a href={m.attachment.url} download={m.attachment.name} style={{ display: "flex", alignItems: "center", gap: 8, color: "inherit", textDecoration: "none", fontWeight: 600, marginBottom: m.text ? 6 : 0 }}>📄 {m.attachment.name}</a>)}
+                  {m.text && <span>{m.text}</span>}
+                </div>
+                <div className="thread-meta">{m.time}</div>
+              </div>
+            ))}
+          </div>
+          <div className="thread-foot">
+            <label className="btn btn-secondary" style={{ cursor: "pointer", display: "flex", alignItems: "center" }} title="Attach photo or PDF">
+              📎
+              <input type="file" accept="image/*,application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttach(f); e.target.value = ""; }} />
+            </label>
+            <input
+              className="thread-input"
+              placeholder="Type a message..."
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") send(); }}
+            />
+            <button className="btn btn-primary" onClick={send}>Send</button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── TREATMENTS ── */
+function TreatmentsPage({ tab, setTab, openModal, toast }: { tab: TxTab; setTab: (t: TxTab) => void; openModal: (m: ModalType) => void; toast: (s: string) => void }) {
+  return (
+    <section className="page active">
+      <div className="inner-tabs">
+        <InnerTab active={tab === "current"} onClick={() => setTab("current")}>Current plan</InnerTab>
+        <InnerTab active={tab === "dose"} onClick={() => setTab("dose")}>Dose schedule</InnerTab>
+        <InnerTab active={tab === "orders"} onClick={() => setTab("orders")}>Shipments</InnerTab>
+        <InnerTab active={tab === "subscription"} onClick={() => setTab("subscription")}>Subscription</InnerTab>
+      </div>
+
+      {tab === "current" && (
+        <div className="inner-tab-content active">
+          <div className="hero">
+            <div className="hero-inner">
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+                  <span className="pill active">Active</span>
+                  <span style={{ fontSize: 11.5, color: "var(--muted)" }}>Started Mar 12, 2026</span>
+                </div>
+                <div className="hero-title">3-Month Semaglutide Treatment</div>
+                <div className="hero-sub">Semaglutide 0.5–1.0mg · Compounded · Pharmacy: Partner Network FL</div>
+                <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button className="btn btn-primary" onClick={() => openModal("refill")}>Request refill</button>
+                  <button className="btn btn-secondary" onClick={() => openModal("pause")}>Pause subscription</button>
+                </div>
+              </div>
+              <div className="hero-vial">💉</div>
+            </div>
+          </div>
+          <div className="plan-meta-grid">
+            <PlanCell lbl="Current dose" val="0.5 mg / week" />
+            <PlanCell lbl="Next dose increase" val="0.75 mg in 2 wk" />
+            <PlanCell lbl="Billed quarterly" val="$499 / 3 mo" />
+            <PlanCell lbl="Next renewal" val="Sep 12, 2026" />
+          </div>
+        </div>
+      )}
+
+      {tab === "dose" && (
+        <div className="inner-tab-content active">
+          <div className="card">
+            <div className="card-h">Dose escalation timeline</div>
+            <div className="timeline">
+              <TimelineItem dot="done" title="Week 1-4 · 0.25 mg starter dose" desc="Initial introduction — your body adjusts to the medication." date="Mar 12 – Apr 8" />
+              <TimelineItem dot="now" title="Week 5-8 · 0.5 mg (current)" desc="Most patients see noticeable appetite changes at this dose." date="Apr 9 – May 6" />
+              <TimelineItem dot="3" title="Week 9-12 · 0.75 mg" desc="Mid-cycle escalation — review with your provider before this step." date="Jun 4 – Jul 1" />
+              <TimelineItem dot="4" title="Week 13-16 · 1.0 mg target dose" desc="Maintenance dose — final step of the 3-month plan." date="Jul 2 – Jul 29" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "orders" && (
+        <div className="inner-tab-content active">
+          <div className="card" style={{ borderColor: "var(--blue)", borderWidth: "1.5px", marginBottom: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 14 }}>
+              <div>
+                <div className="card-h" style={{ color: "var(--blue-dk)", marginBottom: 0 }}>Active shipment</div>
+                <div style={{ fontSize: 17, fontWeight: 700, marginTop: 6 }}>Order #DV-2845</div>
+                <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>3-Month Semaglutide · Refill #2</div>
+              </div>
+              <span className="pill pending">In Transit</span>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-primary" onClick={() => toast("Tracking opened: USPS 1Z999AA10123456784")}>Track package →</button>
+              <button className="btn btn-secondary" onClick={() => toast("Delivery options opened")}>Manage delivery</button>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-h">Order history</div>
+            <div className="timeline">
+              <TimelineItem dot="done" title="Order #DV-2502 · Refill #1" desc="Delivered Apr 12, 2026" date="$499.00" />
+              <TimelineItem dot="done" title="Order #DV-2104 · Initial" desc="Delivered Mar 12, 2026" date="$499.00" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "subscription" && (
+        <div className="inner-tab-content active">
+          <div className="card">
+            <div className="card-h">Subscription details</div>
+            <div className="plan-meta-grid" style={{ marginTop: 12 }}>
+              <PlanCell lbl="Status" val={<span className="pill active">Active</span>} />
+              <PlanCell lbl="Billing cycle" val="Quarterly" />
+              <PlanCell lbl="Amount" val="$499.00" />
+              <PlanCell lbl="Next charge" val="Sep 12, 2026" />
+            </div>
+            <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="btn btn-secondary" onClick={() => openModal("pause")}>Pause subscription</button>
+              <button className="btn btn-danger" onClick={() => openModal("cancel")}>Cancel subscription</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+function InnerTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return <button className={`inner-tab ${active ? "active" : ""}`} onClick={onClick}>{children}</button>;
+}
+function PlanCell({ lbl, val }: { lbl: string; val: ReactNode }) {
+  return (
+    <div className="plan-meta-cell">
+      <div className="plan-meta-lbl">{lbl}</div>
+      <div className="plan-meta-val">{val}</div>
+    </div>
+  );
+}
+
+/* ── SHOTS ── */
+function ShotsPage({ openModal, shots }: { openModal: (m: ModalType) => void; shots: ShotEntry[] }) {
+  const completed = shots.length;
+  return (
+    <section className="page active">
+      <div className="shot-next">
+        <div className="shot-next-lbl">Next dose</div>
+        <div className="shot-next-day">Sunday, Jun 7</div>
+        <div className="shot-next-dose">0.5mg Semaglutide · Subcutaneous injection</div>
+        <button className="shot-log-btn" onClick={() => openModal("logShot")}>💉 Log this week&apos;s shot</button>
+      </div>
+
+      <div className="row three">
+        <StatCard lbl="Shots completed" val={<>{completed}</>} trend={`${completed} of 16 weeks`} />
+        <StatCard lbl="Compliance" val={<>100%</>} trend="Never missed a week" />
+        <StatCard lbl="Current streak" val={<>{completed} wk</>} trend="🔥 Keep it going!" />
+      </div>
+
+      <ShotCalendar shots={shots} />
+
+      <div className="card">
+        <div className="card-h">Shot history</div>
+        <div className="shot-log-list">
+          {shots.length === 0 ? (
+            <div style={{ padding: "20px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>No shots logged yet.</div>
+          ) : shots.map((s) => (
+            <div key={s.id} className="shot-log-row">
+              <div className="shot-log-ico">💉</div>
+              <div className="shot-log-body">
+                <div className="shot-log-title">{formatShotDate(s.date)} · {s.strength}{s.unit} {s.medication}</div>
+                <div className="shot-log-meta">{s.site}</div>
+              </div>
+              <span className="pill active">Logged</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── Visits & Reminders: self-scheduling + dose/refill reminders ── */
+function VisitsPage({ booked, setBooked, doseReminder, setDoseReminder, refillReminder, setRefillReminder, toast }: {
+  booked: string | null; setBooked: (s: string | null) => void;
+  doseReminder: boolean; setDoseReminder: (b: boolean) => void;
+  refillReminder: boolean; setRefillReminder: (b: boolean) => void;
+  toast: (s: string) => void;
+}) {
+  const TIMES = ["9:00 AM", "11:30 AM", "2:00 PM", "4:30 PM"];
+  const [selDay, setSelDay] = useState<string | null>(null);
+  const [selTime, setSelTime] = useState<string | null>(null);
+
+  // Next 10 weekdays as bookable days
+  const days = useMemo(() => {
+    const out: { key: string; label: string; sub: string }[] = [];
+    const d = new Date(); d.setDate(d.getDate() + 1);
+    while (out.length < 10) {
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) {
+        out.push({
+          key: d.toISOString().slice(0, 10),
+          label: d.toLocaleDateString("en-US", { weekday: "short" }),
+          sub: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        });
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return out;
+  }, []);
+
+  // Upcoming weekly doses from next Sunday
+  const doses = useMemo(() => {
+    const out: { date: string; dose: string }[] = [];
+    const d = new Date(); d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7));
+    for (let i = 0; i < 4; i++) {
+      out.push({ date: d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }), dose: "0.5mg Semaglutide" });
+      d.setDate(d.getDate() + 7);
+    }
+    return out;
+  }, []);
+
+  function confirmBooking() {
+    if (!selDay || !selTime) { toast("Pick a day and time first"); return; }
+    const d = new Date(selDay + "T00:00:00");
+    const label = `${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${selTime}`;
+    setBooked(label); setSelDay(null); setSelTime(null);
+    toast("✓ Check-in booked — confirmation sent");
+  }
+
+  return (
+    <section className="page active">
+      {/* Upcoming appointment / next dose banner */}
+      <div className="shot-next">
+        <div className="shot-next-lbl">{booked ? "Upcoming check-in" : "No check-in scheduled"}</div>
+        <div className="shot-next-day">{booked || "Book a virtual visit below"}</div>
+        <div className="shot-next-dose">{booked ? "Video visit with your provider · 15 min" : "Provider check-ins keep your plan on track"}</div>
+        {booked && <button className="shot-log-btn" onClick={() => { setBooked(null); toast("Check-in canceled"); }}>Cancel check-in</button>}
+      </div>
+
+      {/* Self-scheduling */}
+      <div className="card">
+        <div className="card-h">Schedule a provider check-in</div>
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>Pick a day and time that works for you.</div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
+          {days.map((d) => (
+            <button key={d.key} onClick={() => setSelDay(d.key)}
+              style={{ flex: "0 0 auto", minWidth: 58, padding: "8px 6px", borderRadius: 12, textAlign: "center", cursor: "pointer",
+                border: selDay === d.key ? "1.5px solid var(--blue)" : "1px solid var(--border)",
+                background: selDay === d.key ? "var(--blue-soft)" : "var(--surface)", color: "var(--text)" }}>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>{d.label}</div>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{d.sub}</div>
+            </button>
+          ))}
+        </div>
+        {selDay && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            {TIMES.map((t) => (
+              <button key={t} onClick={() => setSelTime(t)}
+                style={{ padding: "7px 14px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
+                  border: selTime === t ? "1.5px solid var(--blue)" : "1px solid var(--border)",
+                  background: selTime === t ? "var(--blue)" : "var(--surface)", color: selTime === t ? "#fff" : "var(--text)" }}>{t}</button>
+            ))}
+          </div>
+        )}
+        <button className="shot-log-btn" onClick={confirmBooking} style={{ opacity: selDay && selTime ? 1 : 0.6 }}>📅 Confirm check-in</button>
+      </div>
+
+      {/* Reminders */}
+      <div className="card">
+        <div className="card-h">Reminders</div>
+        <ReminderRow ico="💉" title="Weekly dose reminder" desc="Get a text + email the day your shot is due." on={doseReminder} onToggle={() => { setDoseReminder(!doseReminder); toast(!doseReminder ? "Dose reminders on" : "Dose reminders off"); }} />
+        <ReminderRow ico="📦" title="Refill reminder" desc="We'll remind you before your next refill ships." on={refillReminder} onToggle={() => { setRefillReminder(!refillReminder); toast(!refillReminder ? "Refill reminders on" : "Refill reminders off"); }} />
+      </div>
+
+      {/* Upcoming doses */}
+      <div className="card">
+        <div className="card-h">Upcoming doses</div>
+        <div className="shot-log-list">
+          {doses.map((d, i) => (
+            <div key={i} className="shot-log-row">
+              <div className="shot-log-ico">💉</div>
+              <div className="shot-log-body">
+                <div className="shot-log-title">{d.date}</div>
+                <div className="shot-log-meta">{d.dose} · subcutaneous</div>
+              </div>
+              <span className="pill active">{i === 0 ? "Next" : "Scheduled"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+function ReminderRow({ ico, title, desc, on, onToggle }: { ico: string; title: string; desc: string; on: boolean; onToggle: () => void }) {
+  return (
+    <div className="shot-log-row" style={{ alignItems: "center" }}>
+      <div className="shot-log-ico">{ico}</div>
+      <div className="shot-log-body">
+        <div className="shot-log-title">{title}</div>
+        <div className="shot-log-meta">{desc}</div>
+      </div>
+      <button onClick={onToggle} role="switch" aria-checked={on}
+        style={{ width: 42, height: 24, borderRadius: 999, position: "relative", cursor: "pointer", transition: "background .15s",
+          border: "none", background: on ? "var(--blue)" : "var(--border)" }}>
+        <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left .15s" }} />
+      </button>
+    </div>
+  );
+}
+
+/* Interactive month calendar that marks the days the patient logged a shot,
+   with prev/next month navigation and a tap-to-see-details day. */
+function ShotCalendar({ shots }: { shots: ShotEntry[] }) {
+  const today = new Date();
+  const [view, setView] = useState({ y: today.getFullYear(), m: today.getMonth() });
+  const [selected, setSelected] = useState<number | null>(null);
+
+  const shotsByDay = new Map<number, ShotEntry>();
+  for (const s of shots) {
+    const mm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.date);
+    if (!mm) continue;
+    if (Number(mm[1]) === view.y && Number(mm[2]) - 1 === view.m) shotsByDay.set(Number(mm[3]), s);
+  }
+
+  const firstWeekday = (new Date(view.y, view.m, 1).getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  const isCurrentMonth = view.y === today.getFullYear() && view.m === today.getMonth();
+  const monthLabel = new Date(view.y, view.m, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  const go = (delta: number) => {
+    setSelected(null);
+    setView((v) => {
+      const d = new Date(v.y, v.m + delta, 1);
+      return { y: d.getFullYear(), m: d.getMonth() };
+    });
+  };
+  const navBtn: CSSProperties = { border: "1px solid var(--border)", background: "var(--surface)", borderRadius: 8, width: 30, height: 30, cursor: "pointer", fontSize: 16, color: "var(--text-2)", lineHeight: 1 };
+  const selShot = selected != null ? shotsByDay.get(selected) : undefined;
+
+  return (
+    <div className="card" style={{ marginBottom: 22 }}>
+      <div className="card-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>Shot calendar</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button style={navBtn} onClick={() => go(-1)} aria-label="Previous month">‹</button>
+          <span className="right" style={{ minWidth: 120, textAlign: "center" }}>{monthLabel}</span>
+          <button style={navBtn} onClick={() => go(1)} aria-label="Next month">›</button>
+        </span>
+      </div>
+      <div className="shot-calendar">
+        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+          <div key={d} className="shot-cal-header">{d}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (d === null) return <div key={i} className="shot-cal-cell" />;
+          const has = shotsByDay.has(d);
+          const isToday = isCurrentMonth && d === today.getDate();
+          const isFuture = isCurrentMonth && d > today.getDate();
+          const isSel = selected === d;
+          return (
+            <div
+              key={i}
+              className={`shot-cal-cell ${has ? "has-shot" : ""} ${isToday ? "today" : ""} ${isFuture ? "future" : ""}`}
+              title={has ? "Shot logged — tap for details" : undefined}
+              onClick={() => has && setSelected(isSel ? null : d)}
+              style={{ cursor: has ? "pointer" : "default", outline: isSel ? "2px solid var(--blue)" : undefined, outlineOffset: -2 }}
+            >
+              {d}
+            </div>
+          );
+        })}
+      </div>
+      {selShot && (
+        <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--blue-soft)", borderRadius: 10, fontSize: 13, color: "var(--text)" }}>
+          <strong>{formatShotDate(selShot.date)}</strong> — {selShot.strength}{selShot.unit} {selShot.medication} · {selShot.site}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── SHOP (catalog) ── */
+function ShopPage({ list, count, filter, setFilter, search, setSearch, onOpen }: {
+  list: ShopProduct[]; count: number;
+  filter: "all" | ShopCategory; setFilter: (f: "all" | ShopCategory) => void;
+  search: string; setSearch: (s: string) => void; onOpen: (id: string) => void;
+}) {
+  const filters: ("all" | ShopCategory)[] = ["all", "weight", "anti-aging", "hair", "sexual", "skin"];
+  return (
+    <section className="page active">
+      <div className="shop-hero">Discover what truly fits your lifestyle. From daily energy to long-term balance. Your goals, your way.</div>
+      <div className="shop-search">
+        <span className="shop-search-ico">🔍</span>
+        <input className="shop-search-input" placeholder="Search product" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+      <div className="shop-filters">
+        {filters.map((f) => (
+          <button key={f} className={`shop-filter ${filter === f ? "active" : ""}`} onClick={() => setFilter(f)}>
+            {f === "all" ? "All" : SHOP_CATEGORY_LABEL[f]}
+          </button>
+        ))}
+      </div>
+      <div className="shop-count">{count} product{count === 1 ? "" : "s"}</div>
+      <div className="shop-grid">
+        {list.map((p) => <ProductCard key={p.id} p={p} onOpen={onOpen} />)}
+      </div>
+    </section>
+  );
+}
+function ProductCard({ p, onOpen }: { p: ShopProduct; onOpen: (id: string) => void }) {
+  return (
+    <div className="product-card" onClick={() => onOpen(p.id)}>
+      <div className={`product-img ${p.cls}`}>{p.img}</div>
+      <div className="product-body">
+        <div className="product-tag">{p.tag}</div>
+        <div className="product-name">{p.name}</div>
+        <div className="product-desc">{p.desc}</div>
+        <div className="product-price">As low as <strong>${p.price}/mo</strong>*</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── SHOP (product detail) ── */
+function ProductDetail({ product: p, related, onBack, onOpen, toast }: {
+  product: ShopProduct; related: ShopProduct[]; onBack: () => void; onOpen: (id: string) => void; toast: (s: string) => void;
+}) {
+  const subtitle = p.longDesc || `${p.desc} Personalized by a licensed provider — no insurance required.`;
+  const benefits = p.benefits && p.benefits.length ? p.benefits : GENERIC_BENEFITS;
+  const faqs = p.faqs && p.faqs.length ? p.faqs : [
+    { q: `What is ${p.name}?`, a: `${p.name} is part of our ${p.tag.split(" · ")[0].toLowerCase()} treatment lineup, prescribed by a licensed provider after a quick online intake.` },
+    { q: "Do I need insurance?", a: "No. Our pricing is cash-pay and includes everything — provider consultation, medication, and ongoing care." },
+    { q: "How quickly will my order ship?", a: "Once your provider approves your prescription, orders typically ship within 2–3 business days via free 2-day shipping." },
+    { q: "Can I cancel anytime?", a: "Yes. You can pause or cancel your subscription anytime from your patient portal — no penalties, no commitment." },
+  ];
+  const safety = p.safety || "Discuss your full medical history and any medications with your provider before starting treatment. Report any unexpected side effects promptly.";
+
+  return (
+    <section className="page active">
+      <button className="pdp-back" onClick={onBack}>← Back to Shop</button>
+      <div className="pdp-hero">
+        <div className={`pdp-hero-img product-img ${p.cls}`}>{p.img}</div>
+        <div className="pdp-hero-info">
+          <div className="pdp-tag">{p.tag}</div>
+          <h1 className="pdp-name">{p.name}</h1>
+          <div className="pdp-rating">
+            <span className="pdp-stars">★★★★★</span>
+            <span>4.8 · 1,247 reviews</span>
+          </div>
+          <div className="pdp-subtitle">{subtitle}</div>
+          <ul className="pdp-benefits">
+            {benefits.map((b, i) => <li key={i}><span className="check">✓</span>{b}</li>)}
+          </ul>
+          <div className="pdp-price-box">
+            <div className="pdp-price-intro-lbl">First month special</div>
+            <div className="pdp-price-row">
+              <div className="pdp-price-big">${p.firstMonth}</div>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>first month</div>
+            </div>
+            <div className="pdp-price-after">Then ${p.price}/month · cancel anytime</div>
+          </div>
+          <button className="pdp-cta" onClick={() => toast(`Starting treatment for ${p.name}…`)}>Get Started →</button>
+          <div className="pdp-trust">
+            <span>🔒 HIPAA-secure</span><span>·</span>
+            <span>📦 Free shipping</span><span>·</span>
+            <span>🩺 US-licensed providers</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="pdp-section">
+        <h2 className="pdp-section-h">How it works</h2>
+        <div className="pdp-steps">
+          {HOW_IT_WORKS.map((s, i) => (
+            <div key={i} className="pdp-step">
+              <div className="pdp-step-num">{i + 1}</div>
+              <div className="pdp-step-title">{s.t}</div>
+              <div className="pdp-step-desc">{s.d}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="pdp-section">
+        <h2 className="pdp-section-h">What&apos;s included</h2>
+        <div className="pdp-included">
+          <div className="pdp-included-grid">
+            {WHATS_INCLUDED.map((item, i) => (
+              <div key={i} className="pdp-included-item"><span className="check">✓</span>{item}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="pdp-section">
+        <h2 className="pdp-section-h">Frequently asked questions</h2>
+        {faqs.map((f, i) => (
+          <details key={i} className="pdp-faq" open={i === 0}>
+            <summary>{f.q}</summary>
+            <div className="pdp-faq-answer">{f.a}</div>
+          </details>
+        ))}
+      </div>
+
+      <div className="pdp-section">
+        <h2 className="pdp-section-h">Safety information</h2>
+        <div className="pdp-safety">
+          <div className="pdp-safety-h">⚠ Important safety information</div>
+          <div className="pdp-safety-body">{safety}</div>
+        </div>
+      </div>
+
+      {related.length > 0 && (
+        <div className="pdp-section">
+          <h2 className="pdp-section-h">You might also like</h2>
+          <div className="pdp-related-grid">
+            {related.map((rp) => <ProductCard key={rp.id} p={rp} onOpen={onOpen} />)}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ── ACCOUNT ── */
+function AccountPage({ tab, setTab, theme, setTheme, openModal, toast, fullName, initials }: {
+  tab: AcctTab; setTab: (t: AcctTab) => void;
+  theme: "light" | "dark"; setTheme: (t: "light" | "dark") => void;
+  openModal: (m: ModalType) => void; toast: (s: string) => void;
+  fullName: string; initials: string;
+}) {
+  return (
+    <section className="page active">
+      <div className="inner-tabs">
+        <InnerTab active={tab === "profile"} onClick={() => setTab("profile")}>Profile</InnerTab>
+        <InnerTab active={tab === "billing"} onClick={() => setTab("billing")}>Billing &amp; Shipping</InnerTab>
+        <InnerTab active={tab === "phi"} onClick={() => setTab("phi")}>PHI</InnerTab>
+      </div>
+
+      {tab === "profile" && (
+        <div className="inner-tab-content active">
+          <div className="row two">
+            <div className="card">
+              <div className="account-info">
+                <div className="account-ava">
+                  {initials}
+                  <div className="account-ava-cam" onClick={() => toast("Upload photo")}>📷</div>
+                </div>
+                <div className="account-info-body">
+                  <h2 className="account-name">{fullName}</h2>
+                  <div className="account-info-line"><span className="account-info-lbl">Date of birth:</span> Aug 14, 1985</div>
+                  <div className="account-info-line"><span className="account-info-lbl">Email:</span> mike@example.com</div>
+                  <div className="account-info-line"><span className="account-info-lbl">Phone:</span> (305) 555-0142</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
+                <button className="btn btn-secondary" onClick={() => toast("Change password form opened")}>Change password</button>
+                <button className="btn btn-primary" onClick={() => openModal("editProfile")}>Edit information</button>
+              </div>
+            </div>
+            <div className="card">
+              <div style={{ marginBottom: 22 }}>
+                <div className="form-label" style={{ marginBottom: 8 }}>Language</div>
+                <select className="account-select" defaultValue="English">
+                  <option>English</option>
+                  <option>Español</option>
+                </select>
+              </div>
+              <div>
+                <div className="form-label" style={{ marginBottom: 10 }}>Theme</div>
+                <div className="theme-toggle">
+                  <button className={`theme-opt ${theme === "dark" ? "active" : ""}`} onClick={() => { setTheme("dark"); toast("Theme: dark"); }}>🌙</button>
+                  <button className={`theme-opt ${theme === "light" ? "active" : ""}`} onClick={() => { setTheme("light"); toast("Theme: light"); }}>☀️</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <HelpCard />
+        </div>
+      )}
+
+      {tab === "billing" && (
+        <div className="inner-tab-content active">
+          <div className="card-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>💳 Payment methods</span>
+            <span className="right" onClick={() => toast("Add new payment method")}>Add new</span>
+          </div>
+          <button onClick={() => toast("Add new card form")} style={{ width: "100%", cursor: "pointer", padding: "16px 18px", background: "#fff", border: "1.5px solid var(--border)", borderRadius: 14, marginBottom: 30, display: "flex", alignItems: "center", gap: 14 }}>
+            <div className="pay-brands">
+              <span className="brand-chip">VISA</span>
+              <span className="brand-chip mc">MC</span>
+              <span className="brand-chip amex">AMEX</span>
+              <span className="brand-chip elo">Elo</span>
+            </div>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Add new card</div>
+            <span className="payment-add-icon">+</span>
+          </button>
+
+          <div className="card-h">📍 Shipping &amp; billing address</div>
+          <button onClick={() => openModal("editAddress")} style={{ width: "100%", cursor: "pointer", padding: "16px 18px", background: "#fff", border: "1.5px solid var(--border)", borderRadius: 14, marginBottom: 30, display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>1234 Ocean Drive, Apt 4B</div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>Opa-locka, FL 33054</div>
+            </div>
+            <span style={{ color: "var(--muted)", fontSize: 16 }}>✏️</span>
+          </button>
+
+          <div className="card-h">🕒 Payment history</div>
+          <div className="card">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <PayRow title="Quarterly subscription" meta="Jun 1, 2026 · INV-2845" border />
+              <PayRow title="Initial subscription" meta="Mar 12, 2026 · INV-2104" />
+            </div>
+          </div>
+          <HelpCard />
+        </div>
+      )}
+
+      {tab === "phi" && (
+        <div className="inner-tab-content active">
+          <div className="row two">
+            <div className="phi-card">
+              <div className="phi-card-title">Protected Healthcare Information</div>
+              <div className="phi-card-desc">You can view and download all your past doctor consultations for your personal records.</div>
+              <div className="phi-actions">
+                <button className="btn btn-secondary" onClick={() => toast("PHI data downloaded as PDF")}>☁ Download data</button>
+                <button className="btn btn-primary" onClick={() => toast("PHI viewer opened")}>View data</button>
+              </div>
+            </div>
+            <div className="phi-card">
+              <div className="phi-card-title">Data Deletion</div>
+              <div className="phi-card-desc">Request deletion of personal data. We&apos;ll review and securely delete it in compliance with privacy laws.</div>
+              <div className="phi-actions">
+                <button className="btn btn-secondary" style={{ width: "100%" }} onClick={() => openModal("deletePhi")}>Request data deletion</button>
+              </div>
+            </div>
+          </div>
+          <HelpCard />
+        </div>
+      )}
+    </section>
+  );
+}
+function HelpCard() {
+  return (
+    <div className="help-card">
+      <div className="help-ico">➕</div>
+      <div>
+        <div className="help-title">Help &amp; Support</div>
+        <div className="help-desc">Get answers by reaching out to our care team, or share your feedback to help us improve.</div>
+      </div>
+    </div>
+  );
+}
+function PayRow({ title, meta, border }: { title: string; meta: string; border?: boolean }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: border ? "1px solid var(--border)" : undefined }}>
+      <div>
+        <div style={{ fontSize: 13.5, fontWeight: 600 }}>{title}</div>
+        <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{meta}</div>
+      </div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <span className="pill active">Paid</span>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>$499.00</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── MODALS ── */
+const PORTAL_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+function AddressVerify({ initialStreet, initialApt, initialCity, initialState, initialZip, onSaved, onCancel }: {
+  initialStreet: string; initialApt: string; initialCity: string; initialState: string; initialZip: string; onSaved: () => void; onCancel: () => void;
+}) {
+  const [street, setStreet] = useState(initialStreet);
+  const [apt, setApt] = useState(initialApt);
+  const [city, setCity] = useState(initialCity);
+  const [stateV, setStateV] = useState(initialState);
+  const [zip, setZip] = useState(initialZip);
+  const [res, setRes] = useState<UspsValidateResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sug, setSug] = useState<AddressSuggestion[]>([]);
+  const [showSug, setShowSug] = useState(false);
+  const sugTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function verifyWith(input: UspsValidateInput) {
+    setBusy(true);
+    const r = await validateAddress(input);
+    setRes(r); setBusy(false);
+  }
+  function verify() {
+    if (!street.trim()) { setRes({ status: "error", dpv: null, address: null, corrections: [], warnings: [], vacant: false, changed: false, message: "Enter a street address first.", source: "mock" }); return; }
+    verifyWith({ streetAddress: street, secondaryAddress: apt, city, state: stateV, ZIPCode: zip });
+  }
+  function onStreet(v: string) {
+    setStreet(v); setRes(null);
+    if (sugTimer.current) clearTimeout(sugTimer.current);
+    if (v.trim().length >= 3) { sugTimer.current = setTimeout(async () => { setSug(await fetchSuggestions(v, stateV)); setShowSug(true); }, 200); }
+    else { setSug([]); setShowSug(false); }
+  }
+  function pick(s: AddressSuggestion) {
+    setStreet(s.street); setApt(s.secondary || apt); setCity(s.city); setStateV(s.state); setZip(s.zip);
+    setSug([]); setShowSug(false);
+    verifyWith({ streetAddress: s.street, secondaryAddress: s.secondary, city: s.city, state: s.state, ZIPCode: s.zip });
+  }
+  function apply() {
+    if (!res?.address) return;
+    const a = res.address;
+    setStreet(a.streetAddress);
+    setApt(a.secondaryAddress || apt);
+    setCity(a.city); setStateV(a.state); setZip(a.ZIPPlus4 ? `${a.ZIPCode}-${a.ZIPPlus4}` : a.ZIPCode);
+    setRes({ ...res, changed: false, status: res.dpv === "Y" ? "verified" : res.status, message: res.dpv === "Y" ? "Address verified — deliverable by USPS." : res.message });
+  }
+  const tone = res ? ({ verified: "#2e7d54", corrected: "#3a7ab0", needs_secondary: "#b86e1e", unverified: "#b8412a", error: "#b8412a" } as Record<string, string>)[res.status] : "";
+
+  return (
+    <>
+      <div className="form-grid" style={{ marginBottom: 12, gridTemplateColumns: "2fr 1fr" }}>
+        <div className="form-field" style={{ position: "relative" }}>
+          <div className="form-label">Street address</div>
+          <input className="form-input" value={street} placeholder="Start typing your address…" autoComplete="off"
+            onChange={(e) => onStreet(e.target.value)}
+            onFocus={() => { if (sug.length) setShowSug(true); }}
+            onBlur={() => setTimeout(() => setShowSug(false), 150)} />
+          {showSug && sug.length > 0 && (
+            <div style={{ position: "absolute", zIndex: 50, left: 0, right: 0, top: "100%", marginTop: 4, background: "#fff", border: "1px solid var(--border)", borderRadius: 10, boxShadow: "0 10px 30px rgba(20,30,50,.18)", overflow: "hidden" }}>
+              {sug.map((s, i) => (
+                <button type="button" key={i} onMouseDown={() => pick(s)} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", fontSize: 12.5, background: "transparent", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer" }}>
+                  <span style={{ fontWeight: 600 }}>{s.street}</span><span style={{ color: "var(--muted)" }}>, {s.city}, {s.state} {s.zip}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="form-field">
+          <div className="form-label">Apt / Suite / Unit</div>
+          <input className="form-input" value={apt} placeholder="Apt 4B (optional)" onChange={(e) => { setApt(e.target.value); setRes(null); }} />
+        </div>
+      </div>
+      <div className="form-grid" style={{ marginBottom: 12 }}>
+        <div className="form-field"><div className="form-label">City</div><input className="form-input" value={city} onChange={(e) => { setCity(e.target.value); setRes(null); }} /></div>
+        <div className="form-field"><div className="form-label">State</div>
+          <select className="form-input" value={stateV} onChange={(e) => { setStateV(e.target.value); setRes(null); }}>{PORTAL_STATES.map((s) => <option key={s}>{s}</option>)}</select></div>
+      </div>
+      <div className="form-field" style={{ marginBottom: 12 }}>
+        <div className="form-label">ZIP code</div>
+        <input className="form-input" value={zip} onChange={(e) => { setZip(e.target.value); setRes(null); }} />
+      </div>
+      <button className="btn btn-secondary" style={{ width: "100%", marginBottom: res ? 12 : 0 }} onClick={verify} disabled={busy}>{busy ? "Verifying…" : "📍 Verify address with USPS"}</button>
+      {res && (
+        <div style={{ border: `1px solid ${tone}`, background: "#fff", borderRadius: 12, padding: "12px 14px", fontSize: 13 }}>
+          <div style={{ fontWeight: 700, color: tone, marginBottom: 4 }}>
+            {res.status === "verified" && "✓ Address verified"}
+            {res.status === "corrected" && "✎ USPS standardized this address"}
+            {res.status === "needs_secondary" && "⚠ Needs apartment / suite / unit"}
+            {(res.status === "unverified" || res.status === "error") && "✕ Could not verify"}
+          </div>
+          <div style={{ color: "var(--muted)" }}>{res.message}</div>
+          {res.address && (res.changed || res.status === "corrected") && (
+            <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: "#f6f8fb", border: "1px solid var(--border)" }}>
+              <div style={{ fontWeight: 600 }}>{res.address.streetAddress}{res.address.secondaryAddress ? `, ${res.address.secondaryAddress}` : ""}</div>
+              <div style={{ color: "var(--muted)" }}>{res.address.city}, {res.address.state} {res.address.ZIPCode}{res.address.ZIPPlus4 ? `-${res.address.ZIPPlus4}` : ""}</div>
+              <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={apply}>Use this address</button>
+            </div>
+          )}
+          {res.corrections.map((c, i) => <div key={i} style={{ marginTop: 4, color: "var(--muted)" }}>• {c}</div>)}
+          {res.warnings.map((w, i) => <div key={i} style={{ marginTop: 4, color: "#b86e1e" }}>⚠ {w}</div>)}
+          <div style={{ marginTop: 6, fontSize: 11, color: "var(--muted)" }}>{res.source === "usps" ? "Verified via USPS Addresses API" : "Demo validator (add USPS credentials to validate live)"}</div>
+        </div>
+      )}
+      <div className="modal-foot">
+        <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary" onClick={onSaved}>Save</button>
+      </div>
+    </>
+  );
+}
+
+function PortalModal({ type, onClose, toast, weightDraft, setWeightDraft, saveWeight, onAddShot }: {
+  type: ModalType; onClose: () => void; toast: (s: string) => void;
+  weightDraft: string; setWeightDraft: (s: string) => void; saveWeight: () => void;
+  onAddShot: (entry: Omit<ShotEntry, "id">) => void;
+}) {
+  function close(msg?: string) { onClose(); if (msg) toast(msg); }
+  // Pre-fill date/time to "now" for the Add dose modal.
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const nowTimeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  // Controlled fields for the Add dose form so we can save what's entered.
+  const [shotDate, setShotDate] = useState(todayStr);
+  const [shotMed, setShotMed] = useState("");
+  const [shotUnit, setShotUnit] = useState("mg");
+  const [shotStrength, setShotStrength] = useState("");
+  const [shotSite, setShotSite] = useState("Stomach - Upper Left");
+
+  function submitShot() {
+    if (!shotMed) { toast("Please select a medication"); return; }
+    onAddShot({
+      date: shotDate || todayStr,
+      medication: shotMed,
+      unit: shotUnit,
+      strength: shotStrength || "—",
+      site: shotSite,
+    });
+  }
+  return (
+    <div className="modal-backdrop show" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        {type === "refill" && (<>
+          <div className="modal-h">Request a refill</div>
+          <div className="modal-sub">Your next scheduled refill is Jul 3, 2026. Request one now if you&apos;re running low.</div>
+          <div className="modal-body">
+            <div className="form-field" style={{ marginBottom: 12 }}>
+              <div className="form-label">Reason</div>
+              <select className="form-input" defaultValue="Running low">
+                <option>Running low</option><option>Lost or damaged supply</option><option>Traveling - need extra</option>
+              </select>
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button className="btn btn-secondary" onClick={() => close()}>Cancel</button>
+            <button className="btn btn-primary" onClick={() => close("Refill requested")}>Submit request</button>
+          </div>
+        </>)}
+        {type === "pause" && (<>
+          <div className="modal-h">Pause your subscription</div>
+          <div className="modal-sub">We&apos;ll skip your next shipment and billing. You can resume anytime.</div>
+          <div className="modal-foot">
+            <button className="btn btn-secondary" onClick={() => close()}>Keep active</button>
+            <button className="btn btn-primary" onClick={() => close("Subscription paused")}>Pause</button>
+          </div>
+        </>)}
+        {type === "cancel" && (<>
+          <div className="modal-h">Cancel your subscription</div>
+          <div className="modal-sub">Cancellation takes effect at the end of your current billing cycle (Sep 12, 2026).</div>
+          <div className="modal-foot">
+            <button className="btn btn-secondary" onClick={() => close()}>Keep my plan</button>
+            <button className="btn btn-danger" onClick={() => close("Cancellation scheduled")}>Cancel subscription</button>
+          </div>
+        </>)}
+        {type === "logWeight" && (<>
+          <div className="modal-h">Log this week&apos;s weight</div>
+          <div className="modal-sub">Take your weight on a consistent day, ideally in the morning.</div>
+          <div className="modal-body">
+            <div className="form-field">
+              <div className="form-label">Current weight (lbs)</div>
+              <input className="form-input" type="number" placeholder="e.g. 195" autoFocus value={weightDraft} onChange={(e) => setWeightDraft(e.target.value)} />
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button className="btn btn-secondary" onClick={() => close()}>Cancel</button>
+            <button className="btn btn-primary" onClick={saveWeight}>Save</button>
+          </div>
+        </>)}
+        {type === "logShot" && (<>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 26px 8px" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em" }}>Add dose</div>
+            <button onClick={() => close()} aria-label="Close" style={{ border: "none", background: "none", cursor: "pointer", fontSize: 22, lineHeight: 1, color: "var(--muted)" }}>✕</button>
+          </div>
+          <div className="modal-sub">We have pre-filled the dose details for you. Please review and edit if necessary.</div>
+          <div className="modal-body">
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div className="form-grid">
+                <div className="form-field">
+                  <div className="form-label">Date</div>
+                  <input className="form-input" type="date" value={shotDate} onChange={(e) => setShotDate(e.target.value)} />
+                </div>
+                <div className="form-field">
+                  <div className="form-label">Time</div>
+                  <input className="form-input" type="time" defaultValue={nowTimeStr} />
+                </div>
+              </div>
+              <div className="form-field">
+                <div className="form-label">Medication</div>
+                <select className="form-input" value={shotMed} onChange={(e) => setShotMed(e.target.value)}>
+                  <option value="" disabled>Select medication</option>
+                  {MEDICATIONS.map((m) => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <div className="form-label">Dosage unit</div>
+                <select className="form-input" value={shotUnit} onChange={(e) => setShotUnit(e.target.value)}>
+                  {DOSAGE_UNITS.map((u) => <option key={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <div className="form-label">Dosage strength</div>
+                <input className="form-input" type="number" placeholder="e.g. 0.5" value={shotStrength} onChange={(e) => setShotStrength(e.target.value)} />
+              </div>
+              <div className="form-field">
+                <div className="form-label">Injection site</div>
+                <select className="form-input" value={shotSite} onChange={(e) => setShotSite(e.target.value)}>
+                  {INJECTION_SITES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button className="btn btn-primary" style={{ width: "100%" }} onClick={submitShot}>Add dose</button>
+          </div>
+        </>)}
+        {type === "editProfile" && (<>
+          <div className="modal-h">Edit profile information</div>
+          <div className="modal-body">
+            <div className="form-grid">
+              <Fld label="First name" val="Michael" /><Fld label="Last name" val="Gromadzki" />
+              <Fld label="Email" val="mike@example.com" /><Fld label="Phone" val="(305) 555-0142" />
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button className="btn btn-secondary" onClick={() => close()}>Cancel</button>
+            <button className="btn btn-primary" onClick={() => close("Profile updated")}>Save</button>
+          </div>
+        </>)}
+        {type === "editAddress" && (<>
+          <div className="modal-h">Edit shipping address</div>
+          <div className="modal-body">
+            <AddressVerify initialStreet="1234 Ocean Drive" initialApt="Apt 4B" initialCity="Opa-locka" initialState="FL" initialZip="33054" onSaved={() => close("Address updated")} onCancel={() => close()} />
+          </div>
+        </>)}
+        {type === "deletePhi" && (<>
+          <div className="modal-h" style={{ color: "var(--red)" }}>Request data deletion</div>
+          <div className="modal-sub">We&apos;ll review your request and securely delete your personal data within 30 days, in compliance with privacy laws. This cannot be undone.</div>
+          <div className="modal-foot">
+            <button className="btn btn-secondary" onClick={() => close()}>Cancel</button>
+            <button className="btn btn-danger" onClick={() => close("Deletion request submitted")}>Request deletion</button>
+          </div>
+        </>)}
+      </div>
+    </div>
+  );
+}
+function Fld({ label, val }: { label: string; val: string }) {
+  return (
+    <div className="form-field">
+      <div className="form-label">{label}</div>
+      <input className="form-input" defaultValue={val} />
+    </div>
+  );
+}
+
+/* ── Toasts ── */
+function ToastStack({ toasts }: { toasts: { id: number; text: string }[] }) {
+  return (
+    <div className="toast-stack">
+      {toasts.map((t) => <div key={t.id} className="toast-item">{t.text}</div>)}
+    </div>
+  );
+}
