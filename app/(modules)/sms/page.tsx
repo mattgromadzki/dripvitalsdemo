@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
@@ -26,6 +26,7 @@ export default function SmsPage() {
   const threads = useSms((s) => s.threads);
   const startThread = useSms((s) => s.startThread);
   const addOutgoing = useSms((s) => s.addOutgoing);
+  const ingestInbound = useSms((s) => s.ingestInbound);
   const markRead = useSms((s) => s.markRead);
   const leads = useLeads((s) => s.leads);
   const addLead = useLeads((s) => s.add);
@@ -34,6 +35,26 @@ export default function SmsPage() {
   const addCampaign = useCampaigns((s) => s.add);
 
   const [tab, setTab] = useState<Tab>("conversations");
+
+  // Poll the inbound webhook store for patient replies and merge them into threads.
+  useEffect(() => {
+    let stopped = false;
+    async function poll() {
+      try {
+        const r = await fetch("/api/sms/messages", { cache: "no-store" });
+        const d = await r.json();
+        if (!stopped && d?.ok && Array.isArray(d.messages)) {
+          // store returns newest-first; ingest oldest-first for chronological order
+          [...d.messages].reverse().forEach((m: { sid: string; from: string; body: string; receivedAt: string }) => {
+            if (m?.from && m?.body) ingestInbound(m.sid, m.from, m.body, m.receivedAt);
+          });
+        }
+      } catch { /* ignore transient network errors */ }
+    }
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => { stopped = true; clearInterval(t); };
+  }, [ingestInbound]);
 
   // conversation state
   const [selId, setSelId] = useState<string | null>(threads[0]?.id ?? null);

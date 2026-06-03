@@ -2,6 +2,26 @@ import type { Patient } from "@/lib/types";
 
 export const PATIENTS: Patient[] = [
   {
+    id: "PT-0001",
+    first: "Matthew", last: "Gromadzki", name: "Matthew Gromadzki",
+    email: "mattgromadzki@gmail.com", phone: "(786) 370-8570",
+    age: 39, gender: "M", state: "FL",
+    status: "active",
+    dob: "1987-06-01",
+    address: "92 SW 3rd St", apt: "Apt 3005", city: "Miami", zip: "33130",
+    heightIn: 70, goalWt: 185, priorGLP1: false,
+    plan: "1-Month Sema", dose: "0.25mg/wk", week: 1, provider: "Dr. Rivera",
+    doctorId: 1, pharmacyId: 1,
+    wt: 214, wtStart: 214, bmi: 30.7, bp: "128/82", hr: 72, a1c: 5.6,
+    since: "Jun 1, 2026", startDate: "2026-06-01",
+    lastVisit: "Jun 1, 2026", lastOrder: "Jun 1, 2026",
+    nextRefill: "Jul 1, 2026", _refillDays: 28, _lastOrderDays: 2,
+    sub: "$189/mo",
+    allergies: "NKDA",
+    tags: ["GLP-1", "Test Account"], notes: "Demo/test patient (account owner). Use for end-to-end testing.",
+    color: "var(--color-brand)",
+  },
+  {
     id: "PT-0041",
     first: "Sarah", last: "Mitchell", name: "Sarah Mitchell",
     email: "sarah@email.com", phone: "(305) 555-0041",
