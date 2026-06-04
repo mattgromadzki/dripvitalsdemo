@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
 import { useChatReads, unreadTotal } from "@/lib/hooks/useChatReads";
 import { useUI } from "@/lib/hooks/useUI";
 
 interface NavItem { href: string; icon: string; label: string; badge?: string | number; }
-interface NavSection { label: string; items: NavItem[]; }
+interface NavSection { label: string; items: NavItem[]; collapsible?: boolean }
 
 const NAV: NavSection[] = [
   {
@@ -35,19 +35,6 @@ const NAV: NavSection[] = [
       { href: "/portal",           icon: "👁", label: "Patient View" },
       { href: "/patient-portal",   icon: "📱", label: "Patient Portal" },
       { href: "/consent",          icon: "✍",  label: "Consent" },
-      { href: "/treatments",       icon: "💉", label: "Treatments" },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/shop",             icon: "🛍️", label: "Shop" },
-      { href: "/medications",      icon: "💊", label: "Medications" },
-      { href: "/pharmacies",       icon: "🏥", label: "Pharmacies" },
-      { href: "/staff",            icon: "🩺", label: "Doctors" },
-      { href: "/roles",            icon: "🔐", label: "Roles & Access" },
-      { href: "/notifications",    icon: "🔔", label: "Notifications" },
-      { href: "/email-templates",  icon: "🎨", label: "Email Templates" },
     ],
   },
   {
@@ -61,21 +48,43 @@ const NAV: NavSection[] = [
       { href: "/pipeline",         icon: "🧲", label: "Lead Pipeline" },
       { href: "/reviews",          icon: "⭐", label: "Reviews" },
       { href: "/affiliate",        icon: "🤝", label: "Affiliate" },
+      { href: "/shop",             icon: "🛍️", label: "Shop" },
     ],
   },
   {
-    label: "Admin",
+    label: "Records",
     items: [
       { href: "/audit-log",        icon: "📋", label: "Audit Log" },
       { href: "/knowledge",        icon: "📚", label: "Knowledge Base" },
-      { href: "/licensure",        icon: "🗺️", label: "State Licensure" },
+    ],
+  },
+  {
+    label: "Settings",
+    collapsible: true,
+    items: [
+      // Catalog / offerings
+      { href: "/treatments",       icon: "💉", label: "Treatments" },
+      { href: "/medications",      icon: "💊", label: "Medications" },
+      { href: "/pharmacies",       icon: "🏥", label: "Pharmacies" },
+      // Team & access
+      { href: "/staff",            icon: "🩺", label: "Doctors" },
+      { href: "/roles",            icon: "🔐", label: "Roles & Access" },
+      // Communications setup
+      { href: "/email-templates",  icon: "🎨", label: "Email Templates" },
+      { href: "/notifications",    icon: "🔔", label: "Notifications" },
+      // Connections
       { href: "/integrations",     icon: "🔗", label: "Integrations" },
       { href: "/api-keys",         icon: "🔑", label: "API Keys" },
       { href: "/connections",      icon: "🔌", label: "Connection Health" },
+      // Compliance
+      { href: "/licensure",        icon: "🗺️", label: "State Licensure" },
+      // General
       { href: "/settings",         icon: "⚙",  label: "Settings" },
     ],
   },
 ];
+
+const headerCls = "text-[10px] uppercase tracking-[1.4px] text-ink-muted-2 font-bold px-3 py-1.5";
 
 export function Sidebar() {
   const open = useUI((s) => s.sidebarOpen);
@@ -102,18 +111,12 @@ function SidebarSkeleton() {
     <>
       {NAV.map((section) => (
         <div key={section.label} className="py-1">
-          <div className="text-[10px] uppercase tracking-[1.4px] text-ink-muted-2 font-bold px-3 py-1.5">
-            {section.label}
-          </div>
-          {section.items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-2.5 py-2 px-3 rounded-[9px] text-[12.5px] font-medium mb-px text-ink-2"
-            >
+          <div className={headerCls}>{section.label}</div>
+          {!section.collapsible && section.items.map((item) => (
+            <div key={item.href} className="flex items-center gap-2.5 py-2 px-3 rounded-[9px] text-[12.5px] font-medium mb-px text-ink-2">
               <span className="text-[14px] w-[18px] text-center flex-shrink-0">{item.icon}</span>
               <span className="flex-1">{item.label}</span>
-            </Link>
+            </div>
           ))}
         </div>
       ))}
@@ -144,6 +147,13 @@ function SidebarInner() {
   useEffect(() => { initMissing(records); }, [records, initMissing]);
   const chatUnread = unreadTotal(records, seen);
 
+  // Collapsible sections start collapsed; the user can toggle them open.
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const s of NAV) if (s.collapsible) init[s.label] = true;
+    return init;
+  });
+
   // Pre-compute the set of full hrefs (path?query) that are declared in the nav,
   // so a plain-path link doesn't claim active when a sibling claims the exact URL.
   const fullHrefsInNav = new Set<string>();
@@ -152,56 +162,66 @@ function SidebarInner() {
       if (item.href.includes("?")) fullHrefsInNav.add(item.href);
     }
   }
-
   const currentFullHref = queryString ? `${path}?${queryString}` : path;
+
+  function itemActive(item: NavItem): boolean {
+    if (item.href.includes("?")) return currentFullHref === item.href;
+    const matchesPath = path === item.href || (item.href !== "/" && path.startsWith(item.href + "/"));
+    return matchesPath && !fullHrefsInNav.has(currentFullHref);
+  }
 
   return (
     <>
-      {NAV.map((section) => (
-        <div key={section.label} className="py-1">
-          <div className="text-[10px] uppercase tracking-[1.4px] text-ink-muted-2 font-bold px-3 py-1.5">
-            {section.label}
-          </div>
-          {section.items.map((item) => {
-            let active: boolean;
-            if (item.href.includes("?")) {
-              // Items with query strings require an exact full match.
-              active = currentFullHref === item.href;
-            } else {
-              // Plain-path items match path; but defer to a sibling claiming the exact full URL.
-              const matchesPath = path === item.href || (item.href !== "/" && path.startsWith(item.href + "/"));
-              const someSiblingClaimsCurrentUrl = fullHrefsInNav.has(currentFullHref);
-              active = matchesPath && !someSiblingClaimsCurrentUrl;
-            }
-            const badge = item.href === "/patient-chat" ? (chatUnread > 0 ? chatUnread : undefined) : item.badge;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={[
-                  "flex items-center gap-2.5 py-2 px-3 rounded-[9px] text-[12.5px] font-medium mb-px transition-colors",
-                  active
-                    ? "text-brand-dk bg-brand-soft font-semibold"
-                    : "text-ink-2 hover:bg-surface-3 hover:text-ink",
-                ].join(" ")}
+      {NAV.map((section) => {
+        const sectionActive = section.items.some(itemActive);
+        // A collapsible section stays open if toggled open OR the current page lives inside it.
+        const expanded = !section.collapsible || !collapsed[section.label] || sectionActive;
+        return (
+          <div key={section.label} className="py-1">
+            {section.collapsible ? (
+              <button
+                type="button"
+                onClick={() => setCollapsed((c) => ({ ...c, [section.label]: !c[section.label] }))}
+                className={`${headerCls} w-full flex items-center justify-between hover:text-ink-muted transition-colors`}
               >
-                <span className="text-[14px] w-[18px] text-center flex-shrink-0">{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {badge != null && (
-                  <span
-                    className={[
-                      "text-[10px] font-bold py-[1px] px-1.5 rounded-pill min-w-[18px] text-center",
-                      item.href === "/patient-chat" ? "bg-red text-white" : active ? "bg-brand text-white" : "bg-surface-3 text-ink-muted",
-                    ].join(" ")}
-                  >
-                    {badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      ))}
+                <span>{section.label}</span>
+                <span className="text-[9px]">{expanded ? "▾" : "▸"}</span>
+              </button>
+            ) : (
+              <div className={headerCls}>{section.label}</div>
+            )}
+            {expanded && section.items.map((item) => {
+              const active = itemActive(item);
+              const badge = item.href === "/patient-chat" ? (chatUnread > 0 ? chatUnread : undefined) : item.badge;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={[
+                    "flex items-center gap-2.5 py-2 px-3 rounded-[9px] text-[12.5px] font-medium mb-px transition-colors",
+                    active
+                      ? "text-brand-dk bg-brand-soft font-semibold"
+                      : "text-ink-2 hover:bg-surface-3 hover:text-ink",
+                  ].join(" ")}
+                >
+                  <span className="text-[14px] w-[18px] text-center flex-shrink-0">{item.icon}</span>
+                  <span className="flex-1">{item.label}</span>
+                  {badge != null && (
+                    <span
+                      className={[
+                        "text-[10px] font-bold py-[1px] px-1.5 rounded-pill min-w-[18px] text-center",
+                        item.href === "/patient-chat" ? "bg-red text-white" : active ? "bg-brand text-white" : "bg-surface-3 text-ink-muted",
+                      ].join(" ")}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        );
+      })}
     </>
   );
 }
