@@ -23,6 +23,7 @@ export interface Patient {
   state: string;
   status: PatientStatus;
   lifecycle?: LifecycleStatus;
+  intakeProgress?: string;
 
   // Demographics / contact captured at intake (optional)
   dob?: string;

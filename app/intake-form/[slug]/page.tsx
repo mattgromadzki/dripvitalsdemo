@@ -22,6 +22,7 @@ export default function IntakeFormPage() {
   const router = useRouter();
   const forms = useTreatmentsIntake((s) => s.forms);
   const addPatient = usePatients((s) => s.add);
+  const updatePatient = usePatients((s) => s.update);
   const addRequest = useTreatmentRequests((s) => s.add);
   const createdPatientId = useRef<string | null>(null);
 
@@ -60,21 +61,26 @@ export default function IntakeFormPage() {
       else if (/goal/i.test(q.text)) { goal = String(raw); }
     }
 
-    const patient = addPatient({
+    const fields = {
       first, last, name, email: client.email, phone: client.phone,
-      age: ageFrom(dob), gender: gender as "M" | "F" | "Other", state, status: "pending", lifecycle: "awaiting_review",
+      age: ageFrom(dob), gender: gender as "M" | "F" | "Other", state, status: "pending" as const, lifecycle: "awaiting_review" as const,
       dob: dob || undefined, goalWt: undefined, zip: client.address?.zip || undefined,
       plan: tx.med, dose: "0.25mg", week: 0, provider: "Unassigned", doctorId: 1, pharmacyId: 1,
       wt: weight, wtStart: weight, bmi, bp: "—", hr: 0,
       since: nowParts().today, startDate: nowParts().today, lastVisit: "—", lastOrder: nowParts().today, nextRefill: "—", _refillDays: 30,
       sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
-    });
-    createdPatientId.current = patient.id;
+      intakeProgress: "Completed",
+    };
+    // Reuse the profile pre-created during intake; only create a new one if the
+    // patient somehow reached completion without a captured contact step.
+    let pid = createdPatientId.current;
+    if (pid) updatePatient(pid, fields);
+    else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
     if (client.email) alertWelcome({ email: client.email, name, first });
 
     const np = nowParts();
     addRequest({
-      patientId: patient.id, patientName: name,
+      patientId: pid, patientName: name,
       treatmentId: `BX-${tx.id}`, treatmentName: tx.name, medication: `${tx.med} (compounded)`,
       dosingProtocol: tx.strength, duration: `${tx.duration} month${tx.duration === "1" ? "" : "s"}`, price,
       category: "GLP-1 / Weight Loss", icon: tx.icon, color: `var(--color-${tx.color})`,
@@ -91,12 +97,51 @@ export default function IntakeFormPage() {
     });
   }
 
+  // Fired as soon as the patient enters name + email (and phone). Pre-creates
+  // the CRM patient profile, then keeps it updated as more is captured.
+  function handleLead(info: { first: string; last: string; phone: string; email: string }) {
+    const name = `${info.first} ${info.last}`.trim() || info.email || "New Lead";
+    if (createdPatientId.current) {
+      updatePatient(createdPatientId.current, {
+        first: info.first || undefined, last: info.last || undefined, name,
+        email: info.email || undefined, phone: info.phone || undefined,
+      });
+      return;
+    }
+    const np = nowParts();
+    const created = addPatient({
+      first: info.first || name, last: info.last || "—", name, email: info.email, phone: info.phone,
+      age: 0, gender: "Other", state: "—", status: "in_progress", lifecycle: "awaiting_review",
+      dob: undefined, goalWt: undefined, zip: undefined,
+      plan: "—", dose: "—", week: 0, provider: "Unassigned", doctorId: 1, pharmacyId: 1,
+      wt: 0, wtStart: 0, bmi: 0, bp: "—", hr: 0,
+      since: np.today, startDate: np.today, lastVisit: "—", lastOrder: "—", nextRefill: "—", _refillDays: 30,
+      sub: "—", allergies: "None", tags: ["Intake in progress"], notes: "Lead captured during intake.",
+      color: COLORS[name.length % COLORS.length], intakeProgress: "Contact captured",
+    });
+    createdPatientId.current = created.id;
+  }
+
+  // Fired on each step so the profile reflects how far the patient has gotten.
+  function handleProgress(info: { stage: string; step: number; total: number }) {
+    if (!createdPatientId.current) return;
+    const label =
+      info.stage === "treatment" ? "Selecting treatment" :
+      info.stage === "checkout" ? "At payment" :
+      info.stage === "success" ? "Completed" :
+      info.stage === "disqualified" ? "Disqualified" :
+      `Question ${Math.min(info.step + 1, info.total || 1)} of ${info.total || 1}`;
+    updatePatient(createdPatientId.current, { intakeProgress: label });
+  }
+
   return (
     <PatientIntakeFlow
       key={form.id}
       formId={form.id}
       live
       onComplete={handleComplete}
+      onLead={handleLead}
+      onProgress={handleProgress}
       onExit={() => router.push("/patient-portal")}
     />
   );

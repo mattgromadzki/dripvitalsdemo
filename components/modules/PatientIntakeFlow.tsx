@@ -68,7 +68,7 @@ function renderShell(opts: {
 }
 
 /** Shared patient intake flow — used by the admin Preview and the public /intake-form/[slug] route. */
-export function PatientIntakeFlow({ formId, onExit, live = false, onComplete }: { formId: number; onExit: () => void; live?: boolean; onComplete?: (clientId: number, treatmentId: number | null) => void }) {
+export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, onLead, onProgress }: { formId: number; onExit: () => void; live?: boolean; onComplete?: (clientId: number, treatmentId: number | null) => void; onLead?: (info: { first: string; last: string; phone: string; email: string }) => void; onProgress?: (info: { stage: string; step: number; total: number }) => void }) {
   const treatments   = useTreatmentsIntake((s) => s.treatments);
   const addClient    = useTreatmentsIntake((s) => s.addClient);
   const updateClient = useTreatmentsIntake((s) => s.updateClient);
@@ -123,6 +123,12 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete }: 
     setLeadId(lead.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Report progress to the host so the CRM can track where the patient is.
+  useEffect(() => {
+    if (live && onProgress) onProgress({ stage, step, total: totalQ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, step]);
 
   // Sync answers → zustand AFTER state commits (debounced via React batching).
   // Splitting this out of commitAnswer prevents the side effect from running
@@ -228,6 +234,17 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete }: 
     if (Object.keys(patch).length > 0) {
       updateClient(leadId, patch);
     }
+
+    // As soon as we have an email + a name, tell the host so it can pre-create
+    // (and then keep updating) the CRM patient profile mid-intake.
+    if (live && onLead) {
+      const lead = useTreatmentsIntake.getState().clients.find((c) => c.id === leadId);
+      const first = (patch.first ?? lead?.first ?? "").trim();
+      const last = (patch.last ?? lead?.last ?? "").trim();
+      const email = (patch.email ?? lead?.email ?? "").trim();
+      const phone = (patch.phone ?? lead?.phone ?? "").trim();
+      if (email && (first || last)) onLead({ first, last, phone, email });
+    }
   }
 
   function commitAnswer(qid: number, value: string | number | string[]) {
@@ -316,10 +333,9 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete }: 
         return;
       }
     }
+    extractContactFromAnswers();
     if (step + 1 >= totalQ) {
-      // Finished all questions — extract contact info from answers into the
-      // lead record before moving to treatment selection.
-      extractContactFromAnswers();
+      // Finished all questions — move to treatment selection.
       setStage("treatment");
     } else {
       setStep(step + 1);
@@ -347,8 +363,8 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete }: 
       return;
     }
     setTimeout(() => {
+      extractContactFromAnswers();
       if (step + 1 >= totalQ) {
-        extractContactFromAnswers();
         setStage("treatment");
       } else {
         setStep(step + 1);
