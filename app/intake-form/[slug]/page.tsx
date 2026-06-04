@@ -76,6 +76,7 @@ export default function IntakeFormPage() {
     let pid = createdPatientId.current;
     if (pid) updatePatient(pid, fields);
     else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
+    fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", id: pid }) }).catch(() => {});
     if (client.email) alertWelcome({ email: client.email, name, first });
 
     const np = nowParts();
@@ -120,6 +121,8 @@ export default function IntakeFormPage() {
       color: COLORS[name.length % COLORS.length], intakeProgress: "Contact captured",
     });
     createdPatientId.current = created.id;
+    // Register the started intake server-side so the 24h reminder can fire if abandoned.
+    fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: created.id, name, email: info.email }) }).catch(() => {});
   }
 
   // Fired on each step so the profile reflects how far the patient has gotten.
