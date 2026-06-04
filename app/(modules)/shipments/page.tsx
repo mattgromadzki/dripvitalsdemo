@@ -9,6 +9,7 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import { useShipments } from "@/lib/hooks/useShipments";
 import { STATUS_LABEL, trackingUrl, type ShipStatus } from "@/lib/shipments/types";
 import { sendSms } from "@/lib/sms/client";
+import { alertOrderProcessing, alertShipment, alertDelivered } from "@/lib/notify/alert";
 
 const ST: Record<ShipStatus, "muted" | "blue" | "amber" | "green" | "red"> = { label_created: "muted", in_transit: "blue", out_for_delivery: "amber", delivered: "green", exception: "red" };
 const fmt = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -88,7 +89,18 @@ export default function ShipmentsPage() {
       {sel && (
         <Modal open={!!sel} onClose={() => setOpenId(null)} title={`${sel.patientName} — ${sel.orderId}`} icon="📦" width={560}
           footer={<div className="flex items-center gap-2 w-full">
-            {sel.status !== "delivered" && sel.status !== "exception" && <button className="btn btn-ghost" onClick={() => { advance(sel.id); toast("Status advanced"); }}>Advance status</button>}
+            {sel.status !== "delivered" && sel.status !== "exception" && <button className="btn btn-ghost" onClick={() => {
+              const FLOW: ShipStatus[] = ["label_created", "in_transit", "out_for_delivery", "delivered"];
+              const next = FLOW[Math.min(FLOW.indexOf(sel.status) + 1, FLOW.length - 1)];
+              advance(sel.id);
+              const p = patients.find((x) => x.id === sel.patientId);
+              if (p) {
+                if (next === "in_transit") alertShipment(p, { carrier: sel.carrier, tracking: sel.trackingNumber, eta: fmtD(sel.estDelivery), orderId: sel.orderId });
+                else if (next === "delivered") alertDelivered(p, { orderId: sel.orderId });
+                else alertOrderProcessing(p, { orderId: sel.orderId, status: STATUS_LABEL[next] });
+              }
+              toast("Status advanced");
+            }}>Advance status</button>}
             <button className="btn btn-primary" onClick={() => notify(sel.id)} disabled={busy}>{busy ? "…" : "📲 Notify patient"}</button>
             <div className="flex-1" /><a className="btn btn-ghost" href={trackingUrl(sel.carrier, sel.trackingNumber.replace(/\s/g, ""))} target="_blank" rel="noreferrer">Track ↗</a>
           </div>}>

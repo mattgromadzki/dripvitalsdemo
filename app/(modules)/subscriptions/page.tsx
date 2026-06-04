@@ -10,6 +10,7 @@ import { useSubscriptions } from "@/lib/hooks/useSubscriptions";
 import { PLANS } from "@/lib/data/subscriptionPlans";
 import { money, monthlyValue, advance } from "@/lib/subscriptions/util";
 import { charge } from "@/lib/payments/client";
+import { alertPaymentFailed } from "@/lib/notify/alert";
 import type { SubStatus, Subscription } from "@/lib/subscriptions/types";
 
 const STATUS_INTENT: Record<SubStatus, "green" | "amber" | "red" | "muted" | "blue"> = { active: "green", trialing: "blue", past_due: "red", paused: "amber", canceled: "muted" };
@@ -45,6 +46,7 @@ export default function SubscriptionsPage() {
     const res = await charge({ sourceId: s.paymentToken, amountCents: s.amountCents, referenceId: s.id, note: `${s.planName} · ${s.patientName}` });
     const cycle = { id: "cy" + Date.now().toString(36), date: new Date().toISOString(), amountCents: s.amountCents, status: (res.ok ? "paid" : "failed") as "paid" | "failed", paymentId: res.paymentId };
     recordCycle(s.id, cycle, { advance: res.ok, failed: !res.ok });
+    if (!res.ok) { const p = patients.find((x) => x.id === s.patientId); if (p) alertPaymentFailed(p, { amount: money(s.amountCents), plan: s.planName }); }
     setBusy(false);
     toast(res.ok ? `✓ Charged ${money(s.amountCents)} · refill queued` : `✕ Payment failed — ${res.error || "declined"}`);
   }

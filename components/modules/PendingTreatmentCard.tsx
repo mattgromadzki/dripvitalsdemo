@@ -9,6 +9,7 @@ import { toast } from "@/lib/hooks/useToast";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
+import { alertApproval } from "@/lib/notify/alert";
 import type { Patient, Prescription, PatientDocument, TreatmentRequest, TreatmentRequestStatus } from "@/lib/types";
 
 interface Props {
@@ -134,6 +135,7 @@ export function PendingTreatmentCard({ patient }: Props) {
                 className="btn btn-primary"
                 onClick={() => {
                   approve(approveTarget.id, reviewer, approveNotes.trim() || undefined);
+                  alertApproval(patient, approveTarget.treatmentName);
                   toast(`✓ ${approveTarget.treatmentName} approved for ${approveTarget.patientName}`);
                   setApproveTarget(null);
                 }}

@@ -6,6 +6,7 @@ import { PatientIntakeFlow } from "@/components/modules/PatientIntakeFlow";
 import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
+import { alertWelcome } from "@/lib/notify/alert";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
 const parsePrice = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
@@ -69,6 +70,7 @@ export default function IntakeFormPage() {
       sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
     });
     createdPatientId.current = patient.id;
+    if (client.email) alertWelcome({ email: client.email, name, first });
 
     const np = nowParts();
     addRequest({

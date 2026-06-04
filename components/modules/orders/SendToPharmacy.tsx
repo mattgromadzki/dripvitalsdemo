@@ -9,7 +9,7 @@ import type { FulfillmentOrder } from "@/lib/data/fulfillmentOrders";
 import type { EmedOrderPayload, EmedOrderStatus, EmedRxStatus } from "@/lib/pharmacy/types";
 import type { LFOrderBody, LFRx } from "@/lib/pharmacy/lifefileTypes";
 import { submitOrder, getOrderStatus, getRxStatus, cancelOrder, submitLifeFile, setLifeFileStatus } from "@/lib/pharmacy/client";
-import { alertOrderStatusToPatient } from "@/lib/notify/alert";
+import { alertRxPharmacy } from "@/lib/notify/alert";
 import type { SentOrder } from "@/lib/hooks/usePharmacyOrders";
 import { LIFEFILE_SANDBOX_PRODUCTS, LIFEFILE_SHIP_SERVICES, LIFEFILE_STATUSES } from "@/lib/data/lifefileSandbox";
 import { nextRxId } from "@/lib/data/rxId";
@@ -84,7 +84,7 @@ export function SendToPharmacyModal({ open, onClose, order, patient, onSent }: {
       setBusy(false);
       if (!res.ok || res.OrderId == null) { setErr(res.error || "The pharmacy did not accept the order."); return; }
       onSent({ connector: "emed", pharmacyName: "RXCompound Store", orderId: res.OrderId, internalRxIds: [rxId], rx: res.Rx || [], sentAt: new Date().toISOString() });
-      alertOrderStatusToPatient(patient, order, "Sent to pharmacy — preparing your order");
+      alertRxPharmacy(patient, { medication: order.medication, pharmacy: "RXCompound Store" });
       toast(`💊 Sent to RXCompound Store — Rx #${rxId} · Order #${res.OrderId}`);
       onClose();
     } else {
@@ -112,7 +112,7 @@ export function SendToPharmacyModal({ open, onClose, order, patient, onSent }: {
       setBusy(false);
       if (!res.ok) { setErr(res.error || "Life File did not accept the order."); return; }
       onSent({ connector: "lifefile", pharmacyName: "Hallandale Pharmacy", orderId: res.orderId ?? "(submitted)", internalRxIds: [rxId], rx: [], message: res.message, sentAt: new Date().toISOString() });
-      alertOrderStatusToPatient(patient, order, "Sent to pharmacy — preparing your order");
+      alertRxPharmacy(patient, { medication: order.medication, pharmacy: "Hallandale Pharmacy" });
       toast(`💊 Sent to Hallandale Pharmacy — Rx #${rxId}`);
       onClose();
     }

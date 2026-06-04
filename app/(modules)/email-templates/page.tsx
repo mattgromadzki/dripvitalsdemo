@@ -6,7 +6,19 @@ interface Tmpl { type: string; label: string; description: string; placeholders:
 
 const SAMPLE: Record<string, Record<string, string>> = {
   new_message: { name: "Matthew", message: "Your refill has been approved and ships today." },
-  order_status: { name: "Matthew", orderId: "BX-1042", medication: "Semaglutide 0.25 mg", status: "Sent to pharmacy — preparing your order" },
+  welcome: { name: "Matthew" },
+  intake_reminder: { name: "Matthew" },
+  approval: { name: "Matthew", treatment: " (Semaglutide 3-Month)" },
+  rx_pharmacy: { name: "Matthew", medication: " (Semaglutide 0.25 mg)", pharmacy: "Hallandale Pharmacy" },
+  order_processing: { name: "Matthew", orderId: "BX-1042", status: "Being prepared" },
+  shipment: { name: "Matthew", carrier: "FedEx", tracking: "7712 3456 7890", eta: "Jun 9, 2026", orderId: "BX-1042" },
+  delivered: { name: "Matthew", orderId: "BX-1042" },
+  refill_10day: { name: "Matthew", medication: "Semaglutide 0.25 mg", refillDate: "Jul 1, 2026" },
+  refill_5day: { name: "Matthew", medication: "Semaglutide 0.25 mg", refillDate: "Jul 1, 2026" },
+  refill_overdue: { name: "Matthew", medication: "Semaglutide 0.25 mg" },
+  checkin_30day: { name: "Matthew" },
+  payment_failed: { name: "Matthew", amount: "$189.00", plan: "1-Month Semaglutide" },
+  inactive_30day: { name: "Matthew" },
 };
 
 function render(s: string, data: Record<string, string>) {
