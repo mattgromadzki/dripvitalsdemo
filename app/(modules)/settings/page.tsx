@@ -10,7 +10,7 @@ import { toast } from "@/lib/hooks/useToast";
 import { useStaff } from "@/lib/hooks/useStaff";
 import { useIntegrations } from "@/lib/hooks/useIntegrations";
 
-type Tab = "practice" | "branding" | "team" | "notifications" | "security" | "billing" | "compliance" | "danger";
+type Tab = "practice" | "branding" | "team" | "notifications" | "security" | "compliance" | "danger";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "practice",      label: "Practice Profile",  icon: "🏥" },
@@ -18,7 +18,6 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "team",          label: "Team & Roles",      icon: "👥" },
   { id: "notifications", label: "Notifications",     icon: "🔔" },
   { id: "security",      label: "Security & SSO",    icon: "🛡" },
-  { id: "billing",       label: "Plan & Billing",    icon: "💳" },
   { id: "compliance",    label: "Compliance",        icon: "📋" },
   { id: "danger",        label: "Danger Zone",       icon: "⚠" },
 ];
@@ -523,92 +522,6 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   )}
-                </Section>
-              </div>
-            </Card>
-          )}
-
-          {tab === "billing" && (
-            <Card title="Plan & Billing" icon="💳" onSave={() => save("Billing")}>
-              <div className="space-y-4">
-                <div
-                  className="rounded-lg p-4 text-white flex items-center gap-4 flex-wrap"
-                  style={{ background: "linear-gradient(135deg, var(--color-brand), var(--color-brand-dk))" }}
-                >
-                  <div className="text-[36px]">✨</div>
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-1">Current Plan</div>
-                    <div className="text-[20px] font-bold leading-tight">DripVitals Practice Plus</div>
-                    <div className="text-white/80 text-[12px] mt-1">$799/month · Annual billing · Renews Nov 14, 2026</div>
-                  </div>
-                  <button className="px-4 py-2 rounded-md bg-white text-ink text-[12.5px] font-bold hover:bg-white/90 transition-colors">
-                    Manage Plan
-                  </button>
-                </div>
-
-                <Section title="What's Included">
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      "Unlimited team members",
-                      "Unlimited patients",
-                      "HIPAA-compliant video visits",
-                      "Custom branding & portal",
-                      "SSO (SAML 2.0)",
-                      "7-year audit retention",
-                      "API access + webhooks",
-                      "Priority support (4h SLA)",
-                    ].map((feature) => (
-                      <div key={feature} className="flex items-center gap-2 text-[12px]">
-                        <span className="text-green">✓</span>
-                        <span className="text-ink-2">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Integration Costs">
-                  <div className="bg-surface-2 border border-border rounded-md p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-[12px] font-semibold">Third-party services this month</div>
-                      <div className="text-[14px] font-bold text-violet">${monthlyIntegrationSpend.toLocaleString()}</div>
-                    </div>
-                    <div className="text-[11px] text-ink-muted">
-                      {connectedIntegrations} connected integrations · billed separately by each provider
-                    </div>
-                    <Link href="/integrations" className="text-[11.5px] font-bold text-brand-dk hover:underline mt-2 inline-block">
-                      View integration usage →
-                    </Link>
-                  </div>
-                </Section>
-
-                <Section title="Payment Method">
-                  <div className="bg-surface-2 border border-border rounded-md p-3 flex items-center gap-3">
-                    <div className="text-[24px]">💳</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12.5px] font-bold">Visa ending in 4242</div>
-                      <div className="text-[11px] text-ink-muted">Expires 12/2027 · Default</div>
-                    </div>
-                    <button className="btn btn-ghost btn-sm" onClick={() => toast("💳 Update payment method via Stripe portal")}>
-                      Update
-                    </button>
-                  </div>
-                </Section>
-
-                <Section title="Recent Invoices">
-                  <div className="bg-surface-2 border border-border rounded-md overflow-hidden">
-                    {[
-                      { date: "May 1, 2026",  amount: "$799.00", status: "paid" },
-                      { date: "Apr 1, 2026",  amount: "$799.00", status: "paid" },
-                      { date: "Mar 1, 2026",  amount: "$799.00", status: "paid" },
-                    ].map((inv, i) => (
-                      <div key={i} className={`flex items-center gap-3 py-2.5 px-3 text-[12px] ${i < 2 ? "border-b border-border" : ""}`}>
-                        <span className="font-mono text-ink-muted">{inv.date}</span>
-                        <span className="font-mono font-bold flex-1">{inv.amount}</span>
-                        <Pill intent="green" dot>Paid</Pill>
-                        <button className="btn btn-ghost btn-sm" onClick={() => toast("📥 Invoice downloaded")}>📥</button>
-                      </div>
-                    ))}
-                  </div>
                 </Section>
               </div>
             </Card>
