@@ -6,6 +6,7 @@ import { useShop } from "@/lib/hooks/useShop";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
+import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { sendChat, pullChat } from "@/lib/chat/client";
 import { seedRecordFromPatient, emptyRecord, formatShotDate } from "@/lib/data/portalRecords";
 import type { ShotEntry } from "@/lib/data/portalRecords";
@@ -78,7 +79,14 @@ export default function PatientPortalPage() {
   // patient is what lets staff open this same person in Patient View and see
   // exactly what they entered here.
   const patients = usePatients((s) => s.patients);
-  const me = patients[0];
+  const sessionPid = usePatientAuth((s) => s.patientId);
+  const authHydrated = usePatientAuth((s) => s.hydrated);
+  const hydrateAuth = usePatientAuth((s) => s.hydrate);
+  const patientLogin = usePatientAuth((s) => s.login);
+  const patientLogout = usePatientAuth((s) => s.logout);
+  const requestReset = usePatientAuth((s) => s.requestReset);
+  const resetPassword = usePatientAuth((s) => s.resetPassword);
+  const me = patients.find((p) => p.id === sessionPid) ?? null;
   const pid = me?.id ?? "";
   const extra = useMemo(() => (me ? getPatientExtra(me) : null), [me]);
   const seed = useMemo(() => (me && extra ? seedRecordFromPatient(me, extra) : emptyRecord()), [me, extra]);
@@ -111,7 +119,14 @@ export default function PatientPortalPage() {
   const fullName = me ? `${me.first} ${me.last}` : "Patient";
   const initials = me ? `${me.first[0]}${me.last[0]}` : "PT";
 
-  const [loggedIn, setLoggedIn] = useState(false);
+  const loggedIn = authHydrated && !!me;
+  useEffect(() => { hydrateAuth(); }, [hydrateAuth]);
+  const [authView, setAuthView] = useState<"login" | "forgot" | "reset">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPw, setAuthPw] = useState("");
+  const [authErr, setAuthErr] = useState<string | null>(null);
+  const [resetPw, setResetPw] = useState("");
+  const [resetSent, setResetSent] = useState(false);
   const [page, setPage] = useState<Page>("home");
   const [txTab, setTxTab] = useState<TxTab>("current");
   const [acctTab, setAcctTab] = useState<AcctTab>("profile");
@@ -175,8 +190,16 @@ export default function PatientPortalPage() {
   }
 
   function doLogin() {
-    setLoggedIn(true);
-    nav("home");
+    const res = patientLogin(authEmail, authPw, patients);
+    if (!res.ok) { setAuthErr(res.error || "Sign in failed."); return; }
+    setAuthErr(null); setAuthPw(""); nav("home");
+  }
+  function doRequestReset() { requestReset(); setResetSent(true); }
+  function doResetPassword() {
+    const res = resetPassword(authEmail, resetPw, patients);
+    if (!res.ok) { setAuthErr(res.error || "Could not reset password."); return; }
+    setAuthErr(null); setResetPw(""); setResetSent(false); setAuthView("login");
+    toast("Password updated — sign in with your new password.");
   }
 
   function sendMessage() {
@@ -221,15 +244,54 @@ export default function PatientPortalPage() {
               <img src="/logo.png" alt="DripVitals" style={{ height: 64, width: "auto", marginBottom: 12 }} />
               <div className="login-brand-sub">Patient Portal</div>
             </div>
-            <div className="login-h">Sign in to your DripVitals account</div>
-            <input className="login-input" type="email" defaultValue="mike@example.com" placeholder="Email address" />
-            <input className="login-input" type="password" defaultValue="••••••••" placeholder="Password" />
-            <button className="login-btn" onClick={doLogin}>Continue</button>
-            <div className="login-helpers">
-              Need help signing in?{" "}
-              <a href="#" onClick={(e) => { e.preventDefault(); toast("Reset email would be sent"); }}>Reset password</a> ·{" "}
-              <a href="#" onClick={(e) => { e.preventDefault(); toast("Help center opened"); }}>Help center</a>
-            </div>
+
+            {authView === "login" && (
+              <>
+                <div className="login-h">Sign in to your DripVitals account</div>
+                {authErr && <div style={{ background: "var(--red-soft)", color: "var(--red)", fontSize: 13, fontWeight: 600, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>{authErr}</div>}
+                <input className="login-input" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email address" />
+                <input className="login-input" type="password" value={authPw} onChange={(e) => setAuthPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doLogin(); }} placeholder="Password" />
+                <button className="login-btn" onClick={doLogin}>Sign in</button>
+                <div className="login-helpers">
+                  <a href="#" onClick={(e) => { e.preventDefault(); setAuthErr(null); setResetSent(false); setAuthView("forgot"); }}>Forgot password?</a>
+                </div>
+                <div style={{ fontSize: 12, color: "var(--ink-muted, #6b7890)", marginTop: 10 }}>
+                  Demo account: <b>mattgromadzki@gmail.com</b> · password <b>demo1234</b>
+                </div>
+              </>
+            )}
+
+            {authView === "forgot" && (
+              <>
+                <div className="login-h">Reset your password</div>
+                {!resetSent ? (
+                  <>
+                    <input className="login-input" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doRequestReset(); }} placeholder="Email address" />
+                    <button className="login-btn" onClick={doRequestReset}>Send reset link</button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ background: "var(--amber-soft, #fef0dd)", color: "var(--amber, #b86e1e)", fontSize: 12.5, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>
+                      Demo: no real email is sent. Continue below to set a new password.
+                    </div>
+                    <button className="login-btn" onClick={() => { setAuthErr(null); setAuthView("reset"); }}>Continue to reset →</button>
+                  </>
+                )}
+                <div className="login-helpers"><a href="#" onClick={(e) => { e.preventDefault(); setAuthView("login"); setAuthErr(null); }}>← Back to sign in</a></div>
+              </>
+            )}
+
+            {authView === "reset" && (
+              <>
+                <div className="login-h">Set a new password</div>
+                {authErr && <div style={{ background: "var(--red-soft)", color: "var(--red)", fontSize: 13, fontWeight: 600, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>{authErr}</div>}
+                <input className="login-input" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email address" />
+                <input className="login-input" type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doResetPassword(); }} placeholder="New password (min 6 characters)" />
+                <button className="login-btn" onClick={doResetPassword}>Update password</button>
+                <div className="login-helpers"><a href="#" onClick={(e) => { e.preventDefault(); setAuthView("login"); setAuthErr(null); }}>← Back to sign in</a></div>
+              </>
+            )}
+
             <div className="login-foot">© 2026 DripVitals · Terms · Privacy</div>
           </div>
           <div className="login-right">
@@ -262,7 +324,7 @@ export default function PatientPortalPage() {
             <NavBtn active={page === "account"} onClick={() => nav("account")} ico="👤">Manage account</NavBtn>
             <NavBtn active={false} onClick={() => nav("home")} ico="🌐">Homepage</NavBtn>
             <NavBtn active={false} onClick={() => toast("Help center opens in a new tab")} ico="❔">Help Center</NavBtn>
-            <button className="nav-link" onClick={() => setLoggedIn(false)} style={{ color: "var(--red)" }}>
+            <button className="nav-link" onClick={() => { patientLogout(); setAuthView("login"); }} style={{ color: "var(--red)" }}>
               <span className="ico">↩</span> Sign out
             </button>
           </div>
