@@ -392,13 +392,11 @@ function TreatmentsList({ onEdit, onOpenForm }: {
                     <div className="tx-questionnaire-row">
                       <span className="qr-ic">📝</span>
                       <span className="qr-text">{linkedForm.name}</span>
-                      <a className="qr-link" onClick={(e) => { e.stopPropagation(); onOpenForm(linkedForm.id); }}>Edit form →</a>
                     </div>
                   ) : (
                     <div className="tx-questionnaire-row empty">
                       <span className="qr-ic">📝</span>
                       <span className="qr-text">No intake form assigned</span>
-                      <a className="qr-link" onClick={(e) => { e.stopPropagation(); onOpenForm("new", t.id); }}>+ Create form</a>
                     </div>
                   )}
                   <div className="tx-actions">
