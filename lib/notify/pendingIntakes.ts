@@ -1,15 +1,18 @@
 import { Redis } from "@upstash/redis";
 
 /**
- * Tracks intakes that have been started (lead captured) but not yet completed,
- * so a scheduled job can remind patients who abandon the questionnaire.
- * Stored in Upstash so the cron job can read it server-side.
+ * Tracks intakes that have been started (lead captured) but not yet completed.
+ * Stored in Upstash so it's visible across devices/sessions — the EMR reads it
+ * to show in-progress intakes, and the cron job reads it to remind abandons.
  */
 export interface PendingIntake {
   id: string;        // patient id (PT-xxxx)
   name: string;
   email: string;
+  phone?: string;
+  progress?: string; // human-readable step label, e.g. "Question 3 of 8"
   startedAt: number; // epoch ms — the 24h clock starts here
+  updatedAt?: number;
   completed: boolean;
   remindedAt: number | null;
 }
@@ -29,34 +32,44 @@ function parse(v: unknown): PendingIntake | null {
   try { return typeof v === "string" ? JSON.parse(v) : (v as PendingIntake); } catch { return null; }
 }
 
-/** Register the start of an intake. Keeps the original startedAt if it already exists. */
-export async function registerStart(id: string, name: string, email: string): Promise<void> {
+async function read(id: string): Promise<PendingIntake | null> {
   const r = redis();
-  const existing = r ? parse(await r.hget(KEY, id)) : mem.get(id) || null;
+  return r ? parse(await r.hget(KEY, id)) : mem.get(id) || null;
+}
+
+async function write(rec: PendingIntake): Promise<void> {
+  const r = redis();
+  if (r) await r.hset(KEY, { [rec.id]: JSON.stringify(rec) });
+  else mem.set(rec.id, rec);
+}
+
+/** Register the start of an intake. Keeps the original startedAt if it already exists. */
+export async function registerStart(id: string, name: string, email: string, phone?: string): Promise<void> {
+  const existing = await read(id);
   const rec: PendingIntake = existing
-    ? { ...existing, name: name || existing.name, email: email || existing.email }
-    : { id, name, email, startedAt: Date.now(), completed: false, remindedAt: null };
-  if (r) await r.hset(KEY, { [id]: JSON.stringify(rec) });
-  else mem.set(id, rec);
+    ? { ...existing, name: name || existing.name, email: email || existing.email, phone: phone || existing.phone, updatedAt: Date.now() }
+    : { id, name, email, phone, progress: "Contact captured", startedAt: Date.now(), updatedAt: Date.now(), completed: false, remindedAt: null };
+  await write(rec);
+}
+
+/** Update how far the patient has gotten in the intake. */
+export async function updateProgress(id: string, progress: string): Promise<void> {
+  const existing = await read(id);
+  if (!existing || existing.completed) return;
+  await write({ ...existing, progress, updatedAt: Date.now() });
 }
 
 /** Mark an intake completed so it won't be reminded. */
 export async function markComplete(id: string): Promise<void> {
-  const r = redis();
-  const existing = r ? parse(await r.hget(KEY, id)) : mem.get(id) || null;
+  const existing = await read(id);
   if (!existing) return;
-  const rec = { ...existing, completed: true };
-  if (r) await r.hset(KEY, { [id]: JSON.stringify(rec) });
-  else mem.set(id, rec);
+  await write({ ...existing, completed: true, progress: "Completed", updatedAt: Date.now() });
 }
 
 export async function markReminded(id: string): Promise<void> {
-  const r = redis();
-  const existing = r ? parse(await r.hget(KEY, id)) : mem.get(id) || null;
+  const existing = await read(id);
   if (!existing) return;
-  const rec = { ...existing, remindedAt: Date.now() };
-  if (r) await r.hset(KEY, { [id]: JSON.stringify(rec) });
-  else mem.set(id, rec);
+  await write({ ...existing, remindedAt: Date.now() });
 }
 
 export async function listPending(): Promise<PendingIntake[]> {

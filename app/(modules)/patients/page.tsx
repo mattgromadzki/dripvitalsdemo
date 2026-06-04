@@ -7,6 +7,7 @@ import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { PatientFormModal } from "@/components/modules/PatientFormModal";
+import { IntakeInProgressPanel } from "@/components/modules/IntakeInProgressPanel";
 import { deriveLifecycle, LIFECYCLE_META, LIFECYCLE_INTENT } from "@/lib/data/lifecycle";
 import type { LifecycleStatus, Patient } from "@/lib/types";
 
@@ -102,6 +103,8 @@ export default function PatientsPage() {
         <button className="btn btn-ghost btn-sm" onClick={() => toast("⬇ Exporting…")}>⬇ Export</button>
         <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>+ Add patient</button>
       </div>
+
+      <IntakeInProgressPanel />
 
       {/* KPIs */}
       <div className="flex flex-wrap justify-between gap-2.5 mb-3.5">

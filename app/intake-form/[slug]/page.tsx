@@ -122,7 +122,7 @@ export default function IntakeFormPage() {
     });
     createdPatientId.current = created.id;
     // Register the started intake server-side so the 24h reminder can fire if abandoned.
-    fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: created.id, name, email: info.email }) }).catch(() => {});
+    fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: created.id, name, email: info.email, phone: info.phone }) }).catch(() => {});
   }
 
   // Fired on each step so the profile reflects how far the patient has gotten.
@@ -135,6 +135,8 @@ export default function IntakeFormPage() {
       info.stage === "disqualified" ? "Disqualified" :
       `Question ${Math.min(info.step + 1, info.total || 1)} of ${info.total || 1}`;
     updatePatient(createdPatientId.current, { intakeProgress: label });
+    // Mirror progress server-side so the EMR sees it across devices/sessions.
+    fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "progress", id: createdPatientId.current, progress: label }) }).catch(() => {});
   }
 
   return (
