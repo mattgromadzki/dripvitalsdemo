@@ -144,20 +144,20 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   // Compute visibleQs INLINE on every render — no useMemo. This guarantees
   // the patient view always reflects the latest question order from zustand,
   // even after the admin reorders questions in FormEditor.
-  // Email + phone are shown together on one card. Find both, keep whichever
-  // appears first as the combined card, and hide the other from the flow.
-  const contactPair = (() => {
-    const emailQ = form.questions.find((q) => q.type === "email" || (q.type === "text" && /email/i.test(q.text)));
+  // Name + email + phone are shown together on one card (the patient's details).
+  // Anchor the combined card on the earliest involved question; hide the rest.
+  const contactGroup = (() => {
+    const emailQ = form.questions.find((q) => q.type === "email" || (q.type === "text" && /e-?mail/i.test(q.text)));
     const phoneQ = form.questions.find((q) => q.type === "phone" || (q.type === "text" && /phone/i.test(q.text)));
-    if (emailQ && phoneQ && emailQ.id !== phoneQ.id) {
-      const keep = form.questions.indexOf(emailQ) <= form.questions.indexOf(phoneQ) ? emailQ : phoneQ;
-      const hideId = keep.id === emailQ.id ? phoneQ.id : emailQ.id;
-      return { emailId: emailQ.id, phoneId: phoneQ.id, keepId: keep.id, hideId };
-    }
-    return null;
+    const nameQ = form.questions.find((q) => isFullNameQ(q));
+    const involved = [nameQ, emailQ, phoneQ].filter(Boolean) as BaskQuestion[];
+    if (involved.length < 2) return null;
+    const anchor = involved.reduce((a, b) => (form.questions.indexOf(a) <= form.questions.indexOf(b) ? a : b));
+    const hideIds = involved.map((q) => q.id).filter((id) => id !== anchor.id);
+    return { anchorId: anchor.id, nameId: nameQ?.id ?? null, emailId: emailQ?.id ?? null, phoneId: phoneQ?.id ?? null, hideIds };
   })();
 
-  const visibleQs = form.questions.filter((q) => q.type !== "section" && !(contactPair && q.id === contactPair.hideId));
+  const visibleQs = form.questions.filter((q) => q.type !== "section" && !(contactGroup && contactGroup.hideIds.includes(q.id)));
   const totalQ = visibleQs.length;
 
   // Fraction of overall flow complete: welcome 2%, each Q step adds, treatment 90%, checkout 95%
@@ -307,8 +307,15 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
         toast("Please acknowledge before continuing");
         return;
       }
-      // Split name needs both first AND last
-      if (isFullNameQ(q)) {
+      // Combined details card validates name + email + phone together
+      if (contactGroup && q.id === contactGroup.anchorId) {
+        if (contactGroup.nameId != null) {
+          try { const o = JSON.parse(String(answers[contactGroup.nameId] || "{}")); if (!(o.first || "").trim() || !(o.last || "").trim()) { toast("Please enter your first and last name"); return; } }
+          catch { toast("Please enter your first and last name"); return; }
+        }
+        if (contactGroup.emailId != null) { const em = String(answers[contactGroup.emailId] || "").trim(); if (!em || !em.includes("@")) { toast("Please enter a valid email"); return; } }
+        if (contactGroup.phoneId != null) { const ph = String(answers[contactGroup.phoneId] || "").replace(/\D/g, ""); if (ph.length < 10) { toast("Please enter a valid phone number"); return; } }
+      } else if (isFullNameQ(q)) {
         try { const o = JSON.parse(String(answers[q.id] || "{}")); if (!(o.first || "").trim() || !(o.last || "").trim()) { toast("Please enter your first and last name"); return; } }
         catch { toast("Please enter your first and last name"); return; }
       }
@@ -316,13 +323,6 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
       if (q.type === "date") {
         try { const o = JSON.parse(String(answers[q.id] || "{}")); if (!o.m || !o.d || !o.y || String(o.y).length < 4) { toast("Please enter your full date of birth"); return; } }
         catch { toast("Please enter your full date of birth"); return; }
-      }
-      // Combined contact card needs both email and phone
-      if (contactPair && q.id === contactPair.keepId) {
-        const em = String(answers[contactPair.emailId] || "").trim();
-        const ph = String(answers[contactPair.phoneId] || "").replace(/\D/g, "");
-        if (!em || !em.includes("@")) { toast("Please enter a valid email"); return; }
-        if (ph.length < 10) { toast("Please enter a valid phone number"); return; }
       }
       // Disqualifier
       const reason = checkDisqualifier(q, answers[q.id]);
@@ -504,30 +504,56 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     let body: ReactNode = null;
     let usesNext = true; // shows the Next button at bottom
 
-    if (contactPair && q.id === contactPair.keepId) {
-      // Combined Email + Phone card
-      const emailVal = (answers[contactPair.emailId] as string) || "";
-      const phoneVal = (answers[contactPair.phoneId] as string) || "";
+    if (contactGroup && q.id === contactGroup.anchorId) {
+      // Combined details card: First, Last, Email, Phone — all on one page
+      let nm = { first: "", last: "" };
+      if (contactGroup.nameId != null) {
+        const raw = answers[contactGroup.nameId];
+        try { if (typeof raw === "string" && raw.startsWith("{")) nm = { ...nm, ...JSON.parse(raw) }; } catch { /* ignore */ }
+      }
+      const patchName = (field: "first" | "last", v: string) => { if (contactGroup.nameId != null) commitAnswer(contactGroup.nameId, JSON.stringify({ ...nm, [field]: v })); };
+      const emailVal = contactGroup.emailId != null ? ((answers[contactGroup.emailId] as string) || "") : "";
+      const phoneVal = contactGroup.phoneId != null ? ((answers[contactGroup.phoneId] as string) || "") : "";
       body = (
         <div className="dv-fields">
-          <div>
-            <div className="dv-field-label">Email address</div>
-            <div className="dv-input-wrap">
-              <input key={`${contactPair.emailId}-em`} className="dv-input" type="email" defaultValue={emailVal} onChange={(e) => commitAnswer(contactPair.emailId, e.target.value)} autoComplete="off" placeholder="you@example.com" />
+          {contactGroup.nameId != null && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <div className="dv-field-label">First name</div>
+                <div className="dv-input-wrap">
+                  <input key={`${contactGroup.nameId}-first`} className="dv-input" defaultValue={nm.first} onChange={(e) => patchName("first", e.target.value)} autoComplete="off" placeholder="First" />
+                </div>
+              </div>
+              <div>
+                <div className="dv-field-label">Last name</div>
+                <div className="dv-input-wrap">
+                  <input key={`${contactGroup.nameId}-last`} className="dv-input" defaultValue={nm.last} onChange={(e) => patchName("last", e.target.value)} autoComplete="off" placeholder="Last" />
+                </div>
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="dv-field-label">Phone number</div>
-            <div className="dv-input-wrap">
-              <input key={`${contactPair.phoneId}-ph`} className="dv-input" type="tel" defaultValue={phoneVal} autoComplete="off" placeholder="(786) 370-8570"
-                onChange={(e) => commitAnswer(contactPair.phoneId, e.target.value)}
-                onBlur={(e) => { const f = formatPhone(e.target.value); e.target.value = f; commitAnswer(contactPair.phoneId, f); }} />
+          )}
+          {contactGroup.emailId != null && (
+            <div>
+              <div className="dv-field-label">Email address</div>
+              <div className="dv-input-wrap">
+                <input key={`${contactGroup.emailId}-em`} className="dv-input" type="email" defaultValue={emailVal} onChange={(e) => commitAnswer(contactGroup.emailId as number, e.target.value)} autoComplete="off" placeholder="you@example.com" />
+              </div>
             </div>
-          </div>
+          )}
+          {contactGroup.phoneId != null && (
+            <div>
+              <div className="dv-field-label">Phone number</div>
+              <div className="dv-input-wrap">
+                <input key={`${contactGroup.phoneId}-ph`} className="dv-input" type="tel" defaultValue={phoneVal} autoComplete="off" placeholder="(786) 370-8570"
+                  onChange={(e) => commitAnswer(contactGroup.phoneId as number, e.target.value)}
+                  onBlur={(e) => { const f = formatPhone(e.target.value); e.target.value = f; commitAnswer(contactGroup.phoneId as number, f); }} />
+              </div>
+            </div>
+          )}
         </div>
       );
     } else if (isFullNameQ(q)) {
-      // Full legal name → First + Last boxes (stored as JSON {first,last})
+      // Lone full-name question → First + Last boxes (stored as JSON {first,last})
       let nm = { first: "", last: "" };
       try { if (typeof a === "string" && a.startsWith("{")) nm = { ...nm, ...JSON.parse(a) }; } catch { /* ignore */ }
       const patchName = (field: "first" | "last", v: string) => commitAnswer(q.id, JSON.stringify({ ...nm, [field]: v }));
@@ -1039,8 +1065,8 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     }
 
     return shell(<>
-        <div className="dv-question">{contactPair && q.id === contactPair.keepId ? "How can we reach you?" : q.text}</div>
-        {q.helper && !(contactPair && q.id === contactPair.keepId) && <div className="dv-helper">{q.helper}</div>}
+        <div className="dv-question">{contactGroup && q.id === contactGroup.anchorId ? "Let's start with your details" : q.text}</div>
+        {q.helper && !(contactGroup && q.id === contactGroup.anchorId) && <div className="dv-helper">{q.helper}</div>}
         {body}
         {usesNext && <button className="dv-btn-primary" onClick={goNext}>Next</button>}
       </>);
