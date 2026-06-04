@@ -12,6 +12,7 @@ interface NotificationsState {
   toggleAllForRule: (ruleId: string, enabled: boolean) => void;
   setQuietHours: (patch: Partial<NotificationQuietHours>) => void;
   retryDelivery: (logId: string) => void;
+  logDelivery: (entry: NotificationLogEntry) => void;
 }
 
 export const useNotifications = create<NotificationsState>((set) => ({
@@ -43,4 +44,5 @@ export const useNotifications = create<NotificationsState>((set) => ({
       log: s.log.map((l) => (l.id === logId ? { ...l, status: "delivered" as const, errorMessage: undefined } : l)),
     }));
   },
+  logDelivery: (entry) => set((s) => ({ log: [entry, ...s.log] })),
 }));

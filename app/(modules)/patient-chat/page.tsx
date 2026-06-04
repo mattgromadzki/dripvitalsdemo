@@ -8,6 +8,7 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
 import { useChatReads, unreadForPid } from "@/lib/hooks/useChatReads";
 import { sendChat, pullAllChat } from "@/lib/chat/client";
+import { alertNewMessageToPatient } from "@/lib/notify/alert";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { seedRecordFromPatient } from "@/lib/data/portalRecords";
 
@@ -94,6 +95,7 @@ export default function PatientChatPage() {
     const t = draft.trim();
     if (!t || !activePid) return;
     sendChat(activePid, { from: "care", text: t, time: "Just now" });
+    if (active) alertNewMessageToPatient(active, t);
     setDraft("");
   }
   function attach(file: File) {

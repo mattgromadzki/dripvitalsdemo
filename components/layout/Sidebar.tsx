@@ -47,6 +47,7 @@ const NAV: NavSection[] = [
       { href: "/staff",            icon: "🩺", label: "Doctors" },
       { href: "/roles",            icon: "🔐", label: "Roles & Access" },
       { href: "/notifications",    icon: "🔔", label: "Notifications" },
+      { href: "/email-templates",  icon: "🎨", label: "Email Templates" },
     ],
   },
   {
