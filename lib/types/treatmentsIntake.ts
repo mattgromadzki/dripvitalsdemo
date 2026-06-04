@@ -34,7 +34,7 @@ export type BaskQuestionType =
   | "section" | "text" | "long_text" | "number" | "date"
   | "yesno"   | "multiple" | "checkbox" | "dropdown" | "scale" | "rating"
   | "email"   | "phone"    | "address"  | "state" | "signature" | "file"
-  | "bmi";
+  | "bmi" | "personal_info";
 
 export type BaskOptionFlag = "ok" | "review" | "disq";
 export interface BaskCheckboxOption { label: string; flag: BaskOptionFlag; }

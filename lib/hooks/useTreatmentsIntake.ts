@@ -45,7 +45,8 @@ interface State {
 // ─── localStorage persistence ──────────────────────────────────────────
 // v3 because the schema changed (new question types + rules on each form).
 // Old v2 data is no longer compatible — admins will re-hydrate from SEED.
-const LS_KEY = "dripvitals_treatments_v3";
+// v4: name/email/phone collapsed into a single "personal_info" question.
+const LS_KEY = "dripvitals_treatments_v4";
 
 // Only data fields are persisted. Action functions are NOT serialized —
 // they're re-created at module load.

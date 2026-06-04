@@ -795,6 +795,7 @@ function FormEditor({ formId, onClose, onOpenQuestionModal, onPreview }: {
       type, text: "", helper: "", impact: "none", required: type !== "section", options: [],
     };
     if (type === "section")  { base.text = "New Section"; base.sectionIcon = "📋"; base.required = false; }
+    if (type === "personal_info") { base.text = "Personal Information"; base.helper = "Your name and contact details"; }
     if (type === "state")    { base.text = "Which state do you live in?"; base.helper = "We match you with a provider licensed in your state."; }
     if (type === "multiple" || type === "dropdown") base.options = ["Option 1", "Option 2"];
     if (type === "checkbox") base.options = [{ label: "Option 1", flag: "ok" }, { label: "Option 2", flag: "ok" }];
@@ -996,6 +997,7 @@ function BuilderTab({ form, dragSrcIdx, moveQuestion, onOpenQuestionModal, dupQu
           </div>
           <div className="q-add-row">
             <button className="q-add-btn" onClick={() => handleAddQ("section")}>＋ Section</button>
+            <button className="q-add-btn" onClick={() => handleAddQ("personal_info")}>＋ Personal Info</button>
             <button className="q-add-btn" onClick={() => handleAddQ("text")}>＋ Short Text</button>
             <button className="q-add-btn" onClick={() => handleAddQ("long_text")}>＋ Long Text</button>
             <button className="q-add-btn" onClick={() => handleAddQ("number")}>＋ Number</button>
@@ -1026,7 +1028,7 @@ const TYPE_LABEL: Record<BaskQuestionType, string> = {
   date: "Date", yesno: "Yes / No", multiple: "Single Choice", checkbox: "Multi-Select",
   dropdown: "Dropdown", scale: "Scale 1–10", rating: "Star Rating",
   email: "Email", phone: "Phone", address: "Address", state: "State", signature: "Signature", file: "File Upload",
-  bmi: "BMI Calculator",
+  bmi: "BMI Calculator", personal_info: "Personal Info",
 };
 
 // ─── LOGIC TAB ──────────────────────────────────────────────────────────

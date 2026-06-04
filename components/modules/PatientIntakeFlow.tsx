@@ -205,7 +205,11 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
       const raw = answers[q.id];
       if (typeof raw !== "string" || !raw.trim()) continue;
       const v = raw.trim();
-      // Full name → may be stored as JSON {first,last} (split boxes) or a plain string
+      // Bundled personal info → JSON {first,last,email,phone}
+      if (q.type === "personal_info") {
+        try { const o = JSON.parse(v); patch.first = (o.first || "").trim(); patch.last = (o.last || "").trim(); patch.email = (o.email || "").trim(); patch.phone = (o.phone || "").trim(); } catch { /* ignore */ }
+        continue;
+      }
       if (lbl.includes("full") && lbl.includes("name")) {
         if (v.startsWith("{")) {
           try { const o = JSON.parse(v); patch.first = (o.first || "").trim(); patch.last = (o.last || "").trim(); } catch { /* ignore */ }
@@ -306,6 +310,14 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
       if (q.impact === "qualify" && q.type === "checkbox" && !ackChecked[q.id]) {
         toast("Please acknowledge before continuing");
         return;
+      }
+      // Bundled personal info card validates all four fields
+      if (q.type === "personal_info") {
+        let pi = { first: "", last: "", email: "", phone: "" };
+        try { pi = { ...pi, ...JSON.parse(String(answers[q.id] || "{}")) }; } catch { /* ignore */ }
+        if (!pi.first.trim() || !pi.last.trim()) { toast("Please enter your first and last name"); return; }
+        if (!pi.email.trim() || !pi.email.includes("@")) { toast("Please enter a valid email"); return; }
+        if (pi.phone.replace(/\D/g, "").length < 10) { toast("Please enter a valid phone number"); return; }
       }
       // Combined details card validates name + email + phone together
       if (contactGroup && q.id === contactGroup.anchorId) {
@@ -504,7 +516,36 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     let body: ReactNode = null;
     let usesNext = true; // shows the Next button at bottom
 
-    if (contactGroup && q.id === contactGroup.anchorId) {
+    if (q.type === "personal_info") {
+      // Single bundled card: First, Last, Email, Phone (stored as JSON)
+      let pi = { first: "", last: "", email: "", phone: "" };
+      try { if (typeof a === "string" && a.startsWith("{")) pi = { ...pi, ...JSON.parse(a) }; } catch { /* ignore */ }
+      const patchPI = (field: "first" | "last" | "email" | "phone", v: string) => commitAnswer(q.id, JSON.stringify({ ...pi, [field]: v }));
+      body = (
+        <div className="dv-fields">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div className="dv-field-label">First name</div>
+              <div className="dv-input-wrap"><input key={`${q.id}-first`} className="dv-input" defaultValue={pi.first} onChange={(e) => patchPI("first", e.target.value)} autoComplete="off" placeholder="First" /></div>
+            </div>
+            <div>
+              <div className="dv-field-label">Last name</div>
+              <div className="dv-input-wrap"><input key={`${q.id}-last`} className="dv-input" defaultValue={pi.last} onChange={(e) => patchPI("last", e.target.value)} autoComplete="off" placeholder="Last" /></div>
+            </div>
+          </div>
+          <div>
+            <div className="dv-field-label">Email address</div>
+            <div className="dv-input-wrap"><input key={`${q.id}-em`} className="dv-input" type="email" defaultValue={pi.email} onChange={(e) => patchPI("email", e.target.value)} autoComplete="off" placeholder="you@example.com" /></div>
+          </div>
+          <div>
+            <div className="dv-field-label">Phone number</div>
+            <div className="dv-input-wrap"><input key={`${q.id}-ph`} className="dv-input" type="tel" defaultValue={pi.phone} autoComplete="off" placeholder="(786) 370-8570"
+              onChange={(e) => patchPI("phone", e.target.value)}
+              onBlur={(e) => { const f = formatPhone(e.target.value); e.target.value = f; patchPI("phone", f); }} /></div>
+          </div>
+        </div>
+      );
+    } else if (contactGroup && q.id === contactGroup.anchorId) {
       // Combined details card: First, Last, Email, Phone — all on one page
       let nm = { first: "", last: "" };
       if (contactGroup.nameId != null) {

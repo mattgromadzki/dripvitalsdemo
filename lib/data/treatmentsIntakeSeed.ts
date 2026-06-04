@@ -93,10 +93,8 @@ export const SEED_FORMS: BaskIntakeForm[] = [
 
       // Identity (intentionally near the end — Figma shows DOB and contact info AFTER the screening questions)
       { id:100, type:"section",  text:"About you", helper:"", sectionIcon:"👤", impact:"none", required:false },
-      { id:101, type:"text",     text:"What is your full legal name?", helper:"As it appears on your government-issued ID", impact:"none", required:true },
+      { id:101, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:102, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:117, type:"text",     text:"What is your email address?", helper:"We'll send updates and your prescription details here", impact:"none", required:true },
-      { id:118, type:"text",     text:"What is your phone number?", helper:"", impact:"none", required:true },
       { id:119, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:120, type:"address",  text:"If prescribed, where should we ship your order?", helper:"", impact:"none", required:true },
 
@@ -122,10 +120,8 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:205, type:"yesno",    text:"Do you have any kidney or liver disease?", helper:"NAD+ is metabolized by these organs", impact:"review", required:true },
       // Identity at the end
       { id:200, type:"section",  text:"About you", helper:"", sectionIcon:"👤", impact:"none", required:false },
-      { id:201, type:"text",     text:"What is your full name?", helper:"", impact:"none", required:true },
+      { id:201, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:202, type:"date",     text:"What is your date of birth?", helper:"Must be 18 or older", impact:"disqualifier", required:true },
-      { id:207, type:"text",     text:"What is your email address?", helper:"", impact:"none", required:true },
-      { id:208, type:"text",     text:"What is your phone number?", helper:"", impact:"none", required:true },
     ],
   },
   {
@@ -135,8 +131,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     questions: [
       { id:302, type:"yesno",    text:"Have you been diagnosed with pre-diabetes or insulin resistance?", helper:"", impact:"none", required:true },
       { id:300, type:"section",  text:"About you", helper:"", sectionIcon:"👤", impact:"none", required:false },
-      { id:301, type:"text",     text:"What is your full name?", helper:"", impact:"none", required:true },
-      { id:303, type:"text",     text:"What is your email address?", helper:"", impact:"none", required:true },
+      { id:301, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
     ],
   },
 ];
