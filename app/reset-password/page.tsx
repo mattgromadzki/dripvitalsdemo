@@ -18,9 +18,9 @@ export default function ResetPasswordPage() {
     try { const p = new URLSearchParams(window.location.search); const e = p.get("email"); if (e) setEmail(e); } catch { /* ignore */ }
   }, []);
 
-  function submit() {
+  async function submit() {
     if (pw !== pw2) { setErr("Passwords don't match."); return; }
-    const res = resetPassword(email, pw);
+    const res = await resetPassword(email, pw);
     if (!res.ok) { setErr(res.error || "Could not reset password."); return; }
     setErr(null);
     setDone(true);

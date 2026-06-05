@@ -6,6 +6,24 @@ import { Suspense, useEffect, useState } from "react";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
 import { useChatReads, unreadTotal } from "@/lib/hooks/useChatReads";
 import { useUI } from "@/lib/hooks/useUI";
+import { usePermissions } from "@/lib/rbac/usePermission";
+
+// Nav items that require a specific permission. Items not listed are visible to
+// any signed-in user. Owners have all permissions, so they see everything.
+const NAV_PERM: Record<string, string> = {
+  "/intake-review": "intake.review",
+  "/rx": "rx.prescribe", "/e-prescribe": "rx.prescribe",
+  "/labs": "labs.order",
+  "/titration": "titration.manage",
+  "/side-effects": "adverse.manage",
+  "/billing": "payments.charge",
+  "/subscriptions": "subscriptions.manage",
+  "/marketing": "campaigns.send", "/automations": "campaigns.send", "/pipeline": "campaigns.send", "/affiliate": "campaigns.send",
+  "/roles": "users.manage", "/staff": "users.manage",
+  "/integrations": "integrations.manage", "/api-keys": "integrations.manage", "/connections": "integrations.manage",
+  "/settings": "settings.manage", "/treatments": "settings.manage", "/medications": "settings.manage",
+  "/pharmacies": "settings.manage", "/email-templates": "settings.manage", "/notifications": "settings.manage", "/licensure": "settings.manage",
+};
 
 interface NavItem { href: string; icon: string; label: string; badge?: string | number; }
 interface NavSection { label: string; items: NavItem[]; collapsible?: boolean }
@@ -146,6 +164,7 @@ function SidebarInner() {
   }, [hydrateRecords, hydrateSeen]);
   useEffect(() => { initMissing(records); }, [records, initMissing]);
   const chatUnread = unreadTotal(records, seen);
+  const perms = usePermissions();
 
   // Collapsible sections start collapsed; the user can toggle them open.
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -173,7 +192,9 @@ function SidebarInner() {
   return (
     <>
       {NAV.map((section) => {
-        const sectionActive = section.items.some(itemActive);
+        const items = section.items.filter((it) => !NAV_PERM[it.href] || perms.includes(NAV_PERM[it.href]));
+        if (items.length === 0) return null;
+        const sectionActive = items.some(itemActive);
         // A collapsible section stays open if toggled open OR the current page lives inside it.
         const expanded = !section.collapsible || !collapsed[section.label] || sectionActive;
         return (
@@ -190,7 +211,7 @@ function SidebarInner() {
             ) : (
               <div className={headerCls}>{section.label}</div>
             )}
-            {expanded && section.items.map((item) => {
+            {expanded && items.map((item) => {
               const active = itemActive(item);
               const badge = item.href === "/patient-chat" ? (chatUnread > 0 ? chatUnread : undefined) : item.badge;
               return (

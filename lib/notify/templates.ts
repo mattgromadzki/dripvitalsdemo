@@ -11,16 +11,45 @@ export interface EmailTemplate {
 }
 
 const shell = (title: string, body: string) => `<!DOCTYPE html>
-<html><body style="margin:0;background:#f5f7fb;font-family:Inter,Arial,sans-serif;color:#1b2330;">
-  <div style="max-width:560px;margin:0 auto;padding:24px;">
-    <div style="font-size:22px;font-weight:800;color:#166b57;">DripVitals</div>
-    <div style="height:3px;width:46px;background:#1f8a70;border-radius:2px;margin:6px 0 18px;"></div>
-    <h1 style="font-size:18px;margin:0 0 12px;">${title}</h1>
-    ${body}
-    <div style="margin-top:24px;font-size:12px;color:#9aa6b8;border-top:1px solid #e6e9ef;padding-top:14px;">
-      You're receiving this because you have a DripVitals account. Automated message — please don't reply.
-    </div>
-  </div>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only"></head>
+<body style="margin:0;padding:0;background:#eef1f0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#2b3a34;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+        <!-- Logo -->
+        <tr><td align="center" style="padding:6px 0 22px;">
+          <img src="https://www.dripvitals.com/assets/images/dripvitalslogo.png" alt="DripVitals" width="160" style="display:block;max-width:160px;height:auto;border:0;outline:none;text-decoration:none;" />
+        </td></tr>
+
+        <!-- Card -->
+        <tr><td style="background:#ffffff;border-radius:16px;border:1px solid #e6eaee;overflow:hidden;">
+          <div style="height:4px;background:#3b7fc4;background:linear-gradient(90deg,#3b7fc4,#5a97d6);font-size:0;line-height:0;">&nbsp;</div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:34px 36px 30px;">
+            <h1 style="margin:0 0 16px;font-size:21px;line-height:1.3;font-weight:700;color:#15181c;letter-spacing:-0.2px;">${title}</h1>
+            <div style="font-size:15px;line-height:1.6;color:#3a4148;">${body}</div>
+          </td></tr></table>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:24px 28px 8px;text-align:center;">
+          <div style="font-size:16px;font-weight:800;color:#1b2733;letter-spacing:0.2px;">DripVitals</div>
+          <div style="font-size:12px;color:#8a9299;margin:4px 0 14px;">Personalized telehealth &mdash; weight loss, anti&#8209;aging, hair, skin &amp; wellness.</div>
+          <div style="font-size:12px;margin-bottom:12px;">
+            <a href="https://www.dripvitals.com" style="color:#3b7fc4;text-decoration:none;font-weight:600;">dripvitals.com</a>
+            &nbsp;&middot;&nbsp;<a href="https://www.dripvitals.com/terms-and-conditions" style="color:#8a9299;text-decoration:none;">Terms</a>
+            &nbsp;&middot;&nbsp;<a href="https://www.dripvitals.com/privacy-policy" style="color:#8a9299;text-decoration:none;">Privacy</a>
+            &nbsp;&middot;&nbsp;<a href="https://www.dripvitals.com/contact" style="color:#8a9299;text-decoration:none;">Contact</a>
+          </div>
+          <div style="font-size:11px;color:#aab2b9;line-height:1.5;">
+            You're receiving this because you have a DripVitals account.<br/>
+            This is an automated message &mdash; please don't reply directly.
+          </div>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
 </body></html>`;
 
 const DEFAULTS: Record<string, EmailTemplate> = {
@@ -31,7 +60,7 @@ const DEFAULTS: Record<string, EmailTemplate> = {
     subject: "New message from your DripVitals care team",
     html: shell("You have a new message", `
     <p style="font-size:14px;line-height:1.5;">Hi {{name}}, your DripVitals care team just sent you a message:</p>
-    <blockquote style="margin:12px 0;padding:12px 14px;background:#f3f5f9;border-left:3px solid #1f8a70;border-radius:6px;font-size:14px;">{{message}}</blockquote>
+    <blockquote style="margin:12px 0;padding:12px 14px;background:#f3f5f9;border-left:3px solid #3b7fc4;border-radius:6px;font-size:14px;">{{message}}</blockquote>
     <p style="font-size:14px;">Open your patient portal to read it and reply.</p>`),
   },
   welcome: {
@@ -42,7 +71,7 @@ const DEFAULTS: Record<string, EmailTemplate> = {
     html: shell("Welcome to DripVitals", `
     <p style="font-size:14px;line-height:1.5;">Hi {{name}}, welcome to DripVitals! Your account has been created.</p>
     <p style="font-size:14px;line-height:1.5;">Set your password to access your patient portal, where you can message your provider, track your treatment, and manage your account.</p>
-    <p style="text-align:center;margin:18px 0;"><a href="{{setPasswordUrl}}" style="display:inline-block;background:#1f8a70;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Set your password</a></p>
+    <p style="text-align:center;margin:18px 0;"><a href="{{setPasswordUrl}}" style="display:inline-block;background:#3b7fc4;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Set your password</a></p>
     <p style="font-size:12px;color:#9aa6b8;">If the button doesn't work, copy and paste this link into your browser:<br/>{{setPasswordUrl}}</p>`),
   },
   intake_reminder: {
@@ -81,7 +110,7 @@ const DEFAULTS: Record<string, EmailTemplate> = {
     subject: "Your DripVitals order is being prepared",
     html: shell("Your order is being prepared", `
     <p style="font-size:14px;line-height:1.5;">Hi {{name}}, your order {{orderId}} is now being prepared.</p>
-    <p style="font-size:14px;">Current status: <b style="color:#166b57;">{{status}}</b>. We'll keep you posted as it ships.</p>`),
+    <p style="font-size:14px;">Current status: <b style="color:#2e6ba8;">{{status}}</b>. We'll keep you posted as it ships.</p>`),
   },
   shipment: {
     type: "shipment", label: "Shipment notification (shipped)",
@@ -102,7 +131,7 @@ const DEFAULTS: Record<string, EmailTemplate> = {
     subject: "Your DripVitals order has been delivered",
     html: shell("Your order was delivered ✅", `
     <p style="font-size:14px;line-height:1.5;">Hi {{name}}, your DripVitals order {{orderId}} has been delivered.</p>
-    <div style="margin:12px 0;padding:12px 14px;background:#e7f4ef;border-radius:8px;font-size:13.5px;line-height:1.5;">
+    <div style="margin:12px 0;padding:12px 14px;background:#eaf2fa;border-radius:8px;font-size:13.5px;line-height:1.5;">
       <b style="color:#166b57;">Storage instructions</b><br/>
       Refrigerate at 36–46°F (2–8°C). If refrigeration isn't available, it may be kept at room temperature (up to 86°F / 30°C) for a limited time per your medication's label. Keep in the original packaging, away from light, and do not freeze.</div>
     <p style="font-size:14px;">Questions about your medication? Message your care team in the patient portal.</p>`),

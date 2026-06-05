@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { toast } from "@/lib/hooks/useToast";
 import { usePatients } from "@/lib/hooks/usePatients";
+import { usePermission } from "@/lib/rbac/usePermission";
 import { SectionCard, DataField, DataGrid } from "@/components/modules/chart/SectionCard";
 import type { Patient, PatientExtra } from "@/lib/types";
 
@@ -22,6 +23,7 @@ function Box({ label, full, children }: { label: string; full?: boolean; childre
 
 export function ProfileTab({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
   const updatePatient = usePatients((s) => s.update);
+  const canEdit = usePermission("patients.edit");
   const a = extra.address;
 
   // Read-mode display values prefer the patient's own (persisted) fields, with
@@ -78,7 +80,7 @@ export function ProfileTab({ patient, extra }: { patient: Patient; extra: Patien
             <button className="btn btn-primary btn-sm" onClick={save}>Save changes</button>
           </div>
         ) : (
-          <button className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit profile</button>
+          canEdit && <button className="btn btn-ghost btn-sm" onClick={startEdit}>✏️ Edit profile</button>
         )}
       </div>
 

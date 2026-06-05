@@ -21,9 +21,9 @@ export default function LoginPage() {
   useEffect(() => { hydrate(); }, [hydrate]);
   useEffect(() => { if (hydrated && user) router.replace("/dashboard"); }, [hydrated, user, router]);
 
-  function submit() {
+  async function submit() {
     setBusy(true);
-    const res = login(email, password);
+    const res = await login(email, password);
     if (!res.ok) { setErr(res.error || "Sign in failed."); setBusy(false); return; }
     router.replace("/dashboard");
   }
