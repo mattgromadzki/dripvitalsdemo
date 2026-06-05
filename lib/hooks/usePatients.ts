@@ -9,6 +9,7 @@ interface PatientsState {
   nextNumericId: number;
   add: (p: Omit<Patient, "id">) => Patient;
   update: (id: string, patch: Partial<Patient>) => void;
+  upsert: (p: Patient) => void;
   remove: (id: string) => void;
 }
 
@@ -47,6 +48,16 @@ export const usePatients = create<PatientsState>((set) => ({
     set((s) => ({
       patients: s.patients.map((p) => (p.id === id ? { ...p, ...patch } : p)),
     }));
+  },
+  upsert: (p) => {
+    set((s) => {
+      const exists = s.patients.some((x) => x.id === p.id);
+      const patients = exists
+        ? s.patients.map((x) => (x.id === p.id ? { ...x, ...p } : x))
+        : [p, ...s.patients];
+      const n = parseInt((p.id.match(/PT-(\d+)/) || [])[1] || "0", 10);
+      return { patients, nextNumericId: Math.max(s.nextNumericId, n + 1) };
+    });
   },
   remove: (id) => {
     set((s) => ({ patients: s.patients.filter((p) => p.id !== id) }));

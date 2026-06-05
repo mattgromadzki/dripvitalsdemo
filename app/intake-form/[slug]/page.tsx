@@ -76,6 +76,7 @@ export default function IntakeFormPage() {
     let pid = createdPatientId.current;
     if (pid) updatePatient(pid, fields);
     else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
+    syncCrm(pid);
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", id: pid }) }).catch(() => {});
     if (client.email) alertWelcome({ email: client.email, name, first });
 
@@ -98,6 +99,14 @@ export default function IntakeFormPage() {
     });
   }
 
+  // Push the full patient profile to the server so it lands in the CRM roster
+  // immediately, across devices.
+  function syncCrm(id: string | null) {
+    if (!id) return;
+    const p = usePatients.getState().patients.find((x) => x.id === id);
+    if (p) fetch("/api/crm/patients", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ patient: p }) }).catch(() => {});
+  }
+
   // Fired as soon as the patient enters name + email (and phone). Pre-creates
   // the CRM patient profile, then keeps it updated as more is captured.
   function handleLead(info: { first: string; last: string; phone: string; email: string }) {
@@ -107,6 +116,7 @@ export default function IntakeFormPage() {
         first: info.first || undefined, last: info.last || undefined, name,
         email: info.email || undefined, phone: info.phone || undefined,
       });
+      syncCrm(createdPatientId.current);
       return;
     }
     const np = nowParts();
@@ -123,6 +133,7 @@ export default function IntakeFormPage() {
     createdPatientId.current = created.id;
     // Register the started intake server-side so the 24h reminder can fire if abandoned.
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: created.id, name, email: info.email, phone: info.phone }) }).catch(() => {});
+    syncCrm(created.id);
   }
 
   // Fired on each step so the profile reflects how far the patient has gotten.
@@ -137,6 +148,7 @@ export default function IntakeFormPage() {
     updatePatient(createdPatientId.current, { intakeProgress: label });
     // Mirror progress server-side so the EMR sees it across devices/sessions.
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "progress", id: createdPatientId.current, progress: label }) }).catch(() => {});
+    syncCrm(createdPatientId.current);
   }
 
   return (
