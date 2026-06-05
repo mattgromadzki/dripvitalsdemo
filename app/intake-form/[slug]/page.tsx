@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PatientIntakeFlow } from "@/components/modules/PatientIntakeFlow";
 import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
@@ -28,6 +28,31 @@ export default function IntakeFormPage() {
 
   const form = useMemo(() => forms.find((f) => f.slug === slug), [forms, slug]);
 
+  // Pull the latest treatments + forms from the server BEFORE rendering the
+  // questionnaire, so patients always see the clinic's current edits (not the
+  // seed baked into their device). Falls back to whatever's local on error.
+  const [formsReady, setFormsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [f, t] = await Promise.all([
+          fetch("/api/store/intake-forms", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+          fetch("/api/store/treatments", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+        ]);
+        if (!alive) return;
+        const cur = useTreatmentsIntake.getState();
+        useTreatmentsIntake.setState({
+          forms: (f?.data ?? cur.forms) as typeof cur.forms,
+          treatments: (t?.data ?? cur.treatments) as typeof cur.treatments,
+        });
+      } catch { /* ignore — fall back to local */ }
+      if (alive) setFormsReady(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  if (!formsReady) return <Msg icon="⏳" title="Loading…" sub="Fetching the latest form." />;
   if (!form) return <Msg icon="🔍" title="Form not found" sub={`No intake form for “${slug}”.`} />;
   if (!form.active) return <Msg icon="🚧" title="This form is not active" sub="Please check back later or contact the clinic." />;
 
