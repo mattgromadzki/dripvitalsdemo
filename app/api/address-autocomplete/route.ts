@@ -49,27 +49,47 @@ const FALLBACK_CITIES: [string, string, string][] = [
 ];
 const SUFFIXES = ["St", "Ave", "Rd", "Dr", "Blvd", "Ln", "Way", "Ct"];
 function hash(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
-function titleCase(s: string): string { return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()); }
+const DIRECTIONALS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW", "US"]);
+function caseToken(t: string): string {
+  const up = t.toUpperCase();
+  if (DIRECTIONALS.has(up)) return up;                 // keep directionals upper: SW, NE
+  if (/^\d+(st|nd|rd|th)$/i.test(t)) return t.toLowerCase(); // ordinals: 3rd, 1st
+  if (/^\d+$/.test(t)) return t;                        // plain numbers
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+function formatStreet(s: string): string {
+  return s.trim().split(/\s+/).filter(Boolean).map(caseToken).join(" ");
+}
+const SUFFIX_RE = /\b(st|street|ave|avenue|rd|road|dr|drive|blvd|ln|lane|way|ct|court|pl|place|ter|terrace|cir|circle|hwy|pkwy)\.?$/i;
 
 function mockSuggest(q: string, state?: string): AddressSuggestion[] {
-  const m = q.trim().match(/^(\d+)\s*(.*)$/);
-  const num = m ? m[1] : String(100 + (hash(q) % 8900));
-  const rawName = (m ? m[2] : q).replace(/\b(st|street|ave|avenue|rd|road|dr|drive|blvd|ln|way|ct)\b/gi, "").trim();
-  const name = titleCase(rawName.split(/\s+/)[0] || "Main");
+  // Split an optional leading house number from the rest of the street, and
+  // KEEP the full street the user typed (e.g. "SW 3rd St") instead of mangling it.
+  const m = q.trim().match(/^(\d+)\s+(.+)$/);
+  const num = m ? parseInt(m[1], 10) : 100 + (hash(q) % 8900);
+  const rawStreet = (m ? m[2] : q).trim();
+  const hasSuffix = SUFFIX_RE.test(rawStreet);
+  const baseStreet = formatStreet(rawStreet);
   const base = hash(q);
+
+  function loc(i: number): [string, string, string] {
+    if (state && STATE_CITY[state]) { const [c, z] = STATE_CITY[state]; return [c, state, z]; }
+    if (state) return ["Springfield", state, String(10000 + ((base + i) % 89999)).padStart(5, "0")];
+    return FALLBACK_CITIES[(base + i) % FALLBACK_CITIES.length];
+  }
 
   const out: AddressSuggestion[] = [];
   const used = new Set<string>();
   for (let i = 0; i < 5; i++) {
-    const suf = SUFFIXES[(base + i) % SUFFIXES.length];
-    let city: string, st: string, zip: string;
-    if (state && STATE_CITY[state]) { [city, zip] = STATE_CITY[state]; st = state; }
-    else if (state) { city = "Springfield"; st = state; zip = String(10000 + ((base + i) % 89999)).padStart(5, "0"); }
-    else { [city, st, zip] = FALLBACK_CITIES[(base + i) % FALLBACK_CITIES.length]; }
-    const numI = i === 0 ? num : String(parseInt(num, 10) + i * 2);
-    const street = `${numI} ${name} ${suf}`;
-    if (used.has(street + st)) continue;
-    used.add(street + st);
+    // If the street already has a suffix, mirror the typed address first, then
+    // offer nearby house numbers. If not, offer the street with a few suffixes.
+    const street = hasSuffix
+      ? `${i === 0 ? num : num + i * 2} ${baseStreet}`
+      : `${num} ${baseStreet} ${SUFFIXES[(base + i) % SUFFIXES.length]}`;
+    const [city, st, zip] = loc(i);
+    const key = street + st;
+    if (used.has(key)) continue;
+    used.add(key);
     out.push({ street, city, state: st, zip, text: `${street}, ${city}, ${st} ${zip}` });
   }
   return out;
