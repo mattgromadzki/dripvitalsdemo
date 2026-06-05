@@ -63,12 +63,15 @@ function mockSuggest(q: string, state?: string): AddressSuggestion[] {
   const baseStreet = formatStreet(rawStreet);
   const base = hash(q);
 
+  // Keep the state's real ZIP prefix (metro region) but vary the last 2 digits
+  // per street, so different addresses get different valid ZIPs.
+  const zipVary = (z: string) => z.slice(0, 3) + String(hash(baseStreet + (state || "")) % 100).padStart(2, "0");
   function loc(i: number): [string, string, string] {
-    if (state && STATE_CITY_ZIP[state]) { const { city, zip } = STATE_CITY_ZIP[state]; return [city, state, zip]; }
+    if (state && STATE_CITY_ZIP[state]) { const { city, zip } = STATE_CITY_ZIP[state]; return [city, state, zipVary(zip)]; }
     if (state) return ["Springfield", state, "00000"]; // unrecognized state code
     const fb = FALLBACK_STATES[(base + i) % FALLBACK_STATES.length];
     const { city, zip } = STATE_CITY_ZIP[fb];
-    return [city, fb, zip];
+    return [city, fb, zipVary(zip)];
   }
 
   const out: AddressSuggestion[] = [];
@@ -92,7 +95,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = (searchParams.get("q") || "").trim();
   const state = searchParams.get("state") || undefined;
-  if (q.length < 3) return Response.json({ suggestions: [] });
+  const live = !!(SMARTY_ID && SMARTY_TOKEN);
+  if (q.length < 3) return Response.json({ suggestions: [], source: live ? "smarty" : "mock" });
   try {
     const suggestions = SMARTY_ID && SMARTY_TOKEN ? await realSuggest(q, state) : mockSuggest(q, state);
     return Response.json({ suggestions, source: SMARTY_ID && SMARTY_TOKEN ? "smarty" : "mock" });

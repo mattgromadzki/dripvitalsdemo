@@ -113,8 +113,11 @@ function mockValidate(input: UspsValidateInput): UspsValidateResult {
 
   const std = standardizeStreet(street);
   const h = hash(std + cityIn.toUpperCase() + state + zip);
-  // Fill a blank ZIP with the state's real representative ZIP (not a random one).
-  if (!zip) zip = STATE_CITY_ZIP[state]?.zip || String(10000 + (h % 89999)).padStart(5, "0");
+  // Fill a blank ZIP with the state's real metro prefix + street-varied digits.
+  if (!zip) {
+    const rep = STATE_CITY_ZIP[state]?.zip;
+    zip = rep ? rep.slice(0, 3) + String(h % 100).padStart(2, "0") : String(10000 + (h % 89999)).padStart(5, "0");
+  }
   const city = (cityIn || STATE_CITY_ZIP[state]?.city || "Springfield").toUpperCase();
 
   const hasSecondary = !!(input.secondaryAddress && input.secondaryAddress.trim()) || /\b(APT|STE|UNIT|#)\b/.test(std);

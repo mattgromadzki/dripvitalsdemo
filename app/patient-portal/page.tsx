@@ -14,6 +14,7 @@ import { SHOP_CATEGORY_LABEL } from "@/lib/data/shopProducts";
 import type { ShopProduct, ShopCategory } from "@/lib/types";
 import { validateAddress } from "@/lib/usps/validateAddress";
 import { fetchSuggestions } from "@/lib/usps/autocomplete";
+import { AddressLookupBadge } from "@/components/ui/AddressLookupBadge";
 import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@/lib/usps/types";
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1270,6 +1271,7 @@ function AddressVerify({ initialStreet, initialApt, initialCity, initialState, i
               ))}
             </div>
           )}
+          <div style={{ marginTop: 5 }}><AddressLookupBadge /></div>
         </div>
         <div className="form-field">
           <div className="form-label">Apt / Suite / Unit</div>

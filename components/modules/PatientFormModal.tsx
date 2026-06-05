@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import type { Patient } from "@/lib/types";
 import { validateAddress } from "@/lib/usps/validateAddress";
 import { fetchSuggestions } from "@/lib/usps/autocomplete";
+import { AddressLookupBadge } from "@/components/ui/AddressLookupBadge";
 import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@/lib/usps/types";
 
 const COLORS = [
@@ -249,6 +250,7 @@ export function PatientFormModal({ open, onClose, patient, onSave }: PatientForm
                 </div>
               )}
             </div>
+            <div className="mt-1"><AddressLookupBadge /></div>
           </Field>
           <Field label="Apt / Suite / Unit">
             <input className="fi" placeholder="Apt 4 (optional)" value={form.apt} onChange={(e) => field("apt", e.target.value)} />
