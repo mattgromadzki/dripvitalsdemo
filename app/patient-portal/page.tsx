@@ -13,7 +13,7 @@ import type { ShotEntry } from "@/lib/data/portalRecords";
 import { SHOP_CATEGORY_LABEL } from "@/lib/data/shopProducts";
 import type { ShopProduct, ShopCategory } from "@/lib/types";
 import { validateAddress } from "@/lib/usps/validateAddress";
-import { fetchSuggestions } from "@/lib/usps/autocomplete";
+import { fetchSuggestions, cleanStreet } from "@/lib/usps/autocomplete";
 import { AddressLookupBadge } from "@/components/ui/AddressLookupBadge";
 import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@/lib/usps/types";
 
@@ -1239,14 +1239,14 @@ function AddressVerify({ initialStreet, initialApt, initialCity, initialState, i
     else { setSug([]); setShowSug(false); }
   }
   function pick(s: AddressSuggestion) {
-    setStreet(s.street); setApt(s.secondary || apt); setCity(s.city); setStateV(s.state); setZip(s.zip);
+    setStreet(cleanStreet(s.street)); setApt(s.secondary || apt); setCity(s.city); setStateV(s.state); setZip(s.zip);
     setSug([]); setShowSug(false);
     verifyWith({ streetAddress: s.street, secondaryAddress: s.secondary, city: s.city, state: s.state, ZIPCode: s.zip });
   }
   function apply() {
     if (!res?.address) return;
     const a = res.address;
-    setStreet(a.streetAddress);
+    setStreet(cleanStreet(a.streetAddress));
     setApt(a.secondaryAddress || apt);
     setCity(a.city); setStateV(a.state); setZip(a.ZIPPlus4 ? `${a.ZIPCode}-${a.ZIPPlus4}` : a.ZIPCode);
     setRes({ ...res, changed: false, status: res.dpv === "Y" ? "verified" : res.status, message: res.dpv === "Y" ? "Address verified — deliverable by USPS." : res.message });

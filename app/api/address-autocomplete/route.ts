@@ -53,25 +53,43 @@ function formatStreet(s: string): string {
 }
 const SUFFIX_RE = /\b(st|street|ave|avenue|rd|road|dr|drive|blvd|ln|lane|way|ct|court|pl|place|ter|terrace|cir|circle|hwy|pkwy)\.?$/i;
 
+// Pull any city / state / ZIP the user typed out of the street, so the street
+// line keeps only the house number + name (e.g. "92 SW 3rd Ave").
+function splitTyped(q: string): { street: string; zip?: string } {
+  const s = q.trim();
+  if (s.includes(",")) {
+    const parts = s.split(",");
+    const z = parts.slice(1).join(" ").match(/\b(\d{5})(?:-\d{4})?\b/);
+    return { street: parts[0].trim(), zip: z ? z[1] : undefined };
+  }
+  // No comma: peel a trailing "ST 12345" (state + ZIP) or a bare trailing ZIP.
+  let m = s.match(/^(.*?)\s+([A-Za-z]{2})\s+(\d{5})(?:-\d{4})?$/);
+  if (m && STATE_CITY_ZIP[m[2].toUpperCase()]) return { street: m[1].trim(), zip: m[3] };
+  m = s.match(/^(.*?)\s+(\d{5})(?:-\d{4})?$/);
+  if (m) return { street: m[1].trim(), zip: m[2] };
+  return { street: s };
+}
+
 function mockSuggest(q: string, state?: string): AddressSuggestion[] {
+  const { street: cleanedQ, zip: typedZip } = splitTyped(q);
   // Split an optional leading house number from the rest of the street, and
   // KEEP the full street the user typed (e.g. "SW 3rd St") instead of mangling it.
-  const m = q.trim().match(/^(\d+)\s+(.+)$/);
-  const num = m ? parseInt(m[1], 10) : 100 + (hash(q) % 8900);
-  const rawStreet = (m ? m[2] : q).trim();
+  const m = cleanedQ.match(/^(\d+)\s+(.+)$/);
+  const num = m ? parseInt(m[1], 10) : 100 + (hash(cleanedQ) % 8900);
+  const rawStreet = (m ? m[2] : cleanedQ).trim();
   const hasSuffix = SUFFIX_RE.test(rawStreet);
   const baseStreet = formatStreet(rawStreet);
   const base = hash(q);
 
   // Keep the state's real ZIP prefix (metro region) but vary the last 2 digits
-  // per street, so different addresses get different valid ZIPs.
+  // per street; if the user typed a ZIP, use that instead.
   const zipVary = (z: string) => z.slice(0, 3) + String(hash(baseStreet + (state || "")) % 100).padStart(2, "0");
   function loc(i: number): [string, string, string] {
-    if (state && STATE_CITY_ZIP[state]) { const { city, zip } = STATE_CITY_ZIP[state]; return [city, state, zipVary(zip)]; }
-    if (state) return ["Springfield", state, "00000"]; // unrecognized state code
+    if (state && STATE_CITY_ZIP[state]) { const { city, zip } = STATE_CITY_ZIP[state]; return [city, state, typedZip || zipVary(zip)]; }
+    if (state) return ["Springfield", state, typedZip || "00000"]; // unrecognized state code
     const fb = FALLBACK_STATES[(base + i) % FALLBACK_STATES.length];
     const { city, zip } = STATE_CITY_ZIP[fb];
-    return [city, fb, zipVary(zip)];
+    return [city, fb, typedZip || zipVary(zip)];
   }
 
   const out: AddressSuggestion[] = [];

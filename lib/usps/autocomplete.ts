@@ -1,6 +1,12 @@
 "use client";
 import type { AddressSuggestion } from "./types";
 
+// Defensive: keep only the street line (drop anything after a comma and any
+// trailing ZIP), so the street field never contains city/state/ZIP.
+export function cleanStreet(s: string): string {
+  return (s || "").split(",")[0].replace(/\s+\d{5}(-\d{4})?\s*$/, "").trim();
+}
+
 // Reports whether real address lookup (Smarty) is connected, or the app is
 // running on the built-in demo generator. Used by the address-field badge.
 export async function fetchAddressMode(): Promise<"smarty" | "mock"> {

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/Modal";
 import type { Patient } from "@/lib/types";
 import { validateAddress } from "@/lib/usps/validateAddress";
-import { fetchSuggestions } from "@/lib/usps/autocomplete";
+import { fetchSuggestions, cleanStreet } from "@/lib/usps/autocomplete";
 import { AddressLookupBadge } from "@/components/ui/AddressLookupBadge";
 import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@/lib/usps/types";
 
@@ -114,14 +114,14 @@ export function PatientFormModal({ open, onClose, patient, onSave }: PatientForm
     } else { setSuggestions([]); setShowSug(false); }
   }
   function pickSuggestion(s: AddressSuggestion) {
-    setForm((f) => ({ ...f, address: s.street, apt: s.secondary || f.apt, city: s.city, state: s.state, zip: s.zip }));
+    setForm((f) => ({ ...f, address: cleanStreet(s.street), apt: s.secondary || f.apt, city: s.city, state: s.state, zip: s.zip }));
     setSuggestions([]); setShowSug(false);
     doVerify({ streetAddress: s.street, secondaryAddress: s.secondary, city: s.city, state: s.state, ZIPCode: s.zip });
   }
   function applyStandardized() {
     if (!verify?.address) return;
     const a = verify.address;
-    setForm((f) => ({ ...f, address: a.streetAddress, apt: a.secondaryAddress || f.apt, city: a.city, zip: a.ZIPPlus4 ? `${a.ZIPCode}-${a.ZIPPlus4}` : a.ZIPCode, state: a.state }));
+    setForm((f) => ({ ...f, address: cleanStreet(a.streetAddress), apt: a.secondaryAddress || f.apt, city: a.city, zip: a.ZIPPlus4 ? `${a.ZIPCode}-${a.ZIPPlus4}` : a.ZIPCode, state: a.state }));
     setVerify({ ...verify, changed: false, status: verify.dpv === "Y" ? "verified" : verify.status, message: verify.dpv === "Y" ? "Address verified — deliverable by USPS." : verify.message });
   }
 
