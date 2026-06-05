@@ -1,4 +1,5 @@
 import type { UspsValidateInput, UspsValidateResult, UspsStandardized } from "@/lib/usps/types";
+import { STATE_CITY_ZIP } from "@/lib/usps/stateZip";
 
 /* ────────────────────────────────────────────────────────────────────────
    USPS Addresses API v3 — server-side validation.
@@ -112,15 +113,16 @@ function mockValidate(input: UspsValidateInput): UspsValidateResult {
 
   const std = standardizeStreet(street);
   const h = hash(std + cityIn.toUpperCase() + state + zip);
-  if (!zip) zip = String(10000 + (h % 89999)).padStart(5, "0");
-  const plus4 = String(1000 + (h % 9000));
-  const city = (cityIn || "SPRINGFIELD").toUpperCase();
+  // Fill a blank ZIP with the state's real representative ZIP (not a random one).
+  if (!zip) zip = STATE_CITY_ZIP[state]?.zip || String(10000 + (h % 89999)).padStart(5, "0");
+  const city = (cityIn || STATE_CITY_ZIP[state]?.city || "Springfield").toUpperCase();
 
   const hasSecondary = !!(input.secondaryAddress && input.secondaryAddress.trim()) || /\b(APT|STE|UNIT|#)\b/.test(std);
   const needsSecondary = !hasSecondary && h % 4 === 0; // ~25% of multi-unit-looking addresses
   const vacant = h % 11 === 0;
 
-  const address: UspsStandardized = { streetAddress: std, secondaryAddress: input.secondaryAddress?.trim() || undefined, city, state, ZIPCode: zip, ZIPPlus4: plus4 };
+  // No fabricated ZIP+4 — only a real provider can supply an accurate one.
+  const address: UspsStandardized = { streetAddress: std, secondaryAddress: input.secondaryAddress?.trim() || undefined, city, state, ZIPCode: zip, ZIPPlus4: undefined };
   const changed = changedFrom(input, address);
 
   const corrections: string[] = [];

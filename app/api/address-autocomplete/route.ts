@@ -1,4 +1,5 @@
 import type { AddressSuggestion } from "@/lib/usps/types";
+import { STATE_CITY_ZIP, FALLBACK_STATES } from "@/lib/usps/stateZip";
 
 /* ────────────────────────────────────────────────────────────────────────
    Address autocomplete (type-ahead). USPS itself has no autocomplete, so this
@@ -37,16 +38,6 @@ async function realSuggest(q: string, state?: string): Promise<AddressSuggestion
 }
 
 // ── Mock ──────────────────────────────────────────────────────────────────
-const STATE_CITY: Record<string, [string, string]> = {
-  FL: ["Miami", "33101"], TX: ["Austin", "78701"], CA: ["Los Angeles", "90012"], NY: ["Brooklyn", "11201"],
-  WA: ["Seattle", "98101"], CO: ["Denver", "80202"], GA: ["Atlanta", "30303"], IL: ["Chicago", "60601"],
-  AZ: ["Phoenix", "85004"], NC: ["Charlotte", "28202"], OH: ["Columbus", "43215"], PA: ["Philadelphia", "19103"],
-  MA: ["Boston", "02108"], NJ: ["Newark", "07102"], VA: ["Richmond", "23219"], MI: ["Detroit", "48226"],
-};
-const FALLBACK_CITIES: [string, string, string][] = [
-  ["Miami", "FL", "33101"], ["Austin", "TX", "78701"], ["Denver", "CO", "80202"],
-  ["Brooklyn", "NY", "11201"], ["Seattle", "WA", "98101"], ["Chicago", "IL", "60601"],
-];
 const SUFFIXES = ["St", "Ave", "Rd", "Dr", "Blvd", "Ln", "Way", "Ct"];
 function hash(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
 const DIRECTIONALS = new Set(["N", "S", "E", "W", "NE", "NW", "SE", "SW", "US"]);
@@ -73,9 +64,11 @@ function mockSuggest(q: string, state?: string): AddressSuggestion[] {
   const base = hash(q);
 
   function loc(i: number): [string, string, string] {
-    if (state && STATE_CITY[state]) { const [c, z] = STATE_CITY[state]; return [c, state, z]; }
-    if (state) return ["Springfield", state, String(10000 + ((base + i) % 89999)).padStart(5, "0")];
-    return FALLBACK_CITIES[(base + i) % FALLBACK_CITIES.length];
+    if (state && STATE_CITY_ZIP[state]) { const { city, zip } = STATE_CITY_ZIP[state]; return [city, state, zip]; }
+    if (state) return ["Springfield", state, "00000"]; // unrecognized state code
+    const fb = FALLBACK_STATES[(base + i) % FALLBACK_STATES.length];
+    const { city, zip } = STATE_CITY_ZIP[fb];
+    return [city, fb, zip];
   }
 
   const out: AddressSuggestion[] = [];
