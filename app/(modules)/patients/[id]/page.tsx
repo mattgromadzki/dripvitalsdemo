@@ -13,7 +13,6 @@ import { ProfileTab }     from "@/components/modules/chart/tabs/ProfileTab";
 import { LabsTab }        from "@/components/modules/chart/tabs/LabsTab";
 import { VisitsTab }      from "@/components/modules/chart/tabs/VisitsTab";
 import { ProgressTab }    from "@/components/modules/chart/tabs/ProgressTab";
-import { MessagesTab }    from "@/components/modules/chart/tabs/MessagesTab";
 import { BillingTab }     from "@/components/modules/chart/tabs/BillingTab";
 import { DocumentsTab }   from "@/components/modules/chart/tabs/DocumentsTab";
 import { ComplianceTab }  from "@/components/modules/chart/tabs/ComplianceTab";
@@ -76,7 +75,6 @@ export default function PatientDetailPage() {
           {tab === "labs"           && <LabsTab       patient={patient} extra={extra} />}
           {tab === "visits"         && <VisitsTab     patient={patient} extra={extra} />}
           {tab === "progress"       && <ProgressTab   patient={patient} extra={extra} />}
-          {tab === "messages"       && <MessagesTab   patient={patient} extra={extra} />}
           {tab === "billing"        && <BillingTab    patient={patient} extra={extra} />}
           {tab === "documents"      && <DocumentsTab  patient={patient} extra={extra} />}
           {tab === "compliance"     && <ComplianceTab patient={patient} extra={extra} />}
