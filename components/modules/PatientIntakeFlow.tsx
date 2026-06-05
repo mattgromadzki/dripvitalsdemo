@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { toast } from "@/lib/hooks/useToast";
 import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
+import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
+import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
 
 function nowStamp(): string {
@@ -98,6 +100,24 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   const [selectedTxId, setSelectedTxId] = useState<number | null>(null);
 
   const [leadId, setLeadId] = useState<number | null>(null);
+
+  // Success-screen password creation (option 1). Sets the patient's portal
+  // password for the email captured during intake.
+  const setPortalPassword = usePatientAuth((s) => s.resetPassword);
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [pwSaved, setPwSaved] = useState(false);
+  const [pwErr, setPwErr] = useState("");
+  function handleSetPassword() {
+    setPwErr("");
+    if (pw.length < 8) { setPwErr("Use at least 8 characters."); return; }
+    if (pw !== pw2) { setPwErr("Passwords don't match."); return; }
+    const email = (useTreatmentsIntake.getState().clients.find((c) => c.id === leadId)?.email || "").trim();
+    if (!email) { setPwErr("We couldn't find your email — we'll send you a link to set it."); return; }
+    const res = setPortalPassword(email, pw, usePatients.getState().patients);
+    if (!res.ok) { setPwErr(res.error || "Couldn't set password here — check the link we emailed you."); return; }
+    setPwSaved(true);
+  }
 
   // Checkout state
   const [coCardNum,  setCoCardNum]  = useState("");
@@ -1386,6 +1406,32 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   if (stage === "success") {
     return shell(<>
         <div className="dv-question">Thank you for completing the quiz and placing your order. Here&apos;s what&apos;s next:</div>
+
+        {live && (
+          <div className="dv-fields" style={{ marginTop: 22, padding: 16, border: "1px solid var(--dv-border, #e6e9ef)", borderRadius: 12 }}>
+            {pwSaved ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600, color: "var(--dv-brand-dk, #166b57)" }}>
+                ✓ Password set — you can now sign in to your patient portal anytime.
+              </div>
+            ) : (
+              <>
+                <div className="dv-question" style={{ fontSize: 17, marginBottom: 2 }}>Create your password</div>
+                <div className="dv-helper" style={{ marginBottom: 4 }}>Set a password to access your patient portal and track your treatment. We&apos;ve also emailed you a link in case you&apos;d rather do it later.</div>
+                <div>
+                  <div className="dv-field-label">Password</div>
+                  <div className="dv-input-wrap"><input className="dv-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" placeholder="At least 8 characters" /></div>
+                </div>
+                <div>
+                  <div className="dv-field-label">Confirm password</div>
+                  <div className="dv-input-wrap"><input className="dv-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" placeholder="Re-enter password" onKeyDown={(e) => { if (e.key === "Enter") handleSetPassword(); }} /></div>
+                </div>
+                {pwErr && <div style={{ color: "var(--dv-red, #c0392b)", fontSize: 13, fontWeight: 600 }}>{pwErr}</div>}
+                <button className="dv-btn-primary" onClick={handleSetPassword} style={{ marginTop: 4 }}>Set password</button>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="dv-success-list" style={{ marginTop: 28 }}>
           <div className="dv-success-step done">
             <div className="dv-success-step-body">

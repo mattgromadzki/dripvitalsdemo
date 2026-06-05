@@ -123,6 +123,12 @@ export default function PatientPortalPage() {
   useEffect(() => { hydrateAuth(); }, [hydrateAuth]);
   const [authView, setAuthView] = useState<"login" | "forgot" | "reset">("login");
   const [authEmail, setAuthEmail] = useState("");
+  // Deep link from the welcome email (?setpw=<email>) opens the set-password view.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const setpw = new URLSearchParams(window.location.search).get("setpw");
+    if (setpw) { setAuthEmail(setpw); setAuthView("reset"); }
+  }, []);
   const [authPw, setAuthPw] = useState("");
   const [authErr, setAuthErr] = useState<string | null>(null);
   const [resetPw, setResetPw] = useState("");

@@ -177,7 +177,7 @@ export default function PatientsPage() {
                         <div>
                           <Link href={`/patients/${r.p.id}`} className="text-brand-dk font-semibold hover:underline">{r.p.name}</Link>
                           <div className="font-mono text-[10.5px] text-ink-muted">{r.p.id}</div>
-                          {r.p.status === "in_progress" && r.p.intakeProgress && <div className="text-[10.5px] text-amber font-semibold mt-0.5">⏳ Intake: {r.p.intakeProgress}</div>}
+                          {r.p.intakeProgress && r.p.intakeProgress !== "Completed" && <div className="text-[10.5px] text-amber font-semibold mt-0.5">⏳ Intake: {r.p.intakeProgress}</div>}
                         </div>
                       </div>
                     </td>

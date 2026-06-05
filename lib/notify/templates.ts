@@ -37,12 +37,13 @@ const DEFAULTS: Record<string, EmailTemplate> = {
   welcome: {
     type: "welcome", label: "Welcome (account created)",
     description: "Sent when a patient account is created.",
-    placeholders: ["name"],
+    placeholders: ["name", "setPasswordUrl"],
     subject: "Welcome to DripVitals",
     html: shell("Welcome to DripVitals", `
     <p style="font-size:14px;line-height:1.5;">Hi {{name}}, welcome to DripVitals! Your account has been created.</p>
-    <p style="font-size:14px;line-height:1.5;">Our care team is reviewing your information. You can sign in to your patient portal anytime to message your provider, track your treatment, and manage your account.</p>
-    <p style="font-size:14px;">We're glad you're here.</p>`),
+    <p style="font-size:14px;line-height:1.5;">Set your password to access your patient portal, where you can message your provider, track your treatment, and manage your account.</p>
+    <p style="text-align:center;margin:18px 0;"><a href="{{setPasswordUrl}}" style="display:inline-block;background:#1f8a70;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 22px;border-radius:8px;">Set your password</a></p>
+    <p style="font-size:12px;color:#9aa6b8;">If the button doesn't work, copy and paste this link into your browser:<br/>{{setPasswordUrl}}</p>`),
   },
   intake_reminder: {
     type: "intake_reminder", label: "Intake reminder (24h)",

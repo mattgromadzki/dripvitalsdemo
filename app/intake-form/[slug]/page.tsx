@@ -112,12 +112,12 @@ export default function IntakeFormPage() {
     const np = nowParts();
     const created = addPatient({
       first: info.first || name, last: info.last || "—", name, email: info.email, phone: info.phone,
-      age: 0, gender: "Other", state: "—", status: "in_progress", lifecycle: "awaiting_review",
+      age: 0, gender: "Other", state: "—", status: "pending", lifecycle: "intake_pending",
       dob: undefined, goalWt: undefined, zip: undefined,
       plan: "—", dose: "—", week: 0, provider: "Unassigned", doctorId: 1, pharmacyId: 1,
       wt: 0, wtStart: 0, bmi: 0, bp: "—", hr: 0,
       since: np.today, startDate: np.today, lastVisit: "—", lastOrder: "—", nextRefill: "—", _refillDays: 30,
-      sub: "—", allergies: "None", tags: ["Intake in progress"], notes: "Lead captured during intake.",
+      sub: "—", allergies: "None", tags: ["New intake"], notes: "Created from intake form.",
       color: COLORS[name.length % COLORS.length], intakeProgress: "Contact captured",
     });
     createdPatientId.current = created.id;

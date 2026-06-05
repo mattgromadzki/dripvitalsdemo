@@ -6,7 +6,7 @@ interface Tmpl { type: string; label: string; description: string; placeholders:
 
 const SAMPLE: Record<string, Record<string, string>> = {
   new_message: { name: "Matthew", message: "Your refill has been approved and ships today." },
-  welcome: { name: "Matthew" },
+  welcome: { name: "Matthew", setPasswordUrl: "https://dripvitalsdemo.vercel.app/patient-portal?setpw=matthew@example.com" },
   intake_reminder: { name: "Matthew" },
   approval: { name: "Matthew", treatment: " (Semaglutide 3-Month)" },
   rx_pharmacy: { name: "Matthew", medication: " (Semaglutide 0.25 mg)", pharmacy: "Hallandale Pharmacy" },

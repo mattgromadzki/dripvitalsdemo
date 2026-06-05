@@ -51,10 +51,10 @@ export default function PatientDetailPage() {
       {/* Always-visible rich header */}
       <ChartHeaderRich patient={patient} extra={extra} />
 
-      {patient.status === "in_progress" && patient.intakeProgress && (
+      {patient.intakeProgress && patient.intakeProgress !== "Completed" && (
         <div className="mt-3 px-4 py-3 rounded-xl bg-amber-soft text-amber border border-border text-[13px] font-semibold flex items-center gap-2">
           ⏳ Intake in progress — {patient.intakeProgress}
-          <span className="font-normal text-[12px] opacity-80">· profile pre-created from the intake form; details fill in when the patient completes it.</span>
+          <span className="font-normal text-[12px] opacity-80">· the rest of the chart fills in as the patient completes the intake.</span>
         </div>
       )}
 

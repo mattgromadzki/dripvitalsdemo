@@ -39,7 +39,9 @@ async function notify(type: string, to: string, toName: string, data: Record<str
 export async function alertWelcome(patient: PatientLike) {
   if (!patient?.email) return;
   const name = nameOf(patient);
-  const ok = await notify("welcome", patient.email, name, { name });
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const setPasswordUrl = `${origin}/patient-portal?setpw=${encodeURIComponent(patient.email)}`;
+  const ok = await notify("welcome", patient.email, name, { name, setPasswordUrl });
   recordLog("Welcome email", patient.email, ok);
 }
 
