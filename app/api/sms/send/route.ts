@@ -1,7 +1,9 @@
 import { sendSms } from "@/lib/sms/provider";
+import { requirePerm } from "@/lib/auth/authorize";
 import type { SendSmsInput } from "@/lib/sms/types";
 
 export async function POST(req: Request) {
+  const gate = await requirePerm(req, "sms.send"); if (gate) return gate;
   let input: SendSmsInput;
   try { input = await req.json(); } catch { return Response.json({ ok: false, error: "Invalid body.", provider: "unknown" }, { status: 400 }); }
   if (!input?.to || !input?.body) return Response.json({ ok: false, error: "Recipient and body are required.", provider: "unknown" }, { status: 400 });

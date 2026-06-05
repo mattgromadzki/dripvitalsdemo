@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { toast } from "@/lib/hooks/useToast";
+import { usePermission } from "@/lib/rbac/usePermission";
+import { PatientContactComposer } from "@/components/modules/chart/PatientContactComposer";
 import { LIFECYCLE_META, LIFECYCLE_ORDER, deriveLifecycle } from "@/lib/data/lifecycle";
 import type { Patient, PatientExtra } from "@/lib/types";
 
 export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
   const update = usePatients((s) => s.update);
   const [open, setOpen] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const canMessage = usePermission("patients.edit") || usePermission("sms.send") || usePermission("email.send");
 
   const current = deriveLifecycle(patient);
   const meta = LIFECYCLE_META[current];
@@ -34,7 +38,7 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
         </div>
         <div className="flex flex-col items-end gap-2.5">
           <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm" onClick={() => toast("✉ Message composer opened")}>✉ Message</button>
+            {canMessage && <button className="btn btn-ghost btn-sm" onClick={() => setComposerOpen(true)}>✉ Message</button>}
             <button className="btn btn-ghost btn-sm" onClick={() => toast("💊 Open the Orders tab to prescribe a paid order")}>💊 Prescribe</button>
             <button className="btn btn-primary btn-sm" onClick={() => toast("🎥 Starting video visit…")}>🎥 Start Visit</button>
           </div>
@@ -94,6 +98,8 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
           <Field label="Last appointment" value={patient.lastVisit} />
         </HeaderCol>
       </div>
+
+      <PatientContactComposer patient={patient} open={composerOpen} onClose={() => setComposerOpen(false)} />
     </div>
   );
 }

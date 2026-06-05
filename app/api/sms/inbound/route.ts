@@ -1,4 +1,5 @@
 import { addInbound } from "@/lib/sms/inboundStore";
+import { verifyTwilioRequest } from "@/lib/sms/verifyTwilio";
 
 /**
  * Twilio "A message comes in" webhook target.
@@ -7,17 +8,24 @@ import { addInbound } from "@/lib/sms/inboundStore";
  *   "A message comes in" → Webhook → https://<your-app>/api/sms/inbound  (HTTP POST)
  *
  * Twilio POSTs application/x-www-form-urlencoded fields: From, To, Body, MessageSid, ...
+ * Requests are verified with the X-Twilio-Signature header.
  */
 export async function POST(req: Request) {
   let from = "", to = "", body = "", sid = "";
+  const params: Record<string, string> = {};
   try {
     const form = await req.formData();
+    for (const [k, v] of form.entries()) params[k] = String(v);
     from = String(form.get("From") || "");
     to = String(form.get("To") || "");
     body = String(form.get("Body") || "");
     sid = String(form.get("MessageSid") || form.get("SmsSid") || "in_" + Date.now());
   } catch {
     // ignore parse errors; we still return valid TwiML below
+  }
+
+  if (!verifyTwilioRequest(req, params)) {
+    return new Response("Invalid Twilio signature.", { status: 403 });
   }
 
   if (from && body) {

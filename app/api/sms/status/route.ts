@@ -1,9 +1,11 @@
 import { setStatus } from "@/lib/sms/inboundStore";
+import { verifyTwilioRequest } from "@/lib/sms/verifyTwilio";
 
 /**
  * Twilio delivery-status callback. The send route registers this URL as the
  * message's StatusCallback, so Twilio POSTs updates here as the message
  * progresses: queued → sent → delivered (or failed/undelivered).
+ * Requests are verified with the X-Twilio-Signature header.
  */
 function mapStatus(s: string): string {
   switch ((s || "").toLowerCase()) {
@@ -23,6 +25,9 @@ function mapStatus(s: string): string {
 export async function POST(req: Request) {
   try {
     const form = await req.formData();
+    const params: Record<string, string> = {};
+    for (const [k, v] of form.entries()) params[k] = String(v);
+    if (!verifyTwilioRequest(req, params)) return new Response(null, { status: 403 });
     const sid = String(form.get("MessageSid") || form.get("SmsSid") || "");
     const status = String(form.get("MessageStatus") || form.get("SmsStatus") || "");
     if (sid && status) await setStatus(sid, mapStatus(status));

@@ -1,14 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { toast } from "@/lib/hooks/useToast";
 import { usePermission } from "@/lib/rbac/usePermission";
+import { PatientContactComposer } from "@/components/modules/chart/PatientContactComposer";
 import type { Patient } from "@/lib/types";
 
 export function ChartActionBar({ patient }: { patient: Patient }) {
   const canLabs = usePermission("labs.order");
   const canRx = usePermission("rx.prescribe");
   const canEdit = usePermission("patients.edit");
+  const canSms = usePermission("sms.send");
+  const canEmail = usePermission("email.send");
+  const canMessage = canEdit || canSms || canEmail;
+
+  const [composerOpen, setComposerOpen] = useState(false);
 
   return (
     <div className="flex items-center gap-2.5 bg-surface border border-border rounded-lg px-3.5 py-2.5 mb-3.5 shadow-xs">
@@ -22,6 +29,11 @@ export function ChartActionBar({ patient }: { patient: Patient }) {
         Patient · <b className="text-ink font-semibold">{patient.name}</b>
       </div>
       <div className="flex-1" />
+      {canMessage && (
+        <button className="btn btn-ghost btn-sm" onClick={() => setComposerOpen(true)}>
+          💬 Message
+        </button>
+      )}
       {canLabs && (
         <button className="btn btn-ghost btn-sm" onClick={() => toast("🧪 Order labs flow opened")}>
           🧪 Order Labs
@@ -42,6 +54,8 @@ export function ChartActionBar({ patient }: { patient: Patient }) {
           🎥 Start Visit
         </button>
       )}
+
+      <PatientContactComposer patient={patient} open={composerOpen} onClose={() => setComposerOpen(false)} />
     </div>
   );
 }
