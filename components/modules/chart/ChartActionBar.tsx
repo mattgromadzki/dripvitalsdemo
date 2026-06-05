@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { toast } from "@/lib/hooks/useToast";
+import { usePermission } from "@/lib/rbac/usePermission";
 import type { Patient } from "@/lib/types";
 
 export function ChartActionBar({ patient }: { patient: Patient }) {
+  const canLabs = usePermission("labs.order");
+  const canRx = usePermission("rx.prescribe");
+  const canEdit = usePermission("patients.edit");
+
   return (
     <div className="flex items-center gap-2.5 bg-surface border border-border rounded-lg px-3.5 py-2.5 mb-3.5 shadow-xs">
       <Link
@@ -17,18 +22,26 @@ export function ChartActionBar({ patient }: { patient: Patient }) {
         Patient · <b className="text-ink font-semibold">{patient.name}</b>
       </div>
       <div className="flex-1" />
-      <button className="btn btn-ghost btn-sm" onClick={() => toast("🧪 Order labs flow opened")}>
-        🧪 Order Labs
-      </button>
-      <button className="btn btn-ghost btn-sm" onClick={() => toast("💊 Prescribe flow opened")}>
-        💊 Prescribe
-      </button>
-      <button className="btn btn-ghost btn-sm" onClick={() => toast("✅ Add task")}>
-        ✅ Add Task
-      </button>
-      <button className="btn btn-primary btn-sm" onClick={() => toast("🎥 Starting video visit…")}>
-        🎥 Start Visit
-      </button>
+      {canLabs && (
+        <button className="btn btn-ghost btn-sm" onClick={() => toast("🧪 Order labs flow opened")}>
+          🧪 Order Labs
+        </button>
+      )}
+      {canRx && (
+        <button className="btn btn-ghost btn-sm" onClick={() => toast("💊 Prescribe flow opened")}>
+          💊 Prescribe
+        </button>
+      )}
+      {canEdit && (
+        <button className="btn btn-ghost btn-sm" onClick={() => toast("✅ Add task")}>
+          ✅ Add Task
+        </button>
+      )}
+      {canEdit && (
+        <button className="btn btn-primary btn-sm" onClick={() => toast("🎥 Starting video visit…")}>
+          🎥 Start Visit
+        </button>
+      )}
     </div>
   );
 }

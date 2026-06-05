@@ -7,23 +7,7 @@ import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
 import { useChatReads, unreadTotal } from "@/lib/hooks/useChatReads";
 import { useUI } from "@/lib/hooks/useUI";
 import { usePermissions } from "@/lib/rbac/usePermission";
-
-// Nav items that require a specific permission. Items not listed are visible to
-// any signed-in user. Owners have all permissions, so they see everything.
-const NAV_PERM: Record<string, string> = {
-  "/intake-review": "intake.review",
-  "/rx": "rx.prescribe", "/e-prescribe": "rx.prescribe",
-  "/labs": "labs.order",
-  "/titration": "titration.manage",
-  "/side-effects": "adverse.manage",
-  "/billing": "payments.charge",
-  "/subscriptions": "subscriptions.manage",
-  "/marketing": "campaigns.send", "/automations": "campaigns.send", "/pipeline": "campaigns.send", "/affiliate": "campaigns.send",
-  "/roles": "users.manage", "/staff": "users.manage", "/team": "users.manage",
-  "/integrations": "integrations.manage", "/api-keys": "integrations.manage", "/connections": "integrations.manage",
-  "/settings": "settings.manage", "/treatments": "settings.manage", "/medications": "settings.manage",
-  "/pharmacies": "settings.manage", "/email-templates": "settings.manage", "/notifications": "settings.manage", "/licensure": "settings.manage",
-};
+import { NAV_PERM } from "@/lib/rbac/navPerms";
 
 interface NavItem { href: string; icon: string; label: string; badge?: string | number; }
 interface NavSection { label: string; items: NavItem[]; collapsible?: boolean }
