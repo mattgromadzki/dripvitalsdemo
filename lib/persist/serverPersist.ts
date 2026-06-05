@@ -1,6 +1,7 @@
 "use client";
 
 import type { Store } from "@/lib/hooks/zustand-shim";
+import { registerPull, isVisible } from "@/lib/persist/syncTrigger";
 
 /**
  * Mirrors one collection field of a client store to the server so the data
@@ -11,7 +12,7 @@ import type { Store } from "@/lib/hooks/zustand-shim";
 const started = new Set<string>();
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function serverPersist(store: Store<any>, domain: string, field: string, pollMs = 12000): void {
+export function serverPersist(store: Store<any>, domain: string, field: string, pollMs = 5000): void {
   if (typeof window === "undefined" || started.has(domain)) return;
   started.add(domain);
 
@@ -49,5 +50,6 @@ export function serverPersist(store: Store<any>, domain: string, field: string, 
   // Hydrate first, THEN attach the write-back listener (so applying server data
   // doesn't immediately echo back), then poll for cross-device updates.
   pull().then(() => store.subscribe(writeBack));
-  setInterval(pull, pollMs);
+  registerPull(pull); // instant refresh when the tab regains focus
+  setInterval(() => { if (isVisible()) pull(); }, pollMs);
 }
