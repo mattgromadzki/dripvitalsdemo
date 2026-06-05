@@ -7,6 +7,11 @@ const ALLOW = new Set([
   "treatment-requests", "soap-notes", "prescriptions", "labs",
   "orders", "shipments", "tasks", "subscriptions", "visit-queue",
   "treatments", "intake-forms",
+  // config catalogs / reference data
+  "medications", "pharmacies", "doctors", "providers", "staff",
+  "integrations", "rbac", "knowledge-base", "reviews", "leads",
+  "consent", "inventory", "patient-documents", "titration",
+  "referrals", "adverse", "campaigns", "affiliates", "billing",
 ]);
 
 const mem = new Map<string, unknown>();
