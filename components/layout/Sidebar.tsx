@@ -19,7 +19,7 @@ const NAV_PERM: Record<string, string> = {
   "/billing": "payments.charge",
   "/subscriptions": "subscriptions.manage",
   "/marketing": "campaigns.send", "/automations": "campaigns.send", "/pipeline": "campaigns.send", "/affiliate": "campaigns.send",
-  "/roles": "users.manage", "/staff": "users.manage",
+  "/roles": "users.manage", "/staff": "users.manage", "/team": "users.manage",
   "/integrations": "integrations.manage", "/api-keys": "integrations.manage", "/connections": "integrations.manage",
   "/settings": "settings.manage", "/treatments": "settings.manage", "/medications": "settings.manage",
   "/pharmacies": "settings.manage", "/email-templates": "settings.manage", "/notifications": "settings.manage", "/licensure": "settings.manage",
@@ -87,6 +87,7 @@ const NAV: NavSection[] = [
       // Team & access
       { href: "/staff",            icon: "🩺", label: "Doctors" },
       { href: "/roles",            icon: "🔐", label: "Roles & Access" },
+      { href: "/team",             icon: "👤", label: "Team" },
       // Communications setup
       { href: "/email-templates",  icon: "🎨", label: "Email Templates" },
       { href: "/notifications",    icon: "🔔", label: "Notifications" },

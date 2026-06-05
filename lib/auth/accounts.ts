@@ -91,6 +91,28 @@ export async function listAccounts(): Promise<Array<Omit<StaffAccount, "pwd">>> 
   return all.map(({ email, name, role, active }) => ({ email, name, role, active }));
 }
 
+export async function createAccount(email: string, name: string, role: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  const e = email.trim().toLowerCase();
+  if (!e.includes("@")) return { ok: false, error: "Enter a valid email address." };
+  if (!name.trim()) return { ok: false, error: "Enter a name." };
+  if ((password || "").length < 6) return { ok: false, error: "Temporary password must be at least 6 characters." };
+  if (await getByEmail(e)) return { ok: false, error: "An account with that email already exists." };
+  await save({ email: e, name: name.trim(), role, pwd: hashPassword(password), active: true });
+  return { ok: true };
+}
+
+export async function setRole(email: string, role: string): Promise<boolean> {
+  const a = await getByEmail(email);
+  if (!a) return false;
+  a.role = role; await save(a); return true;
+}
+
+export async function setActive(email: string, active: boolean): Promise<boolean> {
+  const a = await getByEmail(email);
+  if (!a) return false;
+  a.active = active; await save(a); return true;
+}
+
 export function isPersistent(): boolean {
   return !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
 }
