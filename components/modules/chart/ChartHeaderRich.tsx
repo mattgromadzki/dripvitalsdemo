@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { toast } from "@/lib/hooks/useToast";
 import { usePermission } from "@/lib/rbac/usePermission";
-import { PatientContactComposer } from "@/components/modules/chart/PatientContactComposer";
+import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
 import { SendIntakeFormModal } from "@/components/modules/chart/SendIntakeFormModal";
 import { LIFECYCLE_META, LIFECYCLE_ORDER, deriveLifecycle } from "@/lib/data/lifecycle";
 import type { Patient, PatientExtra } from "@/lib/types";
@@ -106,7 +106,7 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
         </HeaderCol>
       </div>
 
-      <PatientContactComposer patient={patient} open={composerOpen} onClose={() => setComposerOpen(false)} />
+      <PatientMessageCenter patient={patient} open={composerOpen} onClose={() => setComposerOpen(false)} />
       <SendIntakeFormModal patient={patient} open={intakeOpen} onClose={() => setIntakeOpen(false)} />
     </div>
   );
