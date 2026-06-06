@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PatientIntakeFlow } from "@/components/modules/PatientIntakeFlow";
 import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import { usePatients } from "@/lib/hooks/usePatients";
+import type { Patient } from "@/lib/types";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { alertWelcome } from "@/lib/notify/alert";
 
@@ -25,6 +26,7 @@ export default function IntakeFormPage() {
   const updatePatient = usePatients((s) => s.update);
   const addRequest = useTreatmentRequests((s) => s.add);
   const createdPatientId = useRef<string | null>(null);
+  const linkedPidRef = useRef<string | null>(null);
 
   const form = useMemo(() => forms.find((f) => f.slug === slug), [forms, slug]);
 
@@ -50,6 +52,16 @@ export default function IntakeFormPage() {
       if (alive) setFormsReady(true);
     })();
     return () => { alive = false; };
+  }, []);
+
+  // If an admin/clinician sent this form to an existing patient, the link carries
+  // ?pid=<patientId>. Capture it so the completed intake writes back to that
+  // patient instead of creating a duplicate.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get("pid");
+      if (p) { linkedPidRef.current = p; createdPatientId.current = p; }
+    } catch { /* ignore */ }
   }, []);
 
   if (!formsReady) return <Msg icon="⏳" title="Loading…" sub="Fetching the latest form." />;
@@ -99,7 +111,12 @@ export default function IntakeFormPage() {
     // Reuse the profile pre-created during intake; only create a new one if the
     // patient somehow reached completion without a captured contact step.
     let pid = createdPatientId.current;
-    if (pid) updatePatient(pid, fields);
+    if (linkedPidRef.current) {
+      // Sent to an existing patient — write the completed intake back to that id.
+      pid = linkedPidRef.current;
+      const patient = { id: pid, ...fields } as Patient;
+      usePatients.getState().upsert(patient);
+    } else if (pid) updatePatient(pid, fields);
     else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
     syncCrm(pid);
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", id: pid }) }).catch(() => {});

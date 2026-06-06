@@ -5,6 +5,7 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import { toast } from "@/lib/hooks/useToast";
 import { usePermission } from "@/lib/rbac/usePermission";
 import { PatientContactComposer } from "@/components/modules/chart/PatientContactComposer";
+import { SendIntakeFormModal } from "@/components/modules/chart/SendIntakeFormModal";
 import { LIFECYCLE_META, LIFECYCLE_ORDER, deriveLifecycle } from "@/lib/data/lifecycle";
 import type { Patient, PatientExtra } from "@/lib/types";
 
@@ -12,7 +13,12 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
   const update = usePatients((s) => s.update);
   const [open, setOpen] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
-  const canMessage = usePermission("patients.edit") || usePermission("sms.send") || usePermission("email.send");
+  const [intakeOpen, setIntakeOpen] = useState(false);
+  const canEdit = usePermission("patients.edit");
+  const canSms = usePermission("sms.send");
+  const canEmail = usePermission("email.send");
+  const canMessage = canEdit || canSms || canEmail;
+  const canSendIntake = canSms || canEmail;
 
   const current = deriveLifecycle(patient);
   const meta = LIFECYCLE_META[current];
@@ -38,6 +44,7 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
         </div>
         <div className="flex flex-col items-end gap-2.5">
           <div className="flex gap-2">
+            {canSendIntake && <button className="btn btn-ghost btn-sm" onClick={() => setIntakeOpen(true)}>📋 Send Intake</button>}
             {canMessage && <button className="btn btn-ghost btn-sm" onClick={() => setComposerOpen(true)}>✉ Message</button>}
             <button className="btn btn-ghost btn-sm" onClick={() => toast("💊 Open the Orders tab to prescribe a paid order")}>💊 Prescribe</button>
             <button className="btn btn-primary btn-sm" onClick={() => toast("🎥 Starting video visit…")}>🎥 Start Visit</button>
@@ -100,6 +107,7 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
       </div>
 
       <PatientContactComposer patient={patient} open={composerOpen} onClose={() => setComposerOpen(false)} />
+      <SendIntakeFormModal patient={patient} open={intakeOpen} onClose={() => setIntakeOpen(false)} />
     </div>
   );
 }
