@@ -43,11 +43,21 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
           </div>
         </div>
         <div className="flex flex-col items-end gap-2.5">
-          <div className="flex gap-2">
-            {canSendIntake && <button className="btn btn-ghost btn-sm" onClick={() => setIntakeOpen(true)}>📋 Send Intake</button>}
-            {canMessage && <button className="btn btn-ghost btn-sm" onClick={() => setComposerOpen(true)}>✉ Message</button>}
+          <div className="flex gap-2 flex-wrap justify-end items-center">
+            {canSendIntake && (
+              <button onClick={() => setIntakeOpen(true)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, padding: "11px 20px", borderRadius: 10, background: "#eaf2fa", color: "#2e6ba8", border: "1.5px solid #3b7fc4", cursor: "pointer" }}>
+                📋 Send Intake Form
+              </button>
+            )}
+            {canMessage && (
+              <button onClick={() => setComposerOpen(true)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 700, padding: "11px 20px", borderRadius: 10, background: "#3b7fc4", color: "#fff", border: "none", cursor: "pointer" }}>
+                ✉️ Message
+              </button>
+            )}
             <button className="btn btn-ghost btn-sm" onClick={() => toast("💊 Open the Orders tab to prescribe a paid order")}>💊 Prescribe</button>
-            <button className="btn btn-primary btn-sm" onClick={() => toast("🎥 Starting video visit…")}>🎥 Start Visit</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => toast("🎥 Starting video visit…")}>🎥 Start Visit</button>
           </div>
           {/* Status control */}
           <div className="relative">
