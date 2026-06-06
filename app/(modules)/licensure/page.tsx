@@ -8,8 +8,9 @@ import { toast } from "@/lib/hooks/useToast";
 import { useRouter } from "next/navigation";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { ALL_STATES, type Provider } from "@/lib/hooks/useProviders";
-import { useDoctors, getLicenseStatus } from "@/lib/hooks/useDoctors";
-import type { DoctorStateLicense } from "@/lib/types";
+import { useDoctors, getLicenseStatus, formatLicenseExp } from "@/lib/hooks/useDoctors";
+import { usePermission } from "@/lib/rbac/usePermission";
+import type { Doctor, DoctorStateLicense } from "@/lib/types";
 
 export default function LicensurePage() {
   const router = useRouter();
@@ -29,6 +30,16 @@ export default function LicensurePage() {
   })), [doctors]);
 
   function toggleActive(id: string) { const d = doctors.find((x) => x.id === id); if (d) updateDoctor(id, { active: !d.active }); }
+
+  const canRemind = usePermission("settings.manage");
+  async function sendReminder(d: Doctor, lic: DoctorStateLicense) {
+    const s = getLicenseStatus(lic);
+    try {
+      const res = await fetch("/api/license-reminder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: d.email, toName: `${d.first} ${d.last}`.trim(), state: lic.state, license: lic.number, expDate: formatLicenseExp(lic.expDate), days: s.daysUntil ?? "" }) });
+      const j = await res.json().catch(() => ({ ok: false }));
+      toast(j.ok ? `🔔 Renewal reminder sent to ${d.first}` : `⚠️ ${j.error || "Couldn't send reminder"}`);
+    } catch { toast("⚠️ Couldn't send reminder"); }
+  }
 
   const [tab, setTab] = useState<"coverage" | "providers" | "routing">("coverage");
   const [edit, setEdit] = useState<Provider | null>(null);
@@ -91,22 +102,44 @@ export default function LicensurePage() {
 
       {tab === "providers" && (
         <div className="space-y-2.5">
-          {providers.map((p) => (
-            <div key={p.id} className="bg-surface border border-border rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="font-bold text-[14px]">{p.name}</span>
-                <span className="text-[11px] text-ink-muted">NPI {p.npi}</span>
-                <Pill intent={p.active ? "green" : "muted"} dot>{p.active ? "Active" : "Inactive"}</Pill>
-                <span className="text-[11px] text-ink-muted">· {p.states.length} states</span>
-                <div className="flex-1" />
-                <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(p.id)}>{p.active ? "Deactivate" : "Activate"}</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => openEdit(p)}>Edit licenses</button>
+          {doctors.map((d) => {
+            const dispName = `${d.first} ${d.last}${d.title ? ", " + d.title : ""}`.trim();
+            const lic = d.licenses || [];
+            const flags = lic.map((l) => getLicenseStatus(l));
+            const hasExpired = flags.some((s) => s.key === "expired");
+            const hasExpiring = flags.some((s) => s.key === "expiring");
+            return (
+              <div key={d.id} className="bg-surface border border-border rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span className="font-bold text-[14px]">{dispName}</span>
+                  <span className="text-[11px] text-ink-muted">NPI {d.npi || "—"}</span>
+                  <Pill intent={d.active ? "green" : "muted"} dot>{d.active ? "Active" : "Inactive"}</Pill>
+                  <span className="text-[11px] text-ink-muted">· {lic.length} licenses</span>
+                  {hasExpired ? <Pill intent="red" dot>License expired</Pill> : hasExpiring ? <Pill intent="amber" dot>Renewal due</Pill> : null}
+                  <div className="flex-1" />
+                  <button className="btn btn-ghost btn-sm" onClick={() => toggleActive(d.id)}>{d.active ? "Deactivate" : "Activate"}</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { const p = providers.find((pp) => pp.id === d.id); if (p) openEdit(p); }}>Edit licenses</button>
+                </div>
+                {lic.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {lic.map((l) => {
+                      const s = getLicenseStatus(l);
+                      const cls = s.key === "expired" ? "bg-red-soft text-red" : s.key === "expiring" ? "bg-amber-soft text-amber" : s.key === "active" ? "bg-green-soft text-green" : "bg-surface-3 text-ink-muted";
+                      const due = s.key === "expiring" || s.key === "expired";
+                      return (
+                        <span key={l.state} className={`inline-flex items-center gap-1 text-[11px] font-semibold rounded-md px-2 py-1 ${cls}`} title={s.daysUntil != null ? `${s.label} · ${s.daysUntil} days` : s.label}>
+                          {s.icon} {l.state} · exp {formatLicenseExp(l.expDate)}
+                          {due && canRemind && d.email && (
+                            <button onClick={() => sendReminder(d, l)} className="ml-1 underline hover:no-underline">remind</button>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : <span className="text-[12px] text-ink-muted">No licenses assigned</span>}
               </div>
-              <div className="flex flex-wrap gap-1">
-                {p.states.length ? p.states.map((st) => <span key={st} className="text-[11px] font-semibold bg-surface-3 rounded-md px-1.5 py-0.5">{st}</span>) : <span className="text-[12px] text-ink-muted">No states assigned</span>}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

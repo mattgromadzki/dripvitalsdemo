@@ -84,6 +84,17 @@ const DEFAULTS: Record<string, EmailTemplate> = {
     <p style="font-size:14px;line-height:1.5;"><b>Your treatment can't begin until the questionnaire is complete</b>, so please take a couple of minutes to finish it.</p>
     <p style="font-size:14px;">Open your patient portal to pick up where you left off.</p>`),
   },
+  license_expiring: {
+    type: "license_expiring", label: "Provider license expiration reminder",
+    description: "Sent to a doctor 60 days and again 30 days before a state medical license expires (unless renewed).",
+    placeholders: ["name", "state", "license", "expDate", "days"],
+    subject: "Action needed: your {{state}} medical license expires in {{days}} days",
+    html: shell("License renewal reminder", `
+    <p style="font-size:14px;line-height:1.5;">Hi {{name}},</p>
+    <p style="font-size:14px;line-height:1.5;">Your medical license for <b>{{state}}</b> (License #{{license}}) is scheduled to expire on <b>{{expDate}}</b> &mdash; about <b>{{days}} days</b> from now.</p>
+    <p style="font-size:14px;line-height:1.5;">To keep treating patients in {{state}} without interruption, please renew your license and update your credentials in the platform before it lapses.</p>
+    <p style="font-size:14px;line-height:1.5;">If you've already renewed, just update the license details and you won't receive further reminders for this license.</p>`),
+  },
   approval: {
     type: "approval", label: "Provider approval (congratulations)",
     description: "Sent when a provider approves the patient's treatment.",
