@@ -119,7 +119,7 @@ export function MessagesTab({ patient }: { patient: Patient; extra: PatientExtra
   const noChannels = channels.length === 0;
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 270px)", minHeight: 420 }}>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 210px)", minHeight: 600 }}>
       {/* Timeline */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto bg-surface-2 border border-border rounded-xl p-4 space-y-2.5">
         {items.length === 0 ? (

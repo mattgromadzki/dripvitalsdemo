@@ -8,6 +8,8 @@ const ALLOW = new Set([
   "treatment-requests", "soap-notes", "prescriptions", "labs",
   "orders", "shipments", "tasks", "subscriptions", "visit-queue",
   "treatments", "intake-forms",
+  // communications
+  "emails", "sms",
   // config catalogs / reference data
   "medications", "pharmacies", "doctors", "providers", "staff",
   "integrations", "rbac", "knowledge-base", "reviews", "leads",
@@ -32,6 +34,8 @@ const WRITE_PERM: Record<string, string> = {
   "visit-queue": "patients.edit",
   "treatments": "settings.manage",
   "intake-forms": "settings.manage",
+  "emails": "email.send",
+  "sms": "sms.send",
   "medications": "settings.manage",
   "pharmacies": "settings.manage",
   "doctors": "settings.manage",

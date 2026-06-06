@@ -31,6 +31,8 @@ import { useAdverse } from "@/lib/hooks/useAdverse";
 import { useCampaigns } from "@/lib/hooks/useCampaigns";
 import { useAffiliates } from "@/lib/hooks/useAffiliates";
 import { useBilling } from "@/lib/hooks/useBilling";
+import { useEmails } from "@/lib/hooks/useEmails";
+import { useSms } from "@/lib/hooks/useSms";
 
 const CATALOG_POLL = 30000; // config/reference data changes rarely
 
@@ -47,6 +49,10 @@ export function PersistHydrator() {
     serverPersist(useTasks, "tasks", "tasks");
     serverPersist(useSubscriptions, "subscriptions", "subscriptions");
     serverPersist(useVisitQueue, "visit-queue", "visits");
+    // Communications — so the patient-chart Messages tab and the Email/SMS pages
+    // mirror each other and survive reloads / sync across devices.
+    serverPersist(useEmails, "emails", "emails");
+    serverPersist(useSms, "sms", "threads");
     // Treatments (incl. base64 thumbnails) + intake forms — so staff edits go
     // live for patients across devices.
     serverPersist(useTreatmentsIntake, "treatments", "treatments");
