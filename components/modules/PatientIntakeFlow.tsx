@@ -8,6 +8,7 @@ import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
+import { INTAKE_CONSENTS } from "@/lib/legal/documents";
 
 function nowStamp(): string {
   const d = new Date();
@@ -125,6 +126,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   const [coCardCvc,  setCoCardCvc]  = useState("");
   const [coCardName, setCoCardName] = useState("");
   const [coAddr, setCoAddr] = useState({ line1: "", apt: "", city: "", state: "", zip: "" });
+  const [legalAck, setLegalAck] = useState<Record<string, boolean>>({});
 
   // Acknowledge / accordion state per question (keyed by question id)
   const [accOpen, setAccOpen] = useState<Record<number, boolean>>({});
@@ -440,6 +442,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     if (coCardCvc.length < 3) { toast("Please enter a valid CVC"); return; }
     if (!coCardName.trim()) { toast("Please enter the name on the card"); return; }
     if (!coAddr.line1 || !coAddr.city || !coAddr.state || !coAddr.zip) { toast("Please complete your shipping address"); return; }
+    if (!INTAKE_CONSENTS.every((d) => legalAck[d.id])) { toast("Please review and agree to the consent documents to continue"); return; }
     if (leadId !== null) {
       const lastFour = coCardNum.slice(-4);
       const brand = coCardNum[0] === "4" ? "Visa"
@@ -1380,13 +1383,24 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
           </div>
         </div>
 
+        {/* ─── Agreements ─── */}
+        <h2 className="dv-section-h">Agreements</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+          {INTAKE_CONSENTS.map((d) => (
+            <label key={d.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--dv-ink)", cursor: "pointer" }}>
+              <input type="checkbox" checked={!!legalAck[d.id]} onChange={(e) => setLegalAck((x) => ({ ...x, [d.id]: e.target.checked }))} style={{ marginTop: 2, width: 16, height: 16, flexShrink: 0 }} />
+              <span>I have read and agree to the <a href={`/legal/${d.slug}`} target="_blank" rel="noreferrer" style={{ color: "#3b7fc4", textDecoration: "underline" }}>{d.title}</a> <span style={{ color: "var(--dv-muted)" }}>({d.version})</span>.</span>
+            </label>
+          ))}
+        </div>
+
         {/* ─── Total + CTA ─── */}
         <div className="dv-total-row">
           <span className="dv-total-lbl">Total today</span>
           <span className="dv-total-val">{tx.price}</span>
         </div>
 
-        <button className="dv-btn-primary" onClick={submitPayment}>Complete purchase →</button>
+        <button className="dv-btn-primary" onClick={submitPayment} disabled={!INTAKE_CONSENTS.every((d) => legalAck[d.id])} style={!INTAKE_CONSENTS.every((d) => legalAck[d.id]) ? { opacity: 0.55, cursor: "not-allowed" } : undefined}>Complete purchase →</button>
 
         <div className="dv-trust">
           <span>🔒 256-bit SSL secured</span>·

@@ -7,6 +7,13 @@ import { SectionCard, DataField, DataGrid } from "@/components/modules/chart/Sec
 import type { Patient, PatientExtra } from "@/lib/types";
 
 export function ComplianceTab({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
+  const rows = (patient.consents && patient.consents.length)
+    ? patient.consents.map((c) => {
+        const d = new Date(c.acceptedAt);
+        const signed = isNaN(d.getTime()) ? c.acceptedAt : d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        return { form: `${c.title} (${c.version})`, signed, ip: "Captured at intake", device: "Intake form · e-signature" };
+      })
+    : extra.consentHistory;
   return (
     <div className="grid grid-cols-[1fr_1fr] gap-4 max-[1100px]:grid-cols-1">
       {/* LEFT: Consent log */}
@@ -21,7 +28,7 @@ export function ComplianceTab({ patient, extra }: { patient: Patient; extra: Pat
           </button>
         }
       >
-        {extra.consentHistory.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="py-10 text-center text-ink-muted">
             <div className="text-[36px] opacity-40 mb-2">📜</div>
             <div className="text-[13px] font-bold mb-1 text-ink">No consents on file</div>
@@ -42,7 +49,7 @@ export function ComplianceTab({ patient, extra }: { patient: Patient; extra: Pat
                 </tr>
               </thead>
               <tbody>
-                {extra.consentHistory.map((c) => (
+                {rows.map((c) => (
                   <tr key={c.form} className="hover:bg-surface-2 transition-colors">
                     <Td><span className="font-semibold text-[12.5px]">{c.form}</span></Td>
                     <Td><span className="font-mono text-[11px] text-ink-muted whitespace-nowrap">{c.signed}</span></Td>

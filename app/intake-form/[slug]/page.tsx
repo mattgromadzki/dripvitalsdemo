@@ -8,6 +8,7 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import type { Patient } from "@/lib/types";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { alertWelcome } from "@/lib/notify/alert";
+import { INTAKE_CONSENTS } from "@/lib/legal/documents";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
 const parsePrice = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
@@ -107,6 +108,7 @@ export default function IntakeFormPage() {
       since: nowParts().today, startDate: nowParts().today, lastVisit: "—", lastOrder: nowParts().today, nextRefill: "—", _refillDays: 30,
       sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
       intakeProgress: "Completed",
+      consents: INTAKE_CONSENTS.map((d) => ({ docId: d.id, title: d.title, version: d.version, acceptedAt: new Date().toISOString() })),
     };
     // Reuse the profile pre-created during intake; only create a new one if the
     // patient somehow reached completion without a captured contact step.

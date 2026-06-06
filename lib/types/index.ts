@@ -67,6 +67,16 @@ export interface Patient {
   tags: string[];
   notes: string;
   color: string;
+
+  // Legal agreements captured at intake
+  consents?: ConsentAcceptance[];
+}
+
+export interface ConsentAcceptance {
+  docId: string;
+  title: string;
+  version: string;
+  acceptedAt: string;  // ISO
 }
 
 export interface PatientExtra {
