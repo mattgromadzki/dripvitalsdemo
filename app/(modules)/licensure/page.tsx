@@ -5,21 +5,34 @@ import { Pill } from "@/components/ui/Pill";
 import { Modal } from "@/components/ui/Modal";
 import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
+import { useRouter } from "next/navigation";
 import { usePatients } from "@/lib/hooks/usePatients";
-import { useProviders, ALL_STATES, type Provider } from "@/lib/hooks/useProviders";
+import { ALL_STATES, type Provider } from "@/lib/hooks/useProviders";
+import { useDoctors, getLicenseStatus } from "@/lib/hooks/useDoctors";
+import type { DoctorStateLicense } from "@/lib/types";
 
 export default function LicensurePage() {
+  const router = useRouter();
   const patients = usePatients((s) => s.patients);
-  const providers = useProviders((s) => s.providers);
-  const setStates = useProviders((s) => s.setStates);
-  const toggleActive = useProviders((s) => s.toggleActive);
-  const addProvider = useProviders((s) => s.add);
+  const doctors = useDoctors((s) => s.doctors);
+  const updateDoctor = useDoctors((s) => s.update);
+  const setLicenses = useDoctors((s) => s.setLicenses);
+
+  // Providers here ARE the in-house doctors (managed on the Staff page), each
+  // covering the states where they hold a non-expired license.
+  const providers: Provider[] = useMemo(() => doctors.map((d) => ({
+    id: d.id,
+    name: `${d.first} ${d.last}${d.title ? ", " + d.title : ""}`.trim(),
+    npi: d.npi || "—",
+    active: d.active,
+    states: d.licenses.filter((l) => getLicenseStatus(l).key !== "expired").map((l) => l.state),
+  })), [doctors]);
+
+  function toggleActive(id: string) { const d = doctors.find((x) => x.id === id); if (d) updateDoctor(id, { active: !d.active }); }
 
   const [tab, setTab] = useState<"coverage" | "providers" | "routing">("coverage");
   const [edit, setEdit] = useState<Provider | null>(null);
   const [editStates, setEditStates] = useState<Set<string>>(new Set());
-  const [addOpen, setAddOpen] = useState(false);
-  const [nName, setNName] = useState(""); const [nNpi, setNNpi] = useState("");
 
   const eligible = (st: string) => providers.filter((p) => p.active && p.states.includes(st));
   const coverage = useMemo(() => {
@@ -31,18 +44,26 @@ export default function LicensurePage() {
   const gaps = useMemo(() => patients.filter((p) => eligible(p.state).length === 0), [patients, providers]);
 
   function openEdit(p: Provider) { setEdit(p); setEditStates(new Set(p.states)); }
-  function saveEdit() { if (!edit) return; setStates(edit.id, Array.from(editStates).sort()); setEdit(null); toast("Licenses updated"); }
+  function saveEdit() {
+    if (!edit) return;
+    const d = doctors.find((x) => x.id === edit.id);
+    if (d) {
+      const selected = Array.from(editStates).sort();
+      const next: DoctorStateLicense[] = selected.map((st) => d.licenses.find((l) => l.state === st) || { state: st, number: "—", expDate: "" });
+      setLicenses(edit.id, next);
+    }
+    setEdit(null); toast("Licenses updated");
+  }
   function toggleState(st: string) { const n = new Set(editStates); n.has(st) ? n.delete(st) : n.add(st); setEditStates(n); }
-  function saveNew() { if (!nName.trim()) { toast("Name required"); return; } addProvider(nName.trim(), nNpi.trim() || "0000000000", []); setAddOpen(false); setNName(""); setNNpi(""); toast("Provider added — assign states"); }
 
   const KPI = ({ label, value, intent }: { label: string; value: string; intent?: string }) => <div className="bg-surface border border-border rounded-2xl px-4 py-3 min-w-[140px]"><div className={`text-[22px] font-extrabold leading-none ${intent || ""}`}>{value}</div><div className="text-[11px] text-ink-muted mt-1.5">{label}</div></div>;
 
   return (
     <div className="px-7 py-6 text-[14px]">
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div><h1 className="text-[21px] font-extrabold tracking-tight">State Licensure</h1><div className="text-[12px] text-ink-muted mt-0.5">Provider coverage by state · routes patients to a licensed provider</div></div>
+        <div><h1 className="text-[21px] font-extrabold tracking-tight">State Licensure</h1><div className="text-[12px] text-ink-muted mt-0.5">Coverage by state for your in-house doctors · routes patients to a licensed provider</div></div>
         <div className="flex gap-2">{(["coverage", "providers", "routing"] as const).map((t) => <button key={t} onClick={() => setTab(t)} className={`text-[12.5px] font-semibold px-3.5 py-1.5 rounded-full capitalize ${tab === t ? "bg-brand text-white" : "bg-surface-3 text-ink-muted"}`}>{t}</button>)}</div>
-        <div className="flex-1" />{tab === "providers" && <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>＋ Add provider</button>}
+        <div className="flex-1" />{tab === "providers" && <button className="btn btn-primary btn-sm" onClick={() => router.push("/staff")}>Manage doctors →</button>}
       </div>
 
       <div className="flex flex-wrap gap-2.5 mb-4">
@@ -124,11 +145,6 @@ export default function LicensurePage() {
         </Modal>
       )}
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add provider" icon="🩺" width={400}
-        footer={<><button className="btn btn-ghost" onClick={() => setAddOpen(false)}>Cancel</button><button className="btn btn-primary" onClick={saveNew}>Add</button></>}>
-        <label className="fl">Name</label><input className="fi mb-2.5" value={nName} onChange={(e) => setNName(e.target.value)} placeholder="Dr. Jane Doe" />
-        <label className="fl">NPI</label><input className="fi" value={nNpi} onChange={(e) => setNNpi(e.target.value)} placeholder="1234567890" />
-      </Modal>
       <Toast />
     </div>
   );
