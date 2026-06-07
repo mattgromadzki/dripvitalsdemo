@@ -9,6 +9,7 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { toast } from "@/lib/hooks/useToast";
 import { useStaff } from "@/lib/hooks/useStaff";
 import { useIntegrations } from "@/lib/hooks/useIntegrations";
+import { TwoFactorCard } from "@/components/settings/TwoFactorCard";
 
 type Tab = "practice" | "branding" | "team" | "notifications" | "security" | "compliance" | "danger";
 
@@ -437,6 +438,7 @@ export default function SettingsPage() {
           {tab === "security" && (
             <Card title="Security & SSO" icon="🛡" onSave={() => save("Security")}>
               <div className="space-y-4">
+                <TwoFactorCard />
                 <Section title="Authentication">
                   <div className="space-y-2">
                     <ToggleRow

@@ -7,7 +7,7 @@ import { ROLES } from "@/lib/rbac/permissions";
 import { toast } from "@/lib/hooks/useToast";
 import { Toast } from "@/components/ui/Toast";
 
-interface Acct { email: string; name: string; role: string; active: boolean; }
+interface Acct { email: string; name: string; role: string; active: boolean; twofa?: boolean; locked?: boolean; }
 const roleLabel = (id: string) => ROLES.find((r) => r.id === id)?.label || id;
 
 export default function TeamPage() {
@@ -113,13 +113,22 @@ export default function TeamPage() {
                   {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="flex flex-wrap items-center gap-1.5">
                 {a.active
                   ? <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-soft text-green">Active</span>
                   : <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-soft text-red">Disabled</span>}
+                {a.twofa && <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-brand/10 text-brand">🔐 2FA</span>}
+                {a.locked && <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-soft text-amber">Locked</span>}
               </div>
               <div className="flex gap-2 justify-end">
                 <button className="btn btn-ghost btn-sm" onClick={() => { setResetFor(resetFor === a.email ? null : a.email); setResetPw(""); }}>Reset password</button>
+                {a.locked && (
+                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--color-amber)" }}
+                    onClick={() => post({ action: "unlock", email: a.email }, "✓ Account unlocked")}>Unlock</button>
+                )}
+                {a.twofa && a.email !== me && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => post({ action: "disable2fa", email: a.email }, "✓ 2FA reset for user")}>Reset 2FA</button>
+                )}
                 {a.email !== me && (
                   <button className="btn btn-ghost btn-sm" style={{ color: a.active ? "var(--color-red)" : "var(--color-green)" }}
                     onClick={() => post({ action: "active", email: a.email, active: !a.active }, a.active ? "✓ Account disabled" : "✓ Account enabled")}>

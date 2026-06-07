@@ -20,11 +20,11 @@ interface AuthState {
   user: AuthUser | null;
   hydrated: boolean;
   hydrate: () => void;
-  login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  login: (email: string, password: string, code?: string) => Promise<{ ok: boolean; error?: string; twofa?: boolean; locked?: boolean }>;
   logout: () => Promise<void>;
   accountExists: (email: string) => boolean;
-  requestReset: (email: string) => { ok: boolean };
-  resetPassword: (email: string, newPassword: string) => Promise<{ ok: boolean; error?: string }>;
+  requestReset: (email: string) => Promise<{ ok: boolean; devLink?: string }>;
+  resetPassword: (email: string, newPassword: string, token: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -44,12 +44,12 @@ export const useAuth = create<AuthState>((set) => ({
     set({ user: null, hydrated: true });
   },
 
-  login: async (email, password) => {
+  login: async (email, password, code) => {
     try {
-      const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+      const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, code }) });
       const d = await r.json();
       if (d?.ok && d.user) { set({ user: { ...d.user, initials: initialsOf(d.user.name) }, hydrated: true }); return { ok: true }; }
-      return { ok: false, error: d?.error || "Sign in failed." };
+      return { ok: false, error: d?.error, twofa: !!d?.twofa, locked: !!d?.locked };
     } catch { return { ok: false, error: "Network error — please try again." }; }
   },
 
@@ -58,13 +58,19 @@ export const useAuth = create<AuthState>((set) => ({
     try { await fetch("/api/auth/logout", { method: "POST" }); } catch { /* ignore */ }
   },
 
-  // Server decides at reset time; kept optimistic to avoid email enumeration.
+  // Server decides whether to send a link; we never reveal whether an account exists.
   accountExists: () => true,
-  requestReset: () => ({ ok: true }),
-
-  resetPassword: async (email, newPassword) => {
+  requestReset: async (email) => {
     try {
-      const r = await fetch("/api/auth/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, newPassword }) });
+      const r = await fetch("/api/auth/forgot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      const d = await r.json();
+      return { ok: !!d?.ok, devLink: d?.devLink };
+    } catch { return { ok: true }; }
+  },
+
+  resetPassword: async (email, newPassword, token) => {
+    try {
+      const r = await fetch("/api/auth/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, newPassword, token }) });
       const d = await r.json();
       return d?.ok ? { ok: true } : { ok: false, error: d?.error || "Could not reset password." };
     } catch { return { ok: false, error: "Network error — please try again." }; }

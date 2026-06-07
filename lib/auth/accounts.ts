@@ -1,7 +1,22 @@
 import { Redis } from "@upstash/redis";
-import { hashPassword } from "@/lib/auth/serverCrypto";
+import { hashPassword, verifyPassword } from "@/lib/auth/serverCrypto";
 
-export interface StaffAccount { email: string; name: string; role: string; pwd: string; active: boolean; }
+export interface StaffAccount {
+  email: string; name: string; role: string; pwd: string; active: boolean;
+  totpSecret?: string;     // confirmed TOTP secret (base32) — 2FA enabled when present
+  totpPending?: string;    // secret mid-enrollment, not yet confirmed
+  backupCodes?: string[];  // hashed, single-use recovery codes
+  failedAttempts?: number; // consecutive failed logins
+  lockedUntil?: number;    // epoch ms; login blocked until then
+}
+
+export interface StaffAccountPublic {
+  email: string; name: string; role: string; active: boolean;
+  twofa: boolean; locked: boolean;
+}
+
+export const MAX_LOGIN_ATTEMPTS = 5;
+export const LOCK_MINUTES = 15;
 
 const KEY = "auth:staff:v1";
 const mem = new Map<string, StaffAccount>();
@@ -78,7 +93,7 @@ export async function upsertAccount(a: { email: string; name: string; role: stri
   await save(acct);
 }
 
-export async function listAccounts(): Promise<Array<Omit<StaffAccount, "pwd">>> {
+export async function listAccounts(): Promise<StaffAccountPublic[]> {
   await ensureSeeded();
   const r = redis();
   let all: StaffAccount[];
@@ -88,7 +103,10 @@ export async function listAccounts(): Promise<Array<Omit<StaffAccount, "pwd">>> 
   } else {
     all = Array.from(mem.values());
   }
-  return all.map(({ email, name, role, active }) => ({ email, name, role, active }));
+  const now = Date.now();
+  return all.map(({ email, name, role, active, totpSecret, lockedUntil }) => ({
+    email, name, role, active, twofa: !!totpSecret, locked: (lockedUntil || 0) > now,
+  }));
 }
 
 export async function createAccount(email: string, name: string, role: string, password: string): Promise<{ ok: boolean; error?: string }> {
@@ -115,4 +133,68 @@ export async function setActive(email: string, active: boolean): Promise<boolean
 
 export function isPersistent(): boolean {
   return !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
+}
+
+// ─── Login lockout ─────────────────────────────────────────────────────────
+export function lockState(acct: StaffAccount | null): { locked: boolean; until: number } {
+  const until = acct?.lockedUntil || 0;
+  return { locked: until > Date.now(), until };
+}
+
+/** Record a failed attempt; locks the account once the threshold is reached. */
+export async function recordFailedLogin(email: string): Promise<{ locked: boolean; until: number; remaining: number }> {
+  const acct = await getByEmail(email);
+  if (!acct) return { locked: false, until: 0, remaining: MAX_LOGIN_ATTEMPTS };
+  const attempts = (acct.failedAttempts || 0) + 1;
+  if (attempts >= MAX_LOGIN_ATTEMPTS) {
+    acct.lockedUntil = Date.now() + LOCK_MINUTES * 60 * 1000;
+    acct.failedAttempts = 0;
+    await save(acct);
+    return { locked: true, until: acct.lockedUntil, remaining: 0 };
+  }
+  acct.failedAttempts = attempts;
+  await save(acct);
+  return { locked: false, until: 0, remaining: MAX_LOGIN_ATTEMPTS - attempts };
+}
+
+/** Clear failures + any active lock (on successful login, or admin unlock). */
+export async function clearLoginFailures(email: string): Promise<void> {
+  const acct = await getByEmail(email);
+  if (!acct) return;
+  if (acct.failedAttempts || acct.lockedUntil) {
+    acct.failedAttempts = 0; acct.lockedUntil = 0;
+    await save(acct);
+  }
+}
+export async function unlockAccount(email: string): Promise<boolean> {
+  const acct = await getByEmail(email);
+  if (!acct) return false;
+  await clearLoginFailures(email);
+  return true;
+}
+
+// ─── Two-factor (TOTP) ───────────────────────────────────────────────────────
+export async function beginTotp(email: string, secret: string): Promise<boolean> {
+  const a = await getByEmail(email); if (!a) return false;
+  a.totpPending = secret; await save(a); return true;
+}
+export async function confirmTotp(email: string, hashedBackupCodes: string[]): Promise<boolean> {
+  const a = await getByEmail(email); if (!a || !a.totpPending) return false;
+  a.totpSecret = a.totpPending; a.totpPending = undefined; a.backupCodes = hashedBackupCodes;
+  await save(a); return true;
+}
+export async function disableTotp(email: string): Promise<boolean> {
+  const a = await getByEmail(email); if (!a) return false;
+  a.totpSecret = undefined; a.totpPending = undefined; a.backupCodes = [];
+  await save(a); return true;
+}
+/** Verify + consume a single-use backup code. */
+export async function consumeBackupCode(email: string, normalizedCode: string): Promise<boolean> {
+  const a = await getByEmail(email);
+  if (!a || !a.backupCodes?.length || !normalizedCode) return false;
+  const idx = a.backupCodes.findIndex((h) => verifyPassword(normalizedCode, h));
+  if (idx < 0) return false;
+  a.backupCodes.splice(idx, 1);
+  await save(a);
+  return true;
 }

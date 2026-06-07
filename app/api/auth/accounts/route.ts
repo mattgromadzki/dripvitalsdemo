@@ -1,4 +1,4 @@
-import { listAccounts, createAccount, setRole, setActive, setPassword } from "@/lib/auth/accounts";
+import { listAccounts, createAccount, setRole, setActive, setPassword, unlockAccount, disableTotp } from "@/lib/auth/accounts";
 import { verifyToken, type SessionClaims } from "@/lib/auth/serverCrypto";
 import { DEFAULT_ROLE_PERMS } from "@/lib/rbac/permissions";
 
@@ -53,6 +53,15 @@ export async function POST(req: Request) {
     case "reset": {
       if ((b.password || "").length < 6) return json({ ok: false, error: "Password must be at least 6 characters." }, 400);
       const ok = await setPassword(email, b.password!);
+      return json({ ok, error: ok ? undefined : "Account not found." });
+    }
+    case "unlock": {
+      const ok = await unlockAccount(email);
+      return json({ ok, error: ok ? undefined : "Account not found." });
+    }
+    case "disable2fa": {
+      // Recovery: an admin clears a user's 2FA if they're locked out of their authenticator.
+      const ok = await disableTotp(email);
       return json({ ok, error: ok ? undefined : "Account not found." });
     }
     default:
