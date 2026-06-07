@@ -1,5 +1,6 @@
 import { record, list, markPatientPaidByEmail } from "@/lib/payments/stripeLedger";
 import { getPendingOrder, patientByEmail, appendSubscription, buildSubscription } from "@/lib/payments/hppStore";
+import { corepayConfigured, corepayInquiry } from "@/lib/payments/corepay";
 import { getTemplate, renderTemplate } from "@/lib/notify/templates";
 import { sendEmail } from "@/lib/email/provider";
 
@@ -50,10 +51,28 @@ export async function POST(req: Request) {
       const already = (await list()).some((e) => e.id === `pay_${txId}`);
       if (already) return Response.json({ ok: true, duplicate: true });
 
+      // Re-verify against the gateway before trusting the event. A spoofed or replayed
+      // callback can't fabricate an approved transaction this way. Skipped only when the
+      // gateway isn't configured (e.g. a local demo posting a test event).
+      let verifiedCard = "";
+      if (corepayConfigured()) {
+        const inq = await corepayInquiry(txId);
+        if (!inq.ok) {
+          // Couldn't reach the gateway — 500 so NetValve retries later (handler is idempotent).
+          return Response.json({ ok: false, error: inq.error || "verification unavailable" }, { status: 500 });
+        }
+        if (!inq.approved) {
+          // Gateway says this transaction is NOT approved — never create a subscription.
+          await record({ id: `unverified_${txId}`, kind: "payment", provider: "corepay", email: "", paymentId: txId, status: "unverified", createdAt: now });
+          return Response.json({ ok: true, unverified: true });
+        }
+        verifiedCard = inq.cardNumber || "";
+      }
+
       const pending = await getPendingOrder(String(d.clientOrderId || ""));
       const email = pending?.email || "";
       const amountCents = pending?.amountCents || Math.round(Number(d.amount || 0) * 100);
-      const last4 = String(d.cardNumber || "").replace(/[^0-9*]/g, "").slice(-4);
+      const last4 = String(d.cardNumber || verifiedCard || "").replace(/[^0-9*]/g, "").slice(-4);
       const planName = pending?.planName || "Treatment plan";
       const currency = pending?.currency || "USD";
 

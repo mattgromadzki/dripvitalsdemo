@@ -148,3 +148,46 @@ export async function corepayCreateHppOrder(args: HppOrderArgs): Promise<HppOrde
     return { ok: false, error: "Could not reach CorePay." };
   }
 }
+
+/* ── Inquiry (verify a transaction with the gateway) ────────────────────────
+   Used to re-confirm a webhook's PURCHASED event against NetValve directly,
+   so a spoofed or replayed callback can't create a subscription on its own.
+   The OpenAPI spec defines GET /inquiry?transactionId=…; some docs show a POST
+   variant, so we try GET and fall back to POST. */
+export interface InquiryResult {
+  ok: boolean;             // we received a parseable response from the gateway
+  approved: boolean;       // the transaction is approved / paid
+  orderState?: string;
+  amount?: number;         // decimal
+  currency?: string;
+  cardNumber?: string;
+  cardType?: string;
+  transactionID?: string;
+  responseCodeType?: string;
+  error?: string;
+}
+
+export async function corepayInquiry(transactionId: string | number): Promise<InquiryResult> {
+  const idNum = Number(transactionId);
+  const id: string | number = Number.isFinite(idNum) ? idNum : transactionId;
+  const call = (method: "GET" | "POST") =>
+    method === "GET"
+      ? fetch(`${BASE}/inquiry?transactionId=${encodeURIComponent(String(id))}`, { method: "GET", headers: headers() })
+      : fetch(`${BASE}/inquiry`, { method: "POST", headers: headers(), body: JSON.stringify({ transactionId: id }) });
+  try {
+    let r = await call("GET");
+    if ([400, 404, 405].includes(r.status)) {
+      const alt = await call("POST");
+      if (alt.ok) r = alt;
+    }
+    const j = (await r.json().catch(() => ({}))) as NvResp & { orderState?: string; amount?: number };
+    if (!r.ok) return { ok: false, approved: false, error: j?.responseMessage || `Inquiry failed (HTTP ${r.status}).` };
+    const approved = j.responseCodeType === "APPROVED" || j.responseCode === "GTW_1000" || j.orderState === "PAID";
+    return {
+      ok: true, approved, orderState: j.orderState, amount: j.amount, currency: j.currency,
+      cardNumber: j.cardNumber, cardType: j.cardType, transactionID: txId(j), responseCodeType: j.responseCodeType,
+    };
+  } catch {
+    return { ok: false, approved: false, error: "Could not reach CorePay." };
+  }
+}
