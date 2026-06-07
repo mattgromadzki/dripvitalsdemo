@@ -1,5 +1,5 @@
 import { record, list, markPatientPaidByEmail } from "@/lib/payments/stripeLedger";
-import { getPendingOrder, patientByEmail, appendSubscription, buildSubscription } from "@/lib/payments/hppStore";
+import { getPendingOrder, patientByEmail, appendSubscription, buildSubscription, updateSubscriptionCard } from "@/lib/payments/hppStore";
 import { corepayConfigured, corepayInquiry } from "@/lib/payments/corepay";
 import { getTemplate, renderTemplate } from "@/lib/notify/templates";
 import { sendEmail } from "@/lib/email/provider";
@@ -75,6 +75,13 @@ export async function POST(req: Request) {
       const last4 = String(d.cardNumber || verifiedCard || "").replace(/[^0-9*]/g, "").slice(-4);
       const planName = pending?.planName || "Treatment plan";
       const currency = pending?.currency || "USD";
+
+      // Card-update flow: repoint the subscription's token instead of creating one.
+      if (pending?.kind === "update_card") {
+        if (pending.subscriptionId) await updateSubscriptionCard(pending.subscriptionId, txId, last4);
+        await record({ id: `card_${txId}`, kind: "payment", provider: "corepay", email, name: pending.name, paymentId: txId, planName: "Card on file updated", amountCents: 0, currency, status: "card_updated", last4, createdAt: now });
+        return Response.json({ ok: true, cardUpdated: true });
+      }
 
       if (email) await markPatientPaidByEmail(email, planName);
       const { id: patientId, name: patientName } = await patientByEmail(email);

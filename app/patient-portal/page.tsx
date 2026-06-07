@@ -4,6 +4,7 @@ import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { ReactNode, CSSProperties } from "react";
 import { useShop } from "@/lib/hooks/useShop";
 import { usePatients } from "@/lib/hooks/usePatients";
+import { useSubscriptions } from "@/lib/hooks/useSubscriptions";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
 import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
@@ -171,6 +172,46 @@ export default function PatientPortalPage() {
     setToasts((t) => [...t, { id, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 2700);
   }, []);
+
+  // ── Card on file (NetValve hosted update) ────────────────────────────────
+  const subscriptions = useSubscriptions((s) => s.subscriptions);
+  const mySub = useMemo(() => {
+    if (!me) return null;
+    const nm = `${me.first} ${me.last}`.toLowerCase();
+    return subscriptions.find((s) => s.patientId === me.id)
+      || subscriptions.find((s) => (s.patientName || "").toLowerCase() === nm)
+      || null;
+  }, [subscriptions, me]);
+  const [payReady, setPayReady] = useState(false);
+  useEffect(() => { fetch("/api/payments/config").then((r) => r.json()).then((c) => setPayReady(c?.provider === "corepay" && !!c?.ready)).catch(() => {}); }, []);
+
+  const updateCard = useCallback(async () => {
+    if (!me) return;
+    if (!payReady) { toast("Secure card updates aren't enabled in this environment"); return; }
+    try {
+      const r = await fetch("/api/payments/update-card", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "begin", subscriptionId: mySub?.id, email: me.email, firstName: me.first, lastName: me.last }) });
+      const d = await r.json();
+      if (d?.ok && d.url) window.location.href = d.url; else toast("⚠️ " + (d?.error || "Couldn't start card update"));
+    } catch { toast("⚠️ Couldn't start card update"); }
+  }, [payReady, me, mySub, toast]);
+
+  // Handle the return from NetValve's hosted card-update page.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const co = p.get("cardUpdated");
+    const cu = p.get("cardUpdate");
+    const clean = (key: string) => { const u = new URL(window.location.href); u.searchParams.delete(key); window.history.replaceState({}, "", u.toString()); };
+    if (co) {
+      fetch("/api/payments/update-card", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "finalize", clientOrderId: co }) })
+        .then((r) => r.json())
+        .then((d) => toast(d?.ok ? `✓ Card updated${d.last4 ? ` · ending ${d.last4}` : ""}` : "⚠️ " + (d?.error || "Couldn't confirm the new card")))
+        .catch(() => toast("⚠️ Couldn't confirm the new card"))
+        .finally(() => clean("cardUpdated"));
+    } else if (cu === "cancel") { toast("Card update canceled"); clean("cardUpdate"); }
+    else if (cu === "failed") { toast("⚠️ Card couldn't be authorized"); clean("cardUpdate"); }
+  }, [toast]);
+
 
   // ── Shop catalog (published only, sorted) ─────────────────────────────────
   const published = useMemo(
@@ -368,7 +409,7 @@ export default function PatientPortalPage() {
                 ? <ProductDetail product={pdpProduct} related={published.filter((r) => r.cat === pdpProduct.cat && r.id !== pdpProduct.id).slice(0, 3)} onBack={() => setPdpId(null)} onOpen={setPdpId} toast={toast} />
                 : <ShopPage list={shopList} count={shopList.length} filter={shopFilter} setFilter={setShopFilter} search={shopSearch} setSearch={setShopSearch} onOpen={setPdpId} />
             )}
-            {page === "account" && <AccountPage tab={acctTab} setTab={setAcctTab} theme={theme} setTheme={setTheme} openModal={setModal} toast={toast} fullName={fullName} initials={initials} />}
+            {page === "account" && <AccountPage tab={acctTab} setTab={setAcctTab} theme={theme} setTheme={setTheme} openModal={setModal} toast={toast} fullName={fullName} initials={initials} cardLast4={mySub?.cardLast4} onUpdateCard={updateCard} />}
           </div>
         </main>
       </div>
@@ -1062,11 +1103,12 @@ function ProductDetail({ product: p, related, onBack, onOpen, toast }: {
 }
 
 /* ── ACCOUNT ── */
-function AccountPage({ tab, setTab, theme, setTheme, openModal, toast, fullName, initials }: {
+function AccountPage({ tab, setTab, theme, setTheme, openModal, toast, fullName, initials, cardLast4, onUpdateCard }: {
   tab: AcctTab; setTab: (t: AcctTab) => void;
   theme: "light" | "dark"; setTheme: (t: "light" | "dark") => void;
   openModal: (m: ModalType) => void; toast: (s: string) => void;
   fullName: string; initials: string;
+  cardLast4?: string; onUpdateCard: () => void;
 }) {
   return (
     <section className="page active">
@@ -1121,19 +1163,26 @@ function AccountPage({ tab, setTab, theme, setTheme, openModal, toast, fullName,
       {tab === "billing" && (
         <div className="inner-tab-content active">
           <div className="card-h" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span>💳 Payment methods</span>
-            <span className="right" onClick={() => toast("Add new payment method")}>Add new</span>
+            <span>💳 Payment method</span>
           </div>
-          <button onClick={() => toast("Add new card form")} style={{ width: "100%", cursor: "pointer", padding: "16px 18px", background: "#fff", border: "1.5px solid var(--border)", borderRadius: 14, marginBottom: 30, display: "flex", alignItems: "center", gap: 14 }}>
-            <div className="pay-brands">
-              <span className="brand-chip">VISA</span>
-              <span className="brand-chip mc">MC</span>
-              <span className="brand-chip amex">AMEX</span>
-              <span className="brand-chip elo">Elo</span>
+          <button onClick={onUpdateCard} style={{ width: "100%", cursor: "pointer", padding: "16px 18px", background: "#fff", border: "1.5px solid var(--border)", borderRadius: 14, marginBottom: 12, display: "flex", alignItems: "center", gap: 14 }}>
+            <span className="brand-chip">{cardLast4 ? "CARD" : "VISA"}</span>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              {cardLast4
+                ? <>
+                    <div style={{ fontSize: 14.5, fontWeight: 600 }}>Card ending •••• {cardLast4}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>Used for your subscription. Tap to update.</div>
+                  </>
+                : <>
+                    <div style={{ fontSize: 14.5, fontWeight: 600 }}>Update card on file</div>
+                    <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 2 }}>Enter a new card on our processor&apos;s secure page.</div>
+                  </>}
             </div>
-            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Add new card</div>
-            <span className="payment-add-icon">+</span>
+            <span style={{ color: "var(--muted)", fontSize: 16 }}>✏️</span>
           </button>
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 30, display: "flex", alignItems: "center", gap: 6 }}>
+            🔒 Card details are entered on our payment provider&apos;s secure page — never stored on our servers.
+          </div>
 
           <div className="card-h">📍 Shipping &amp; billing address</div>
           <button onClick={() => openModal("editAddress")} style={{ width: "100%", cursor: "pointer", padding: "16px 18px", background: "#fff", border: "1.5px solid var(--border)", borderRadius: 14, marginBottom: 30, display: "flex", alignItems: "center", gap: 14 }}>

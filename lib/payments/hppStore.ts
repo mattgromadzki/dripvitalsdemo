@@ -19,6 +19,8 @@ const SUBS_KEY = "store:subscriptions"; // same key the subscriptions store pers
 
 export interface PendingOrder {
   clientOrderId: string;
+  kind?: "checkout" | "update_card"; // default checkout
+  subscriptionId?: string;           // for update_card
   email?: string;
   name?: string;
   firstName?: string;
@@ -80,7 +82,25 @@ export async function appendSubscription(sub: Subscription): Promise<void> {
   await r.set(SUBS_KEY, JSON.stringify(arr));
 }
 
-/** Build a Subscription from a pending order + the gateway transaction id. */
+/** Repoint a subscription to a new card/token (used by "update card on file").
+   Clears past-due dunning state since the card has been refreshed. */
+export async function updateSubscriptionCard(subscriptionId: string, token: string, last4: string): Promise<boolean> {
+  const r = redis();
+  if (!r) return false;
+  const v = await r.get(SUBS_KEY);
+  const arr: Subscription[] = Array.isArray(v) ? v : typeof v === "string" ? JSON.parse(v) : [];
+  const idx = arr.findIndex((s) => s.id === subscriptionId);
+  if (idx < 0) return false;
+  arr[idx] = {
+    ...arr[idx],
+    paymentToken: token,
+    cardLast4: last4 || arr[idx].cardLast4,
+    failedAttempts: 0,
+    status: arr[idx].status === "past_due" ? "active" : arr[idx].status,
+  };
+  await r.set(SUBS_KEY, JSON.stringify(arr));
+  return true;
+}
 export function buildSubscription(opts: {
   transactionId: string;
   pending: PendingOrder | null;

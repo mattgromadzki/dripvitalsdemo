@@ -82,6 +82,7 @@ export async function corepayRefund(input: RefundInput): Promise<RefundResult> {
 export interface HppOrderArgs {
   amountCents: number;
   currency?: string;
+  mode?: "SALE" | "AUTHORIZATION"; // AUTHORIZATION validates a card without capturing
   successUrl: string;
   cancelUrl: string;
   failedUrl: string;
@@ -107,7 +108,7 @@ export async function corepayCreateHppOrder(args: HppOrderArgs): Promise<HppOrde
   const currency = (args.currency || "USD").toUpperCase();
   const c = args.customer || {};
   const body: Record<string, unknown> = {
-    mode: "SALE",
+    mode: args.mode || "SALE",
     amount: toDecimal(args.amountCents),
     currency,
     netvalveMidId: corepayMidFor(currency),
@@ -186,6 +187,34 @@ export async function corepayInquiry(transactionId: string | number): Promise<In
     return {
       ok: true, approved, orderState: j.orderState, amount: j.amount, currency: j.currency,
       cardNumber: j.cardNumber, cardType: j.cardType, transactionID: txId(j), responseCodeType: j.responseCodeType,
+    };
+  } catch {
+    return { ok: false, approved: false, error: "Could not reach CorePay." };
+  }
+}
+
+/* ── Order lookup ───────────────────────────────────────────────────────────
+   Reads back an order by our clientOrderId so we can deterministically capture
+   the resulting transaction id + card after a hosted-page return (used by the
+   "update card on file" flow, which can't rely on a charge webhook). */
+interface OrderTxn { transactionId?: number; transactionType?: string; responseCode?: string; responseCodeType?: string; cardNumber?: string; cardType?: string; }
+interface OrderResp { transactions?: OrderTxn[]; cardNumber?: string; cardType?: string; responseCodeType?: string; responseMessage?: string; }
+export interface OrderLookup { ok: boolean; approved: boolean; transactionID?: string; last4?: string; cardType?: string; error?: string; }
+
+export async function corepayGetOrder(clientOrderId: string): Promise<OrderLookup> {
+  try {
+    const r = await fetch(`${BASE}/order?clientOrderId=${encodeURIComponent(clientOrderId)}`, { method: "GET", headers: headers() });
+    const j = (await r.json().catch(() => ({}))) as OrderResp;
+    if (!r.ok) return { ok: false, approved: false, error: j?.responseMessage || `Order lookup failed (HTTP ${r.status}).` };
+    const txns = Array.isArray(j.transactions) ? j.transactions : [];
+    const appr = txns.find((t) => (t.responseCodeType === "APPROVED" || t.responseCode === "GTW_1000") && (t.transactionType === "SALE" || t.transactionType === "AUTHORIZATION"));
+    const card = appr?.cardNumber || j.cardNumber || "";
+    return {
+      ok: true,
+      approved: !!appr || j.responseCodeType === "APPROVED",
+      transactionID: appr?.transactionId != null ? String(appr.transactionId) : undefined,
+      last4: String(card).replace(/[^0-9*]/g, "").slice(-4),
+      cardType: appr?.cardType || j.cardType,
     };
   } catch {
     return { ok: false, approved: false, error: "Could not reach CorePay." };
