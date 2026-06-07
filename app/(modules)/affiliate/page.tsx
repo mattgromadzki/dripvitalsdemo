@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { Key, ReactNode } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
@@ -619,9 +620,9 @@ function AffiliateRow({ affiliate: a, expanded, onToggle, onCopyCode, onPay, onP
               <button className="btn btn-ghost btn-sm" onClick={onCopyCode}>
                 📋 Copy Code
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => toast(`📊 ${a.name} analytics opened`)}>
-                📊 View Analytics
-              </button>
+              <Link href={`/affiliate/${a.id}`} className="btn btn-ghost btn-sm">
+                📊 View Details
+              </Link>
               <button className="btn btn-ghost btn-sm" onClick={() => toast(`📧 Sent welcome kit to ${a.name}`)}>
                 📧 Resend Welcome Kit
               </button>

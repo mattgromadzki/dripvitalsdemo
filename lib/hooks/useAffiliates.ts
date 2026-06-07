@@ -7,6 +7,7 @@ import { AFFILIATES as SEED } from "@/lib/data/affiliates";
 interface AffiliatesState {
   affiliates: Affiliate[];
   add: (a: Omit<Affiliate, "id">) => Affiliate;
+  update: (id: string, patch: Partial<Omit<Affiliate, "id">>) => void;
   setStatus: (id: string, status: AffiliateStatus) => void;
   updateCommissionRate: (id: string, rate: number) => void;
   payCommission: (id: string, method: AffiliatePayout["method"], period: string) => AffiliatePayout | null;
@@ -43,6 +44,9 @@ export const useAffiliates = create<AffiliatesState>((set, get) => ({
     const created: Affiliate = { id: nextId(), ...input };
     set((s) => ({ affiliates: [created, ...s.affiliates] }));
     return created;
+  },
+  update: (id, patch) => {
+    set((s) => ({ affiliates: s.affiliates.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
   },
   setStatus: (id, status) => {
     set((s) => ({
