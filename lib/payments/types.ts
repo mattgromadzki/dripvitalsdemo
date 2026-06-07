@@ -23,3 +23,16 @@ export interface PaymentsPublicConfig {
   ready: boolean;          // true when the provider can take live cards
   square?: { appId?: string; locationId?: string; env: "sandbox" | "production" };
 }
+export interface RefundInput {
+  paymentId: string;       // the gateway's original transaction/payment id
+  amountCents?: number;    // omit for full refund
+  currency?: string;
+  reason?: string;
+}
+export interface RefundResult {
+  ok: boolean;
+  refundId?: string;
+  status?: string;
+  error?: string;
+  provider: string;
+}

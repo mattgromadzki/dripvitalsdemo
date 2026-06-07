@@ -22,6 +22,7 @@ export const NAV_PERM: Record<string, string> = {
   "/consent": "patients.edit",
   // Business
   "/subscriptions": "subscriptions.manage",
+  "/payments": "payments.charge",
   "/billing": "payments.charge",
   "/marketing": "campaigns.send", "/automations": "campaigns.send", "/pipeline": "campaigns.send", "/affiliate": "campaigns.send",
   // Records

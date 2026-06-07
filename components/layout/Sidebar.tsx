@@ -44,6 +44,7 @@ const NAV: NavSection[] = [
     items: [
       { href: "/analytics",        icon: "📈", label: "Analytics" },
       { href: "/subscriptions",    icon: "🔁", label: "Subscriptions" },
+      { href: "/payments",         icon: "💸", label: "Payments" },
       { href: "/billing",          icon: "💳", label: "Billing" },
       { href: "/marketing",        icon: "📡", label: "Marketing" },
       { href: "/automations",      icon: "⚡", label: "Automations" },

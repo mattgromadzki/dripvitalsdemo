@@ -192,6 +192,20 @@ const DEFAULTS: Record<string, EmailTemplate> = {
     <p style="font-size:14px;line-height:1.5;">Hi {{name}}, we tried to charge {{amount}} for your {{plan}} but the payment didn't go through.</p>
     <p style="font-size:14px;line-height:1.5;">Please update your payment method in the patient portal to avoid any interruption to your treatment. We'll automatically retry once it's updated.</p>`),
   },
+  payment_receipt: {
+    type: "payment_receipt", label: "Payment receipt",
+    description: "Sent to a patient when a subscription payment succeeds.",
+    placeholders: ["name", "amount", "plan", "date", "receiptUrl"],
+    subject: "Your DripVitals payment receipt",
+    html: shell("Payment received — thank you", `
+    <p style="font-size:14px;line-height:1.5;">Hi {{name}}, we've received your payment. Here are the details:</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;border:1px solid #e6eaee;border-radius:10px;">
+      <tr><td style="padding:10px 14px;font-size:13px;color:#6b7280;">Plan</td><td style="padding:10px 14px;font-size:13px;text-align:right;font-weight:600;">{{plan}}</td></tr>
+      <tr><td style="padding:10px 14px;font-size:13px;color:#6b7280;border-top:1px solid #eef1f6;">Amount</td><td style="padding:10px 14px;font-size:13px;text-align:right;font-weight:700;border-top:1px solid #eef1f6;">{{amount}}</td></tr>
+      <tr><td style="padding:10px 14px;font-size:13px;color:#6b7280;border-top:1px solid #eef1f6;">Date</td><td style="padding:10px 14px;font-size:13px;text-align:right;border-top:1px solid #eef1f6;">{{date}}</td></tr>
+    </table>
+    <p style="font-size:13px;line-height:1.5;color:#6b7280;">A detailed invoice is available here: <a href="{{receiptUrl}}" style="color:#3b7fc4;">View invoice</a>.</p>`),
+  },
   inactive_30day: {
     type: "inactive_30day", label: "Patient inactive 30 days",
     description: "Sent when a patient has had no activity for 30 days (scheduled).",

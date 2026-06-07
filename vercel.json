@@ -1,12 +1,7 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/intake-reminders",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/license-reminders",
-      "schedule": "30 15 * * *"
-    }
+    { "path": "/api/cron/intake-reminders",  "schedule": "0 15 * * *" },
+    { "path": "/api/cron/license-reminders", "schedule": "30 15 * * *" },
+    { "path": "/api/cron/recurring-billing", "schedule": "0 16 * * *" }
   ]
 }
