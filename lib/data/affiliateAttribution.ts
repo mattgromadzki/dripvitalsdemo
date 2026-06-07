@@ -41,7 +41,9 @@ export function attributedPatients(affiliate: Affiliate, allAffiliates: Affiliat
   });
 }
 
-const BASE = "https://app.dripvitals.com";
+// Affiliate links point at the public marketing site (where prospective patients
+// land and sign up), NOT app.dripvitals.com which hosts the EMR.
+const BASE = "https://dripvitals.com";
 
 /** The unique referral link assigned to an affiliate (carries their code). */
 export function referralLink(a: Affiliate): string {
