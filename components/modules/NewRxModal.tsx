@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { ClinicalSafetyStrip } from "@/components/clinical/ClinicalSafetyStrip";
+import { RxAlertsPanel } from "@/components/clinical/RxAlertsPanel";
+import { useClinical } from "@/lib/hooks/useClinical";
+import { seedChart } from "@/lib/clinical/chartTypes";
+import { screenPrescription } from "@/lib/clinical/interactions";
 import type { Prescription } from "@/lib/types";
 
 interface NewRxModalProps {
@@ -57,6 +61,24 @@ export function NewRxModal({ open, onClose, onSave, defaultPatientId }: NewRxMod
   const [error, setError] = useState("");
   const selectedPatient = patients.find((p) => p.id === form.patientId) || null;
 
+  const charts = useClinical((s) => s.charts);
+  const ensureSeeded = useClinical((s) => s.ensureSeeded);
+  useEffect(() => { if (selectedPatient) ensureSeeded(selectedPatient.id, selectedPatient); }, [selectedPatient, ensureSeeded]);
+  const clinChart = useMemo(
+    () => (selectedPatient ? (charts[selectedPatient.id] ?? seedChart(selectedPatient)) : null),
+    [charts, selectedPatient]
+  );
+  const screening = useMemo(
+    () => screenPrescription({
+      proposed: [{ name: form.medication }],
+      allergies: clinChart?.allergies ?? [],
+      currentMeds: clinChart?.meds ?? [],
+    }),
+    [form.medication, clinChart]
+  );
+  const [alertsAck, setAlertsAck] = useState(false);
+  useEffect(() => { if (!screening.danger) setAlertsAck(false); }, [screening.danger]);
+
   useEffect(() => {
     if (open) {
       setForm({
@@ -88,6 +110,7 @@ export function NewRxModal({ open, onClose, onSave, defaultPatientId }: NewRxMod
     const patient = patients.find((p) => p.id === form.patientId);
     if (!patient) { setError("Patient not found"); return; }
     if (!form.sig.trim()) { setError("Signa (instructions) is required"); return; }
+    if (screening.danger && !alertsAck) { setError("Acknowledge the contraindication alert before signing"); return; }
 
     const m = MEDICATIONS.find((x) => x.name === form.medication) || MEDICATIONS[0];
     const today = new Date();
@@ -125,7 +148,7 @@ export function NewRxModal({ open, onClose, onSave, defaultPatientId }: NewRxMod
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>✓ Sign & Transmit</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={screening.danger && !alertsAck}>✓ Sign & Transmit</button>
         </>
       }
     >
@@ -144,6 +167,13 @@ export function NewRxModal({ open, onClose, onSave, defaultPatientId }: NewRxMod
       </div>
 
       {selectedPatient && <ClinicalSafetyStrip patient={selectedPatient} className="mb-3" />}
+      {selectedPatient && <RxAlertsPanel result={screening} className="mb-3" />}
+      {screening.danger && (
+        <label className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-red-soft border border-red/40 text-[12px] text-red font-semibold cursor-pointer">
+          <input type="checkbox" checked={alertsAck} onChange={(e) => setAlertsAck(e.target.checked)} />
+          I&rsquo;ve reviewed the contraindication alert above
+        </label>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>

@@ -17,6 +17,8 @@ import { getPatientExtra } from "@/lib/data/patientExtras";
 import { ClinicalSafetyStrip } from "@/components/clinical/ClinicalSafetyStrip";
 import { useClinical } from "@/lib/hooks/useClinical";
 import { seedChart } from "@/lib/clinical/chartTypes";
+import { screenPrescription } from "@/lib/clinical/interactions";
+import { RxAlertsPanel } from "@/components/clinical/RxAlertsPanel";
 import { RxPreviewBask } from "@/components/modules/RxPreviewBask";
 import {
   DRUG_CATALOG,
@@ -246,6 +248,19 @@ export function EPrescribeWorkspace(
   // Derived counts
   const meds = orderCart.filter((l): l is MedicationLine => l.type === "medication");
   const sups = orderCart.filter((l): l is SupplyLine => l.type === "supply");
+
+  // Decision support — drug–allergy + curated drug–drug screening, live as the
+  // cart changes. Danger-level alerts must be acknowledged before signing.
+  const screening = useMemo(
+    () => screenPrescription({
+      proposed: meds.map((m) => ({ name: m.drug.name, drugClass: m.drug.drugClass })),
+      allergies: clinChart?.allergies ?? [],
+      currentMeds: clinChart?.meds ?? [],
+    }),
+    [meds, clinChart]
+  );
+  const [alertsAck, setAlertsAck] = useState(false);
+  useEffect(() => { if (!screening.danger) setAlertsAck(false); }, [screening.danger]);
   const rxCount = savedDocs.filter((d) => d.category === "rx").length;
 
   // ── Drug + supply form handlers ─────────────────────────────────────
@@ -344,6 +359,7 @@ export function EPrescribeWorkspace(
 
   function submitOrder() {
     if (!patient || !selectedPharmacyId) return;
+    if (screening.danger && !alertsAck) { toast("⛔ Acknowledge the contraindication alert before signing"); return; }
     const selectedPharmacy = pharmacies.find((p) => p.id === selectedPharmacyId);
     if (!selectedPharmacy) return;
 
@@ -576,6 +592,7 @@ export function EPrescribeWorkspace(
 
       {/* Allergy + problem safety check, surfaced throughout the prescribe flow */}
       {patient && <ClinicalSafetyStrip patient={patient} className="mb-4" />}
+      {patient && <RxAlertsPanel result={screening} className="mb-4" />}
 
       {/* Order context (when launched from a paid order on the chart) */}
       {orderContext && (
@@ -1093,7 +1110,13 @@ export function EPrescribeWorkspace(
             <>
               <button className="btn btn-ghost" onClick={closeReviewAndReset}>← Edit Order</button>
               <div className="flex-1" />
-              <button className="btn btn-primary" onClick={submitOrder}>✓ Confirm &amp; Send</button>
+              {screening.danger && (
+                <label className="flex items-center gap-1.5 text-[11.5px] text-red font-semibold mr-1 cursor-pointer">
+                  <input type="checkbox" checked={alertsAck} onChange={(e) => setAlertsAck(e.target.checked)} />
+                  I&rsquo;ve reviewed the contraindication alert
+                </label>
+              )}
+              <button className="btn btn-primary" onClick={submitOrder} disabled={screening.danger && !alertsAck}>✓ Confirm &amp; Send</button>
             </>
           )
         }

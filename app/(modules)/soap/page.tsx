@@ -9,6 +9,12 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { toast } from "@/lib/hooks/useToast";
 import { useSoapNotes } from "@/lib/hooks/useSoapNotes";
 import { usePatients } from "@/lib/hooks/usePatients";
+import { useClinical } from "@/lib/hooks/useClinical";
+import { seedChart } from "@/lib/clinical/chartTypes";
+import {
+  prefillSections, appendBlock,
+  formatProblemsForAssessment, formatMedsForPlan, formatObjective, formatAllergiesLine,
+} from "@/lib/clinical/soapPrefill";
 import { SOAP_TEMPLATES, type SoapTemplate } from "@/lib/data/soapTemplates";
 import type { SoapNote, SoapNoteStatus } from "@/lib/types";
 
@@ -58,6 +64,34 @@ export default function SoapNotesPage() {
     ? patients.find((p) => p.id === activeNote.patientId)
     : undefined;
 
+  // Structured clinical chart for the linked patient (store:clinical), seeded on
+  // demand. This is what the right-rail chart context and the "insert into note"
+  // pulls read from — so notes stay grounded in coded data.
+  const charts = useClinical((s) => s.charts);
+  const ensureSeeded = useClinical((s) => s.ensureSeeded);
+  useEffect(() => { if (activePatient) ensureSeeded(activePatient.id, activePatient); }, [activePatient, ensureSeeded]);
+  const clinChart = useMemo(
+    () => (activePatient ? (charts[activePatient.id] ?? seedChart(activePatient)) : null),
+    [charts, activePatient]
+  );
+
+  // Focus a specific note when arrived at via /soap?note=<id> (e.g. from the
+  // patient chart's "+ New Note"). Client-only so no Suspense boundary needed.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("note");
+    if (!q) return;
+    const id = parseInt(q, 10);
+    if (!Number.isNaN(id) && notes.some((n) => n.id === id)) setActiveId(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes.length]);
+
+  function pullInto(field: "o" | "a" | "p", block: string, what: string) {
+    if (!activeNote || isLocked || !clinChart) return;
+    if (!block) { toast(`No ${what} to insert`); return; }
+    updateSection(activeNote.id, field, appendBlock(activeNote[field], block));
+    toast(`📋 ${what} inserted`);
+  }
+
   // Counts for filter badges
   const counts = useMemo(() => ({
     all: notes.length,
@@ -79,6 +113,9 @@ export default function SoapNotesPage() {
     const dateStr = `${months[today.getMonth()]} ${today.getDate()}, ${today.getFullYear()}`;
     const dateOrdered = parseInt(`${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`, 10);
     const firstPatient = patients[0];
+    const pre = firstPatient
+      ? prefillSections(useClinical.getState().charts[firstPatient.id] ?? seedChart(firstPatient))
+      : { o: "", a: "", p: "" };
     const created = addNote({
       patientName: firstPatient?.name || "New Patient",
       patientId: firstPatient?.id,
@@ -87,10 +124,10 @@ export default function SoapNotesPage() {
       type: "New Note",
       status: "draft",
       provider: "Dr. Rivera",
-      s: "", o: "", a: "", p: "",
+      s: "", o: pre.o, a: pre.a, p: pre.p,
     });
     setActiveId(created.id);
-    toast("📝 New note draft created");
+    toast("📝 New note created — problems & meds pulled in");
   }
 
   function handleApplyTemplate(t: SoapTemplate) {
@@ -355,7 +392,41 @@ export default function SoapNotesPage() {
               <ContextRow label="Weight"    value={`${activePatient.wt} lbs`} />
               <ContextRow label="BMI"       value={String(activePatient.bmi)} />
               <ContextRow label="BP"        value={activePatient.bp} mono />
-              <ContextRow label="Allergies" value={activePatient.allergies} alert={activePatient.allergies !== "NKDA"} last />
+
+              {clinChart && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className={`text-[11px] rounded-md px-2.5 py-2 mb-2.5 ${clinChart.allergies.some((a) => a.status === "active") ? "bg-red-soft text-red font-semibold" : "bg-surface-2 text-ink-2"}`}>
+                    {formatAllergiesLine(clinChart)}
+                  </div>
+
+                  <RailList label="Problem list" empty="No active problems">
+                    {clinChart.problems.filter((p) => p.status === "active").map((p) => (
+                      <div key={p.id} className="flex items-center gap-1.5 text-[11.5px] py-0.5">
+                        <span className="font-mono text-[10.5px] text-ink-muted bg-surface-2 border border-border rounded px-1">{p.code}</span>
+                        <span className="text-ink-2 truncate">{p.label}</span>
+                      </div>
+                    ))}
+                  </RailList>
+
+                  <RailList label="Current meds" empty="No active medications">
+                    {clinChart.meds.filter((m) => m.status === "active").map((m) => (
+                      <div key={m.id} className="text-[11.5px] py-0.5">
+                        <span className="font-semibold text-ink">{m.name}</span>
+                        {[m.dose, m.frequency].filter(Boolean).length > 0 && (
+                          <span className="text-ink-muted"> · {[m.dose, m.frequency].filter(Boolean).join(" · ")}</span>
+                        )}
+                      </div>
+                    ))}
+                  </RailList>
+
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mt-3 mb-1.5">Pull into note</div>
+                  <div className="flex flex-col gap-1.5">
+                    <RailPullBtn onClick={() => pullInto("a", formatProblemsForAssessment(clinChart), "problem list → Assessment")} disabled={!activeNote || isLocked}>＋ Problems → Assessment</RailPullBtn>
+                    <RailPullBtn onClick={() => pullInto("p", formatMedsForPlan(clinChart), "medications → Plan")} disabled={!activeNote || isLocked}>＋ Meds → Plan</RailPullBtn>
+                    <RailPullBtn onClick={() => pullInto("o", formatObjective(clinChart), "vitals & allergies → Objective")} disabled={!activeNote || isLocked}>＋ Vitals → Objective</RailPullBtn>
+                  </div>
+                </div>
+              )}
             </>
           ) : activeNote ? (
             <div className="text-center py-6">
@@ -486,5 +557,27 @@ function ContextRow({ label, value, mono, alert, last }: ContextRowProps) {
         {value}
       </span>
     </div>
+  );
+}
+
+function RailList({ label, empty, children }: { label: string; empty: string; children: ReactNode }) {
+  const hasItems = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return (
+    <div className="mb-2.5">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1">{label}</div>
+      {hasItems ? <div>{children}</div> : <div className="text-[11px] text-ink-muted italic">{empty}</div>}
+    </div>
+  );
+}
+
+function RailPullBtn({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full text-left py-1.5 px-2.5 rounded-md bg-surface-2 border border-border text-[11px] font-semibold text-ink-2 hover:bg-brand-soft hover:border-brand hover:text-brand-dk transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      {children}
+    </button>
   );
 }
