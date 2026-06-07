@@ -73,3 +73,78 @@ export async function corepayRefund(input: RefundInput): Promise<RefundResult> {
     return { ok: false, error: "Could not reach CorePay.", provider: "corepay" };
   }
 }
+
+/* ── Hosted Payment Page (HPP) ──────────────────────────────────────────────
+   Creates a hosted order and returns NetValve's redirectUrl. The patient is sent
+   there to enter card details on NetValve's PCI-compliant page (SAQ A). The
+   resulting transactionID arrives via the success redirect + the webhook, and is
+   stored as the subscription's token for future /rebill charges. */
+export interface HppOrderArgs {
+  amountCents: number;
+  currency?: string;
+  successUrl: string;
+  cancelUrl: string;
+  failedUrl: string;
+  pendingUrl?: string;
+  clientOrderId?: string;
+  orderDesc?: string;
+  descriptor?: string; // statement descriptor, <= 50 chars
+  customer?: {
+    email?: string; firstName?: string; lastName?: string; phone?: string;
+    address?: string; city?: string; state?: string; zip?: string; countryCode?: string;
+  };
+}
+export interface HppOrderResult {
+  ok: boolean;
+  redirectUrl?: string;
+  orderId?: string;
+  transactionID?: string;
+  orderState?: string;
+  error?: string;
+}
+
+export async function corepayCreateHppOrder(args: HppOrderArgs): Promise<HppOrderResult> {
+  const currency = (args.currency || "USD").toUpperCase();
+  const c = args.customer || {};
+  const body: Record<string, unknown> = {
+    mode: "SALE",
+    amount: toDecimal(args.amountCents),
+    currency,
+    netvalveMidId: corepayMidFor(currency),
+    successUrl: args.successUrl,
+    cancelUrl: args.cancelUrl,
+    failedUrl: args.failedUrl,
+    ...(args.pendingUrl ? { pendingUrl: args.pendingUrl } : {}),
+    ...(args.clientOrderId ? { clientOrderId: args.clientOrderId.slice(0, 100) } : {}),
+    ...(args.orderDesc ? { orderDesc: args.orderDesc } : {}),
+    ...(args.descriptor ? { descriptor: args.descriptor.slice(0, 50) } : {}),
+    customerDetails: {
+      ...(c.email ? { customerEmail: c.email } : {}),
+      ...(c.firstName ? { customerFirstName: c.firstName } : {}),
+      ...(c.lastName ? { customerLastName: c.lastName } : {}),
+      ...(c.phone ? { customerPhone: c.phone } : {}),
+      ...(c.address ? { customerAddress: c.address } : {}),
+      ...(c.city ? { customerCity: c.city } : {}),
+      ...(c.state ? { customerState: c.state } : {}),
+      ...(c.zip ? { customerZipCode: c.zip } : {}),
+      customerCountryCode: (c.countryCode || "US").slice(0, 2),
+    },
+  };
+  try {
+    const r = await fetch(`${BASE}/hpp/order`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+    const j = (await r.json().catch(() => ({}))) as NvResp & { orderId?: number; orderState?: string; redirectUrl?: string };
+    const redirectUrl = j.redirectUrl;
+    if (!r.ok || !redirectUrl) {
+      return { ok: false, error: j?.responseMessage || `Could not start hosted checkout (HTTP ${r.status}).` };
+    }
+    return {
+      ok: true,
+      redirectUrl,
+      orderId: j.orderId != null ? String(j.orderId) : undefined,
+      transactionID: txId(j),
+      orderState: j.orderState,
+    };
+  } catch {
+    return { ok: false, error: "Could not reach CorePay." };
+  }
+}

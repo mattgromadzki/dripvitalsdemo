@@ -134,6 +134,8 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     return () => { alive = false; };
   }, []);
   const isStripe = payProvider?.provider === "stripe" && payProvider.ready;
+  const isCorepay = payProvider?.provider === "corepay" && payProvider.ready;
+  const isHosted = isStripe || isCorepay; // card collected on the provider's secure page
 
   // Acknowledge / accordion state per question (keyed by question id)
   const [accOpen, setAccOpen] = useState<Record<number, boolean>>({});
@@ -444,15 +446,30 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   }
 
   function submitPayment() {
-    // Real payments: redirect to Stripe Checkout (card collected securely on Stripe).
-    if (isStripe && leadId !== null) {
+    // Hosted-redirect providers (Stripe Checkout, NetValve Hosted Payment Page):
+    // the card is collected on the provider's PCI-compliant page, never here.
+    if (isHosted && leadId !== null) {
       if (!coAddr.line1 || !coAddr.city || !coAddr.state || !coAddr.zip) { toast("Please complete your shipping address"); return; }
       if (!INTAKE_CONSENTS.every((d) => legalAck[d.id])) { toast("Please review and agree to the consent documents to continue"); return; }
       const lead = useTreatmentsIntake.getState().clients.find((c) => c.id === leadId);
       const tx = treatments.find((t) => t.id === selectedTxId);
       updateClient(leadId, { status: "paid", paidAt: nowStamp(), address: coAddr });
       if (live) onComplete?.(leadId, selectedTxId);
-      fetch("/api/stripe/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: lead?.email, name: `${lead?.first || ""} ${lead?.last || ""}`.trim(), planName: tx?.name, price: tx?.price, interval: tx?.billing, treatmentId: selectedTxId }) })
+      const endpoint = isStripe ? "/api/stripe/checkout" : "/api/payments/checkout";
+      const payload = {
+        email: lead?.email,
+        firstName: lead?.first,
+        lastName: lead?.last,
+        name: `${lead?.first || ""} ${lead?.last || ""}`.trim(),
+        phone: lead?.phone,
+        planName: tx?.name,
+        price: tx?.price,
+        interval: tx?.billing,
+        treatmentId: selectedTxId,
+        clientOrderId: `lead_${leadId}`,
+        address: { line1: coAddr.line1, city: coAddr.city, state: coAddr.state, zip: coAddr.zip, countryCode: "US" },
+      };
+      fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
         .then((r) => r.json())
         .then((j) => { if (j.ok && j.url) window.location.href = j.url; else toast("⚠️ " + (j.error || "Couldn't start secure checkout")); })
         .catch(() => toast("⚠️ Couldn't start secure checkout"));
@@ -1356,10 +1373,10 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
         })()}
 
         {/* ─── Payment Method ─── */}
-        {isStripe ? (
+        {isHosted ? (
           <div style={{ background: "var(--dv-card)", border: "1px solid var(--dv-border)", borderRadius: 12, padding: "14px 16px", margin: "8px 0 4px", fontSize: 13, color: "var(--dv-ink)", lineHeight: 1.5 }}>
             <div style={{ fontWeight: 700, marginBottom: 4 }}>🔒 Secure payment</div>
-            You'll enter your card details on the next screen, hosted securely by Stripe. Your card is never stored on our servers.
+            You&apos;ll enter your card details on the next screen, hosted securely by {isStripe ? "Stripe" : "our payment provider"}. Your card is never stored on our servers.
           </div>
         ) : (
         <>
@@ -1430,7 +1447,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
           <span className="dv-total-val">{tx.price}</span>
         </div>
 
-        <button className="dv-btn-primary" onClick={submitPayment} disabled={!INTAKE_CONSENTS.every((d) => legalAck[d.id])} style={!INTAKE_CONSENTS.every((d) => legalAck[d.id]) ? { opacity: 0.55, cursor: "not-allowed" } : undefined}>{isStripe ? "Continue to secure payment →" : "Complete purchase →"}</button>
+        <button className="dv-btn-primary" onClick={submitPayment} disabled={!INTAKE_CONSENTS.every((d) => legalAck[d.id])} style={!INTAKE_CONSENTS.every((d) => legalAck[d.id]) ? { opacity: 0.55, cursor: "not-allowed" } : undefined}>{isHosted ? "Continue to secure payment →" : "Complete purchase →"}</button>
 
         <div className="dv-trust">
           <span>🔒 256-bit SSL secured</span>·
