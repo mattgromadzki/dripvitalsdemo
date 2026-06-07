@@ -21,6 +21,7 @@ export interface PendingOrder {
   clientOrderId: string;
   kind?: "checkout" | "update_card"; // default checkout
   subscriptionId?: string;           // for update_card
+  ownerPid?: string;                 // patient id that initiated an update_card
   email?: string;
   name?: string;
   firstName?: string;
@@ -80,6 +81,17 @@ export async function appendSubscription(sub: Subscription): Promise<void> {
   if (arr.some((s) => s.id === sub.id)) return; // idempotent
   arr.unshift(sub);
   await r.set(SUBS_KEY, JSON.stringify(arr));
+}
+
+/** True if the subscription exists and belongs to the given patient id. */
+export async function subscriptionOwnedBy(subscriptionId: string, pid: string): Promise<boolean> {
+  if (!subscriptionId || !pid) return false;
+  const r = redis();
+  if (!r) return false;
+  const v = await r.get(SUBS_KEY);
+  const arr: Subscription[] = Array.isArray(v) ? v : typeof v === "string" ? JSON.parse(v) : [];
+  const sub = arr.find((s) => s.id === subscriptionId);
+  return !!sub && sub.patientId === pid;
 }
 
 /** Repoint a subscription to a new card/token (used by "update card on file").

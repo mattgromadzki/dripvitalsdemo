@@ -237,14 +237,14 @@ export default function PatientPortalPage() {
     if (typeof window !== "undefined") window.scrollTo(0, 0);
   }
 
-  function doLogin() {
-    const res = patientLogin(authEmail, authPw, patients);
+  async function doLogin() {
+    const res = await patientLogin(authEmail, authPw, patients);
     if (!res.ok) { setAuthErr(res.error || "Sign in failed."); return; }
     setAuthErr(null); setAuthPw(""); nav("home");
   }
   function doRequestReset() { requestReset(); setResetSent(true); }
-  function doResetPassword() {
-    const res = resetPassword(authEmail, resetPw, patients);
+  async function doResetPassword() {
+    const res = await resetPassword(authEmail, resetPw, patients);
     if (!res.ok) { setAuthErr(res.error || "Could not reset password."); return; }
     setAuthErr(null); setResetPw(""); setResetSent(false); setAuthView("login");
     toast("Password updated — sign in with your new password.");
@@ -334,7 +334,7 @@ export default function PatientPortalPage() {
                 <div className="login-h">Set a new password</div>
                 {authErr && <div style={{ background: "var(--red-soft)", color: "var(--red)", fontSize: 13, fontWeight: 600, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>{authErr}</div>}
                 <input className="login-input" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email address" />
-                <input className="login-input" type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doResetPassword(); }} placeholder="New password (min 6 characters)" />
+                <input className="login-input" type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doResetPassword(); }} placeholder="New password (min 8 characters)" />
                 <button className="login-btn" onClick={doResetPassword}>Update password</button>
                 <div className="login-helpers"><a href="#" onClick={(e) => { e.preventDefault(); setAuthView("login"); setAuthErr(null); }}>← Back to sign in</a></div>
               </>

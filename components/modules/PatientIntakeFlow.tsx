@@ -110,13 +110,13 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   const [pw2, setPw2] = useState("");
   const [pwSaved, setPwSaved] = useState(false);
   const [pwErr, setPwErr] = useState("");
-  function handleSetPassword() {
+  async function handleSetPassword() {
     setPwErr("");
     if (pw.length < 8) { setPwErr("Use at least 8 characters."); return; }
     if (pw !== pw2) { setPwErr("Passwords don't match."); return; }
     const email = (useTreatmentsIntake.getState().clients.find((c) => c.id === leadId)?.email || "").trim();
     if (!email) { setPwErr("We couldn't find your email — we'll send you a link to set it."); return; }
-    const res = setPortalPassword(email, pw, usePatients.getState().patients);
+    const res = await setPortalPassword(email, pw, usePatients.getState().patients);
     if (!res.ok) { setPwErr(res.error || "Couldn't set password here — check the link we emailed you."); return; }
     setPwSaved(true);
   }
