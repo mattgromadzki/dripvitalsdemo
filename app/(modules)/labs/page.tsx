@@ -8,6 +8,7 @@ import { toast } from "@/lib/hooks/useToast";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { useLabs } from "@/lib/hooks/useLabs";
 import { PANELS } from "@/lib/labs/panels";
+import { pushLabToFlowsheet, hasFlowsheetData } from "@/lib/labs/flowsheet";
 import type { LabOrder, LabStatus } from "@/lib/labs/types";
 
 const ST: Record<LabStatus, "muted" | "blue" | "amber" | "green"> = { ordered: "muted", collected: "blue", resulted: "amber", reviewed: "green" };
@@ -85,7 +86,7 @@ export default function LabsPage() {
       {sel && (
         <Modal open={!!sel} onClose={() => setOpenId(null)} title={`${sel.patientName} — ${sel.panelName}`} icon="🧪" width={580}
           footer={<div className="flex items-center gap-2 w-full">
-            {(sel.status === "ordered" || sel.status === "collected") && <button className="btn btn-primary" onClick={() => { enterResults(sel.id); toast("Results entered"); }}>Enter results</button>}
+            {(sel.status === "ordered" || sel.status === "collected") && <button className="btn btn-primary" onClick={() => { enterResults(sel.id); const o = useLabs.getState().orders.find((x) => x.id === sel.id); const added = o ? pushLabToFlowsheet(patients.find((p) => p.id === o.patientId), o) : false; toast(added ? "Results entered · A1C → flowsheet" : "Results entered"); }}>Enter results</button>}
             {sel.status === "resulted" && <button className="btn btn-primary" onClick={() => { markReviewed(sel.id, note); toast("Marked reviewed"); }}>Mark reviewed</button>}
             <div className="flex-1" /><button className="btn btn-ghost" onClick={() => setOpenId(null)}>Close</button>
           </div>}>
