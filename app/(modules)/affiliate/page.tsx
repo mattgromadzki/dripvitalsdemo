@@ -446,7 +446,13 @@ function AffiliateRow({ affiliate: a, expanded, onToggle, onCopyCode, onPay, onP
               {initials}
             </div>
             <div className="min-w-0">
-              <div className="text-[12.5px] font-bold truncate">{a.name}</div>
+              <Link
+                href={`/affiliate/${a.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="block text-[12.5px] font-bold truncate hover:text-brand hover:underline"
+              >
+                {a.name}
+              </Link>
               <div className="text-[10.5px] text-ink-muted truncate">{a.handle}</div>
             </div>
           </div>
