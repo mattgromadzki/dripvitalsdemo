@@ -344,6 +344,26 @@ function RequestRow({ request: r, onApprove, onDeny }: {
       {/* Expanded content */}
       {expanded && (
         <div className="px-3.5 pb-3.5 pt-1 space-y-3">
+          {/* Clinical screening — relative contraindications flagged at intake */}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1.5">
+              🩺 Clinical Screening
+            </div>
+            {r.clinicalFlags && r.clinicalFlags.length > 0 ? (
+              <div className="bg-amber-soft border border-amber/40 rounded-md p-3">
+                <div className="text-[12.5px] font-bold text-amber mb-1.5">⚠ Provider review — {r.clinicalFlags.length} caution{r.clinicalFlags.length > 1 ? "s" : ""} flagged</div>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {r.clinicalFlags.map((f, i) => (
+                    <li key={i} className="text-[12px] text-ink-2">{f}</li>
+                  ))}
+                </ul>
+                <div className="text-[10.5px] text-ink-muted mt-1.5">Absolute contraindications block intake automatically; these are relative cautions for your clinical judgment.</div>
+              </div>
+            ) : (
+              <div className="bg-green-soft border border-green/30 rounded-md px-3 py-2 text-[12px] font-semibold text-green">✓ No contraindication cautions detected at intake</div>
+            )}
+          </div>
+
           {/* Intake highlights */}
           {r.intakeHighlights && r.intakeHighlights.length > 0 && (
             <div>

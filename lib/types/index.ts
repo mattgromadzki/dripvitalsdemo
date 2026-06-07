@@ -70,6 +70,7 @@ export interface Patient {
 
   // Legal agreements captured at intake
   consents?: ConsentAcceptance[];
+  clinicalFlags?: string[];        // GLP-1 relative-contraindication flags from intake screening
 }
 
 export interface ConsentAcceptance {
@@ -879,6 +880,7 @@ export interface TreatmentRequest {
   visitId?: string;             // optional link to the visit during which intake was filled
   // Submitted-with-form intake answer highlights (denormalized for display)
   intakeHighlights?: { label: string; value: string }[];
+  clinicalFlags?: string[];     // relative contraindications flagged at intake for provider review
   // Workflow state
   status: TreatmentRequestStatus;
   approvedBy?: string;          // staff member name

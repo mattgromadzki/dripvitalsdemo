@@ -9,6 +9,7 @@ import type { Patient } from "@/lib/types";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { alertWelcome } from "@/lib/notify/alert";
 import { INTAKE_CONSENTS } from "@/lib/legal/documents";
+import { screenAnswers } from "@/lib/clinical/glp1Screening";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
 const parsePrice = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
@@ -99,6 +100,9 @@ export default function IntakeFormPage() {
       else if (/goal/i.test(q.text)) { goal = String(raw); }
     }
 
+    const screen = screenAnswers(form.questions, client.answers);
+    const reviewFlags = screen.reviewFlags;
+
     const fields = {
       first, last, name, email: client.email, phone: client.phone,
       age: ageFrom(dob), gender: gender as "M" | "F" | "Other", state, status: "pending" as const, lifecycle: "awaiting_review" as const,
@@ -109,6 +113,7 @@ export default function IntakeFormPage() {
       sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
       intakeProgress: "Completed",
       consents: INTAKE_CONSENTS.map((d) => ({ docId: d.id, title: d.title, version: d.version, acceptedAt: new Date().toISOString() })),
+      ...(reviewFlags.length ? { clinicalFlags: reviewFlags } : {}),
     };
     // Reuse the profile pre-created during intake; only create a new one if the
     // patient somehow reached completion without a captured contact step.
@@ -140,6 +145,7 @@ export default function IntakeFormPage() {
         { label: "Form", value: form.name },
       ],
       status: "pending",
+      ...(reviewFlags.length ? { clinicalFlags: reviewFlags } : {}),
     });
   }
 

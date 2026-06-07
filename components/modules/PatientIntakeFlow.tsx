@@ -8,6 +8,7 @@ import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
+import { disqualifierReason } from "@/lib/clinical/glp1Screening";
 import { INTAKE_CONSENTS } from "@/lib/legal/documents";
 
 function nowStamp(): string {
@@ -291,26 +292,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   }
 
   function checkDisqualifier(q: BaskQuestion, v: string | number | string[] | undefined): string | null {
-    if (q.impact !== "disqualifier") return null;
-    if (q.type === "yesno" && v === "Yes") return q.text;
-    if (q.type === "checkbox" && Array.isArray(v)) {
-      const hits = v.filter((val) => {
-        const opt = (q.options || []).find((o) => (typeof o === "string" ? o : o.label) === val);
-        return opt && typeof opt === "object" && opt.flag === "disq";
-      });
-      if (hits.length > 0) return hits.join(", ");
-    }
-    if (q.type === "date" && typeof v === "string" && v) {
-      let dob: Date | null = null;
-      if (v.startsWith("{")) {
-        try { const o = JSON.parse(v); if (o.y && o.m && o.d) dob = new Date(+o.y, +o.m - 1, +o.d); } catch { dob = null; }
-      } else { dob = new Date(v); }
-      if (dob && !isNaN(dob.getTime())) {
-        const age = (Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-        if (age < 18) return "Under 18 years old";
-      }
-    }
-    return null;
+    return disqualifierReason(q, v);
   }
 
   function goNext() {

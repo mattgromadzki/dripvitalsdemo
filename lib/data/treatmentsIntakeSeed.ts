@@ -68,7 +68,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:110, type:"section",  text:"Goals", helper:"", sectionIcon:"💪", impact:"none", required:false },
       { id:111, type:"multiple", text:"What's your weight loss goal?", helper:"This helps us match you with the right treatment", impact:"none", required:true, options:["Up to 20 lbs","21 to 50 lbs","50+ lbs","Not sure yet"] },
       { id:112, type:"multiple", text:"What are you hoping to improve by losing weight?", helper:"", impact:"none", required:true, options:["My physical health","My appearance","My mental health","All of the above"] },
-      { id:115, type:"yesno",    text:"Have you taken a GLP-1 medication in the past 2 months?", helper:"Examples: Ozempic, Wegovy, Zepbound, or Mounjaro", impact:"none", required:true },
+      { id:115, type:"yesno",    text:"Have you taken a GLP-1 medication in the past 2 months?", helper:"Examples: Ozempic, Wegovy, Zepbound, or Mounjaro", impact:"review", required:true },
 
       // Physical screening
       { id:116, type:"section",  text:"Physical", helper:"", sectionIcon:"📏", impact:"none", required:false },
@@ -84,7 +84,13 @@ export const SEED_FORMS: BaskIntakeForm[] = [
         { label:"Obesity (BMI ≥ 30)",                               flag:"ok"   },
         { label:"Sleep apnea",                                      flag:"ok"   },
         { label:"Hypothyroidism, Hyperthyroidism, or Thyroid Issues", flag:"ok" },
-        { label:"History of pancreatitis",                          flag:"disq" },
+        { label:"History of pancreatitis",                          flag:"review" },
+        { label:"Gallbladder disease or gallstones",                flag:"review" },
+        { label:"Type 1 diabetes",                                  flag:"review" },
+        { label:"Currently taking insulin or a sulfonylurea",       flag:"review" },
+        { label:"Diabetic retinopathy",                             flag:"review" },
+        { label:"Severe kidney or liver disease",                   flag:"review" },
+        { label:"History of an eating disorder",                    flag:"review" },
         { label:"Medullary thyroid carcinoma (MTC) or MEN2",        flag:"disq" },
         { label:"Gastroparesis / severe GI motility disorder",      flag:"disq" },
       ] },

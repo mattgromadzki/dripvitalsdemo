@@ -15,7 +15,19 @@ export function ComplianceTab({ patient, extra }: { patient: Patient; extra: Pat
       })
     : extra.consentHistory;
   return (
-    <div className="grid grid-cols-[1fr_1fr] gap-4 max-[1100px]:grid-cols-1">
+    <div className="flex flex-col gap-4">
+      {patient.clinicalFlags && patient.clinicalFlags.length > 0 && (
+        <div className="bg-amber-soft border border-amber/40 rounded-lg p-4">
+          <div className="text-[13px] font-bold text-amber mb-1.5">🩺 Intake screening — {patient.clinicalFlags.length} clinical caution{patient.clinicalFlags.length > 1 ? "s" : ""} for review</div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {patient.clinicalFlags.map((f, i) => (
+              <li key={i} className="text-[12.5px] text-ink-2">{f}</li>
+            ))}
+          </ul>
+          <div className="text-[11px] text-ink-muted mt-2">Relative contraindications flagged at intake. Absolute contraindications block enrollment automatically.</div>
+        </div>
+      )}
+      <div className="grid grid-cols-[1fr_1fr] gap-4 max-[1100px]:grid-cols-1">
       {/* LEFT: Consent log */}
       <SectionCard
         title="Consent & Signature Log"
@@ -118,6 +130,7 @@ export function ComplianceTab({ patient, extra }: { patient: Patient; extra: Pat
             <RequiredItem label="GLP-1 Risk Acknowledgment"      done={patient.dose !== "—"} />
           </div>
         </SectionCard>
+      </div>
       </div>
     </div>
   );
