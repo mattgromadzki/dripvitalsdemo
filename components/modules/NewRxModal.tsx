@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { usePatients } from "@/lib/hooks/usePatients";
+import { ClinicalSafetyStrip } from "@/components/clinical/ClinicalSafetyStrip";
 import type { Prescription } from "@/lib/types";
 
 interface NewRxModalProps {
@@ -54,6 +55,7 @@ export function NewRxModal({ open, onClose, onSave, defaultPatientId }: NewRxMod
     patientId: defaultPatientId || patients[0]?.id || "",
   }));
   const [error, setError] = useState("");
+  const selectedPatient = patients.find((p) => p.id === form.patientId) || null;
 
   useEffect(() => {
     if (open) {
@@ -140,6 +142,8 @@ export function NewRxModal({ open, onClose, onSave, defaultPatientId }: NewRxMod
           {patients.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.id}</option>)}
         </select>
       </div>
+
+      {selectedPatient && <ClinicalSafetyStrip patient={selectedPatient} className="mb-3" />}
 
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>

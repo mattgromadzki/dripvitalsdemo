@@ -4,6 +4,7 @@ export type TabKey =
   | "orders"
   | "orders_current"
   | "profile"
+  | "clinical"
   | "labs"
   | "visits"
   | "progress"
@@ -17,6 +18,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "orders",         label: "Orders" },
   { key: "orders_current", label: "Rx & Treatment" },
   { key: "profile",        label: "Profile" },
+  { key: "clinical",       label: "Clinical" },
   { key: "labs",           label: "Labs" },
   { key: "visits",         label: "Visits & Notes" },
   { key: "progress",       label: "Progress" },

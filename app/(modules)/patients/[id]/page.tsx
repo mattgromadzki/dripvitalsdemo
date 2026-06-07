@@ -10,6 +10,7 @@ import { ChartTabs, type TabKey } from "@/components/modules/chart/ChartTabs";
 import { OrdersTab }      from "@/components/modules/chart/tabs/OrdersTab";
 import { OrdersRxTab }    from "@/components/modules/chart/tabs/OrdersRxTab";
 import { ProfileTab }     from "@/components/modules/chart/tabs/ProfileTab";
+import { ClinicalTab }    from "@/components/modules/chart/tabs/ClinicalTab";
 import { LabsTab }        from "@/components/modules/chart/tabs/LabsTab";
 import { VisitsTab }      from "@/components/modules/chart/tabs/VisitsTab";
 import { ProgressTab }    from "@/components/modules/chart/tabs/ProgressTab";
@@ -73,6 +74,7 @@ export default function PatientDetailPage() {
           {tab === "orders"         && <OrdersTab     patient={patient} extra={extra} />}
           {tab === "orders_current" && <OrdersRxTab   patient={patient} extra={extra} />}
           {tab === "profile"        && <ProfileTab    patient={patient} extra={extra} />}
+          {tab === "clinical"       && <ClinicalTab   patient={patient} extra={extra} />}
           {tab === "labs"           && <LabsTab       patient={patient} extra={extra} />}
           {tab === "visits"         && <VisitsTab     patient={patient} extra={extra} />}
           {tab === "progress"       && <ProgressTab   patient={patient} extra={extra} />}

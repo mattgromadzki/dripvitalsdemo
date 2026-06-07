@@ -14,6 +14,9 @@ import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 import { getPatientExtra } from "@/lib/data/patientExtras";
+import { ClinicalSafetyStrip } from "@/components/clinical/ClinicalSafetyStrip";
+import { useClinical } from "@/lib/hooks/useClinical";
+import { seedChart } from "@/lib/clinical/chartTypes";
 import { RxPreviewBask } from "@/components/modules/RxPreviewBask";
 import {
   DRUG_CATALOG,
@@ -94,6 +97,23 @@ export function EPrescribeWorkspace(
   // from a per-patient seed). We use these for the "Shipping To" sidebar card
   // and for the Review letterhead's Patient Information section.
   const extra = useMemo(() => (patient ? getPatientExtra(patient) : null), [patient]);
+
+  // Structured clinical chart (store:clinical) — used for the safety strip and,
+  // critically, to snapshot the patient's *structured* allergies onto the signed
+  // Rx document instead of the legacy flat patient.allergies string.
+  const storedChart    = useClinical((s) => (patient ? s.charts[patient.id] : undefined));
+  const ensureSeededClin = useClinical((s) => s.ensureSeeded);
+  useEffect(() => { if (patient) ensureSeededClin(patient.id, patient); }, [patient, ensureSeededClin]);
+  const clinChart = useMemo(() => (patient ? (storedChart ?? seedChart(patient)) : null), [storedChart, patient]);
+
+  // One canonical structured-allergy string, reused by the signed Rx document and
+  // the live Rx preview so both match the on-screen safety strip.
+  const allergiesSnapshot = useMemo(() => {
+    const active = clinChart ? clinChart.allergies.filter((a) => a.status === "active") : [];
+    if (active.length) return active.map((a) => (a.reaction ? `${a.allergen} (${a.reaction})` : a.allergen)).join(", ");
+    if (clinChart?.nkda) return "NKDA";
+    return patient?.allergies || "";
+  }, [clinChart, patient]);
 
   // ── Cart & item-type toggle ─────────────────────────────────────────
   const [orderCart, setOrderCart] = useState<CartLine[]>([]);
@@ -381,7 +401,7 @@ export function EPrescribeWorkspace(
         phone:   patient.phone,
         email:   patient.email,
         address: extra?.address,
-        allergies: patient.allergies,
+        allergies: allergiesSnapshot,
         insurance: extra?.insurance,
       },
       medications: meds.map((m) => ({
@@ -554,6 +574,9 @@ export function EPrescribeWorkspace(
         <StepIndicator n={4} current={currentStep} label="Review & Send" />
       </div>
 
+      {/* Allergy + problem safety check, surfaced throughout the prescribe flow */}
+      {patient && <ClinicalSafetyStrip patient={patient} className="mb-4" />}
+
       {/* Order context (when launched from a paid order on the chart) */}
       {orderContext && (
         <div className="bg-green-soft border border-green-soft rounded-lg p-3 mb-4 flex items-center gap-3" style={{ borderLeft: "3px solid var(--color-green)" }}>
@@ -598,19 +621,6 @@ export function EPrescribeWorkspace(
       <div className="grid grid-cols-[1fr_360px] gap-4 max-[1100px]:grid-cols-1">
         {/* LEFT — main pane */}
         <div className="space-y-4">
-          {/* Allergy alert */}
-          {patient?.allergies && patient.allergies !== "None" && (
-            <div className="bg-red-soft border border-red rounded-lg p-3.5 flex items-start gap-3" style={{ borderLeft: "3px solid var(--color-red)" }}>
-              <div className="text-[20px] flex-shrink-0">⚠</div>
-              <div className="flex-1">
-                <div className="text-[12.5px] font-bold text-red mb-0.5">Allergy Alert</div>
-                <div className="text-[11.5px] text-ink-2">
-                  Patient has documented allergies: <strong>{patient.allergies}</strong>. Verify any prescribed medication is safe before sending.
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Add items card — allowOverflow lets the drug-search dropdown
               escape the card boundary so all 8 medications are visible */}
           <Card
@@ -1097,6 +1107,7 @@ export function EPrescribeWorkspace(
               refNum: finalRefNum || "DVRx-PENDING",
               dateWritten: previewToday(),
               signedAt: finalRefNum ? signedAtNow() : "",
+              allergies: allergiesSnapshot,
             })}
             status={finalRefNum ? "signed" : "draft"}
             refNum={finalRefNum || "DVRx-PENDING"}
@@ -1123,7 +1134,7 @@ export function EPrescribeWorkspace(
 // Constructs the same rxPayload shape that submitOrder() writes to the
 // shared documents store, but from live form state — so the user sees the
 // exact prescription content before signing it.
-function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber, refNum, dateWritten, signedAt }: {
+function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber, refNum, dateWritten, signedAt, allergies }: {
   patient:     Patient;
   extra:       PatientExtra | null;
   meds:        MedicationLine[];
@@ -1133,6 +1144,7 @@ function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber,
   refNum:      string;
   dateWritten: string;
   signedAt:    string;
+  allergies:   string;
 }): NonNullable<PatientDocument["rxPayload"]> {
   return {
     refNum,
@@ -1148,7 +1160,7 @@ function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber,
       phone:     patient.phone,
       email:     patient.email,
       address:   extra?.address,
-      allergies: patient.allergies,
+      allergies: allergies,
       insurance: extra?.insurance,
     },
     medications: meds.map((m) => ({
