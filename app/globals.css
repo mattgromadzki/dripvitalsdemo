@@ -3008,7 +3008,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal .portal { grid-template-columns: 1fr; }
 .dv-portal .sidebar { display: none; }
 .dv-portal .mob-tabbar { display: grid; }
-.dv-portal .main-head { padding: 18px 18px 0; }
+.dv-portal .main-head { padding: max(18px, env(safe-area-inset-top)) 18px 0; }
 .dv-portal .main-body { padding: 0 18px 100px; }
 .dv-portal .main-title { font-size: 22px; }
 .dv-portal .bell-btn, .dv-portal .avatar-btn { width: 36px; height: 36px; }
