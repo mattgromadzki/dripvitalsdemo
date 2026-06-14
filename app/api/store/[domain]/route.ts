@@ -1,5 +1,8 @@
 import { Redis } from "@upstash/redis";
 import { requireAuth, requirePerm } from "@/lib/auth/authorize";
+import { hasDb } from "@/lib/db/client";
+import { dbGetDomain, dbSetDomain } from "@/lib/db/store";
+import { bumpVersion } from "@/lib/realtime/signal";
 
 export const dynamic = "force-dynamic";
 
@@ -70,13 +73,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ domain: string 
   const { domain } = await ctx.params;
   if (!ALLOW.has(domain)) return Response.json({ ok: false, error: "Unknown domain." }, { status: 400 });
   if (!PUBLIC_READ.has(domain)) { const gate = requireAuth(req); if (gate) return gate; }
-  const r = redis();
+  const useDb = hasDb();
+  const r = useDb ? null : redis();
   let data: unknown = null;
   try {
-    if (r) { const v = await r.get(`store:${domain}`); data = typeof v === "string" ? JSON.parse(v) : (v ?? null); }
+    if (useDb) data = await dbGetDomain(domain);
+    else if (r) { const v = await r.get(`store:${domain}`); data = typeof v === "string" ? JSON.parse(v) : (v ?? null); }
     else data = mem.get(domain) ?? null;
   } catch { /* ignore */ }
-  return Response.json({ ok: true, persistent: !!r, data });
+  return Response.json({ ok: true, persistent: useDb || !!r, backend: useDb ? "postgres" : r ? "redis" : "memory", data });
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ domain: string }> }) {
@@ -85,10 +90,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ domain: string
   const gate = await requirePerm(req, WRITE_PERM[domain] || "users.manage"); if (gate) return gate;
   let body: { data?: unknown };
   try { body = await req.json(); } catch { return Response.json({ ok: false, error: "Invalid body." }, { status: 400 }); }
-  const r = redis();
+  const useDb = hasDb();
+  const r = useDb ? null : redis();
   try {
-    if (r) await r.set(`store:${domain}`, JSON.stringify(body.data ?? null));
+    if (useDb) await dbSetDomain(domain, body.data ?? null);
+    else if (r) await r.set(`store:${domain}`, JSON.stringify(body.data ?? null));
     else mem.set(domain, body.data ?? null);
   } catch (e) { return Response.json({ ok: false, error: String(e) }, { status: 500 }); }
-  return Response.json({ ok: true, persistent: !!r });
+  await bumpVersion(domain);
+  return Response.json({ ok: true, persistent: useDb || !!r, backend: useDb ? "postgres" : r ? "redis" : "memory" });
 }

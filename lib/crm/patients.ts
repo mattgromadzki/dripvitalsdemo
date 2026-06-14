@@ -1,5 +1,7 @@
 import { Redis } from "@upstash/redis";
 import type { Patient } from "@/lib/types";
+import { hasDb } from "@/lib/db/client";
+import { dbSavePatient, dbListPatients } from "@/lib/db/store";
 
 /**
  * Full patient profiles created/updated during intake, stored in Upstash so they
@@ -24,12 +26,14 @@ function parse(v: unknown): Patient | null {
 
 export async function savePatient(p: Patient): Promise<void> {
   if (!p?.id) return;
+  if (hasDb()) { await dbSavePatient(p); return; }
   const r = redis();
   if (r) await r.hset(KEY, { [p.id]: JSON.stringify(p) });
   else mem.set(p.id, p);
 }
 
 export async function listPatients(): Promise<Patient[]> {
+  if (hasDb()) return dbListPatients();
   const r = redis();
   if (r) {
     const all = await r.hgetall<Record<string, unknown>>(KEY);
@@ -40,5 +44,5 @@ export async function listPatients(): Promise<Patient[]> {
 }
 
 export function isPersistent(): boolean {
-  return !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
+  return hasDb() || !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
 }
