@@ -18,8 +18,41 @@ let sms: SmsCreds = {
   from: process.env.TWILIO_FROM,
 };
 
-export function getEmailCreds(): EmailCreds { return email; }
-export function getSmsCreds(): SmsCreds { return sms; }
+import { getBrand, DEFAULT_BRAND_ID } from "@/lib/brands/registry";
+
+/**
+ * Per-brand credentials.
+ *
+ * The default brand (DripVitals) uses the runtime store seeded from the base env
+ * vars — unchanged, so existing calls `getEmailCreds()` behave exactly as before.
+ *
+ * Other brands have a SEPARATE SendGrid/Twilio registration, read from env vars
+ * suffixed with the brand's `envKey` (e.g. SENDGRID_API_KEY_VITALSRX,
+ * EMAIL_FROM_VITALSRX, TWILIO_ACCOUNT_SID_VITALSRX, …). When a brand's "from" env
+ * var is unset we fall back to the brand's registry default so the address is
+ * still correct even before all env vars are wired.
+ */
+export function getEmailCreds(brandId?: string): EmailCreds {
+  if (!brandId || brandId === DEFAULT_BRAND_ID) return email;
+  const b = getBrand(brandId);
+  const sfx = b.envKey ? `_${b.envKey}` : "";
+  return {
+    provider: (process.env[`EMAIL_PROVIDER${sfx}`] as EmailCreds["provider"]) || "sendgrid",
+    apiKey: process.env[`SENDGRID_API_KEY${sfx}`] || process.env[`RESEND_API_KEY${sfx}`],
+    from: process.env[`EMAIL_FROM${sfx}`] || b.from,
+  };
+}
+export function getSmsCreds(brandId?: string): SmsCreds {
+  if (!brandId || brandId === DEFAULT_BRAND_ID) return sms;
+  const b = getBrand(brandId);
+  const sfx = b.envKey ? `_${b.envKey}` : "";
+  return {
+    provider: "twilio",
+    accountSid: process.env[`TWILIO_ACCOUNT_SID${sfx}`],
+    authToken: process.env[`TWILIO_AUTH_TOKEN${sfx}`],
+    from: process.env[`TWILIO_FROM${sfx}`],
+  };
+}
 
 export function setEmailCreds(patch: Partial<EmailCreds>) { email = { ...email, ...clean(patch) }; }
 export function setSmsCreds(patch: Partial<SmsCreds>) { sms = { ...sms, ...clean(patch) }; }

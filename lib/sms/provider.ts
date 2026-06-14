@@ -5,10 +5,10 @@ import { getSmsCreds } from "@/lib/integrations/store";
    store (set via the API Keys screen) and fall back to env. Mock when no creds. */
 function validPhone(p: string) { return /[0-9]{7,}/.test(p.replace(/[^\d]/g, "")); }
 
-export async function sendSms(input: SendSmsInput): Promise<SendSmsResult> {
+export async function sendSms(input: SendSmsInput, brandId?: string): Promise<SendSmsResult> {
   if (!validPhone(input.to)) return { ok: false, error: "Invalid phone number.", provider: "sms" };
   if (!input.body.trim()) return { ok: false, error: "Message body is empty.", provider: "sms" };
-  const c = getSmsCreds();
+  const c = getSmsCreds(brandId);
   if (c.accountSid && c.authToken && c.from) {
     try {
       const params: Record<string, string> = { To: input.to, From: c.from, Body: input.body };

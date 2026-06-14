@@ -8,6 +8,7 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import type { Patient } from "@/lib/types";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { alertWelcome } from "@/lib/notify/alert";
+import { resolveBrandId } from "@/lib/brands/resolve";
 import { INTAKE_CONSENTS } from "@/lib/legal/documents";
 import { screenAnswers } from "@/lib/clinical/glp1Screening";
 
@@ -103,7 +104,16 @@ export default function IntakeFormPage() {
     const screen = screenAnswers(form.questions, client.answers);
     const reviewFlags = screen.reviewFlags;
 
+    // Which brand did this order come in through? Prefer the form's assigned
+    // brand, then the domain it was served on, then default (DripVitals).
+    const brandId = resolveBrandId({
+      brandId: (form as { brandId?: string }).brandId,
+      slug,
+      host: typeof window !== "undefined" ? window.location.host : null,
+    });
+
     const fields = {
+      brandId,
       first, last, name, email: client.email, phone: client.phone,
       age: ageFrom(dob), gender: gender as "M" | "F" | "Other", state, status: "pending" as const, lifecycle: "awaiting_review" as const,
       dob: dob || undefined, goalWt: undefined, zip: client.address?.zip || undefined,
@@ -127,10 +137,11 @@ export default function IntakeFormPage() {
     else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
     syncCrm(pid);
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", id: pid }) }).catch(() => {});
-    if (client.email) alertWelcome({ email: client.email, name, first });
+    if (client.email) alertWelcome({ email: client.email, name, first, brandId });
 
     const np = nowParts();
     addRequest({
+      brandId,
       patientId: pid, patientName: name,
       treatmentId: `BX-${tx.id}`, treatmentName: tx.name, medication: `${tx.med} (compounded)`,
       dosingProtocol: tx.strength, duration: `${tx.duration} month${tx.duration === "1" ? "" : "s"}`, price,

@@ -12,6 +12,8 @@ export type LifecycleStatus =
 
 export interface Patient {
   id: string;
+  /** Which brand this patient belongs to (separate records per brand). Absent ⇒ "dripvitals". */
+  brandId?: string;
   // Identity
   first: string;
   last: string;
@@ -861,6 +863,8 @@ export type TreatmentRequestStatus = "pending" | "approved" | "denied" | "prescr
 
 export interface TreatmentRequest {
   id: string;
+  /** Brand the order came in through. Absent ⇒ "dripvitals". */
+  brandId?: string;
   patientId: string;
   patientName: string;
   treatmentId: string;

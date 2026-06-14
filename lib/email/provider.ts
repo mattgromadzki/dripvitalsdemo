@@ -1,5 +1,6 @@
 import type { SendEmailInput, SendEmailResult } from "./types";
 import { getEmailCreds } from "@/lib/integrations/store";
+import { getBrand } from "@/lib/brands/registry";
 
 /* Email provider (server-side). Drivers: SendGrid, Resend. Credentials come
    from the runtime store (set via the API Keys screen) and fall back to env.
@@ -37,12 +38,13 @@ async function resend(key: string, from: string, input: SendEmailInput): Promise
   return { ok: true, id: j?.id, provider: "resend" };
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+export async function sendEmail(input: SendEmailInput, brandId?: string): Promise<SendEmailResult> {
   if (!validEmail(input.to)) return { ok: false, error: "Invalid recipient email.", provider: "email" };
-  const c = getEmailCreds();
+  const c = getEmailCreds(brandId);
+  const fallbackFrom = brandId ? getBrand(brandId).from : "DripVitals <care@dripvitals.com>";
   try {
-    if (c.provider === "sendgrid" && c.apiKey) return await sendgrid(c.apiKey, c.from || "", input);
-    if (c.provider === "resend" && c.apiKey) return await resend(c.apiKey, c.from || "DripVitals <care@dripvitals.com>", input);
+    if (c.provider === "sendgrid" && c.apiKey) return await sendgrid(c.apiKey, c.from || fallbackFrom, input);
+    if (c.provider === "resend" && c.apiKey) return await resend(c.apiKey, c.from || fallbackFrom, input);
   } catch { return { ok: false, error: "Could not reach the email provider.", provider: c.provider }; }
   return { ok: true, id: "mock_email_" + Date.now().toString(36), provider: "mock" };
 }
