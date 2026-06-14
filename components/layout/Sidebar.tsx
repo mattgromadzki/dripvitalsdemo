@@ -65,6 +65,8 @@ const NAV: NavSection[] = [
     label: "Settings",
     collapsible: true,
     items: [
+      // Brands
+      { href: "/brands",           icon: "🏷️", label: "Brands" },
       // Catalog / offerings
       { href: "/treatments",       icon: "💉", label: "Treatments" },
       { href: "/medications",      icon: "💊", label: "Medications" },
