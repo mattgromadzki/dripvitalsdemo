@@ -2,6 +2,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { EmailMessage, Folder } from "@/lib/email/types";
 import { htmlToPreview } from "@/lib/email/types";
+import { seedList } from "@/lib/config/runtime";
 
 const mk = (m: Omit<EmailMessage, "preview">): EmailMessage => ({ ...m, preview: htmlToPreview(m.html) });
 
@@ -44,7 +45,7 @@ interface State {
 }
 
 export const useEmails = create<State>((set) => ({
-  emails: SEED,
+  emails: seedList(SEED),
   seq: 1008,
   add: (input) => {
     let created: EmailMessage = { id: "EM-0", preview: "", ...input } as EmailMessage;
