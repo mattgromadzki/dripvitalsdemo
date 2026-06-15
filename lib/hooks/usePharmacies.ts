@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Pharmacy, PharmacyConnectionStatus } from "@/lib/types";
 import { PHARMACIES as SEED } from "@/lib/data/pharmacies";
+import { seedList } from "@/lib/config/runtime";
 
 interface PharmaciesState {
   pharmacies: Pharmacy[];
@@ -18,7 +19,7 @@ function nextId(): string {
 }
 
 export const usePharmacies = create<PharmaciesState>((set) => ({
-  pharmacies: SEED,
+  pharmacies: seedList(SEED),
   add: (input) => {
     const created: Pharmacy = { id: nextId(), ...input };
     set((s) => ({ pharmacies: [created, ...s.pharmacies] }));

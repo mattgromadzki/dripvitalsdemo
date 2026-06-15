@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { OrderRow, RxStatus, LabStatus } from "@/lib/types";
 import { ORDERS as SEED } from "@/lib/data/orders";
+import { seedList } from "@/lib/config/runtime";
 
 interface OrdersState {
   orders: OrderRow[];
@@ -11,7 +12,7 @@ interface OrdersState {
 }
 
 export const useOrders = create<OrdersState>((set) => ({
-  orders: SEED,
+  orders: seedList(SEED),
   updateStatus: (id, status) => {
     set((s) => ({
       orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)),

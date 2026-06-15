@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { KbArticle, KbCategory } from "@/lib/types";
 import { KB_ARTICLES as SEED } from "@/lib/data/knowledgeBase";
+import { seedList } from "@/lib/config/runtime";
 
 interface KbState {
   articles: KbArticle[];
@@ -20,7 +21,7 @@ function nextId(): string {
 }
 
 export const useKnowledgeBase = create<KbState>((set) => ({
-  articles: SEED,
+  articles: seedList(SEED),
   togglePin: (id) => {
     set((s) => ({
       articles: s.articles.map((a) => (a.id === id ? { ...a, pinned: !a.pinned } : a)),

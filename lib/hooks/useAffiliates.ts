@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Affiliate, AffiliateStatus, AffiliatePayout } from "@/lib/types";
 import { AFFILIATES as SEED } from "@/lib/data/affiliates";
+import { seedList } from "@/lib/config/runtime";
 
 interface AffiliatesState {
   affiliates: Affiliate[];
@@ -39,7 +40,7 @@ function mockTxId(method: AffiliatePayout["method"]): string {
 }
 
 export const useAffiliates = create<AffiliatesState>((set, get) => ({
-  affiliates: SEED,
+  affiliates: seedList(SEED),
   add: (input) => {
     const created: Affiliate = { id: nextId(), ...input };
     set((s) => ({ affiliates: [created, ...s.affiliates] }));

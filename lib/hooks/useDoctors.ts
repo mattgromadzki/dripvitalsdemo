@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Doctor, DoctorStateLicense } from "@/lib/types";
 import { DOCTORS as SEED } from "@/lib/data/doctors";
+import { seedList } from "@/lib/config/runtime";
 
 interface DoctorsState {
   doctors: Doctor[];
@@ -19,7 +20,7 @@ function nextId(): string {
 }
 
 export const useDoctors = create<DoctorsState>((set) => ({
-  doctors: SEED,
+  doctors: seedList(SEED),
   add: (input) => {
     const created: Doctor = { id: nextId(), ...input };
     set((s) => ({ doctors: [created, ...s.doctors] }));

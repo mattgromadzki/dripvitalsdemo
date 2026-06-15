@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Task, TaskStatus } from "@/lib/types";
 import { TASKS as SEED } from "@/lib/data/tasks";
+import { seedList } from "@/lib/config/runtime";
 
 interface TasksState {
   tasks: Task[];
@@ -32,7 +33,7 @@ function nowDisplay(): string {
 }
 
 export const useTasks = create<TasksState>((set) => ({
-  tasks: SEED,
+  tasks: seedList(SEED),
   add: (input) => {
     const created: Task = {
       id: nextId++,

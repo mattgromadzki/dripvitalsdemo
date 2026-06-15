@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { QueueVisit, QueueStatus } from "@/lib/types";
 import { QUEUE_VISITS as SEED } from "@/lib/data/visits";
+import { seedList } from "@/lib/config/runtime";
 
 interface VisitQueueState {
   visits: QueueVisit[];
@@ -14,7 +15,7 @@ interface VisitQueueState {
 let nextId = 9;
 
 export const useVisitQueue = create<VisitQueueState>((set) => ({
-  visits: SEED,
+  visits: seedList(SEED),
   add: (input) => {
     const id = `V-${String(nextId++).padStart(3, "0")}`;
     const created: QueueVisit = { id, ...input };

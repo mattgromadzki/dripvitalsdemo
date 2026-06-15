@@ -67,6 +67,7 @@ const NAV: NavSection[] = [
     items: [
       // Brands
       { href: "/brands",           icon: "🏷️", label: "Brands" },
+      { href: "/readiness",        icon: "🚀", label: "Launch readiness" },
       // Catalog / offerings
       { href: "/treatments",       icon: "💉", label: "Treatments" },
       { href: "/medications",      icon: "💊", label: "Medications" },

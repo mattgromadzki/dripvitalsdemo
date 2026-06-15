@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
+import SentryInit from "@/components/observability/SentryInit";
 
 export const metadata: Metadata = {
   title: "DripVitals — Telehealth Operating System",
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           rel="stylesheet"
         />
       </head>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning><SentryInit />{children}</body>
     </html>
   );
 }

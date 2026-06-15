@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { ShopProduct, ShopProductInput } from "@/lib/types";
 import { SHOP_PRODUCTS as SEED } from "@/lib/data/shopProducts";
+import { seedList } from "@/lib/config/runtime";
 
 interface ShopState {
   products: ShopProduct[];
@@ -22,7 +23,7 @@ function nextId(): string {
 }
 
 export const useShop = create<ShopState>((set, get) => ({
-  products: SEED,
+  products: seedList(SEED),
 
   add: (input) => {
     const product: ShopProduct = { id: nextId(), ...input };

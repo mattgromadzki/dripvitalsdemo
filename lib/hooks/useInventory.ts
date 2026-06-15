@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { InventoryItem, InventoryStatus } from "@/lib/types";
 import { INVENTORY as SEED } from "@/lib/data/inventory";
+import { seedList } from "@/lib/config/runtime";
 
 interface InventoryState {
   items: InventoryItem[];
@@ -26,7 +27,7 @@ function nowStr(): string {
 }
 
 export const useInventory = create<InventoryState>((set) => ({
-  items: SEED,
+  items: seedList(SEED),
   reorder: (id, qty) => {
     set((s) => ({
       items: s.items.map((it) => {

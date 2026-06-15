@@ -30,7 +30,7 @@ export const NAV_PERM: Record<string, string> = {
   // Settings / administration
   "/roles": "users.manage", "/staff": "users.manage", "/team": "users.manage",
   "/integrations": "integrations.manage", "/api-keys": "integrations.manage", "/connections": "integrations.manage",
-  "/settings": "settings.manage", "/brands": "settings.manage", "/treatments": "settings.manage", "/medications": "settings.manage",
+  "/settings": "settings.manage", "/brands": "settings.manage", "/readiness": "settings.manage", "/treatments": "settings.manage", "/medications": "settings.manage",
   "/pharmacies": "settings.manage", "/email-templates": "settings.manage", "/notifications": "settings.manage", "/licensure": "settings.manage",
 };
 

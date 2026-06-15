@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { SoapNote, SoapNoteStatus } from "@/lib/types";
 import { SOAP_NOTES as SEED } from "@/lib/data/soapNotes";
+import { seedList } from "@/lib/config/runtime";
 
 interface SoapNotesState {
   notes: SoapNote[];
@@ -17,7 +18,7 @@ interface SoapNotesState {
 let nextId = SEED.length + 1;
 
 export const useSoapNotes = create<SoapNotesState>((set) => ({
-  notes: SEED,
+  notes: seedList(SEED),
   add: (input) => {
     const id = nextId++;
     const created: SoapNote = { id, ...input };

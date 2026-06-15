@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { TreatmentRequest } from "@/lib/types";
 import { TREATMENT_REQUESTS as SEED } from "@/lib/data/treatmentRequests";
+import { seedList } from "@/lib/config/runtime";
 
 interface TreatmentRequestsState {
   requests: TreatmentRequest[];
@@ -36,7 +37,7 @@ function nowInt(): number {
 }
 
 export const useTreatmentRequests = create<TreatmentRequestsState>((set) => ({
-  requests: SEED,
+  requests: seedList(SEED),
   add: (input) => {
     const created: TreatmentRequest = { id: nextId(), ...input };
     set((s) => ({ requests: [created, ...s.requests] }));

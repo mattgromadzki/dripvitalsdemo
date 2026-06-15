@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Review } from "@/lib/types";
 import { REVIEWS as SEED } from "@/lib/data/reviews";
+import { seedList } from "@/lib/config/runtime";
 
 interface ReviewsState {
   reviews: Review[];
@@ -18,7 +19,7 @@ function nowDisplay(): string {
 }
 
 export const useReviews = create<ReviewsState>((set) => ({
-  reviews: SEED,
+  reviews: seedList(SEED),
   addReply: (id, reply, author) => {
     set((s) => ({
       reviews: s.reviews.map((r) =>

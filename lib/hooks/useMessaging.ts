@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { MessageThread } from "@/lib/types";
 import { MESSAGE_THREADS as SEED } from "@/lib/data/messageThreads";
+import { seedList } from "@/lib/config/runtime";
 
 interface MessagingState {
   threads: MessageThread[];
@@ -35,7 +36,7 @@ function nowTimeString(): string {
 }
 
 export const useMessaging = create<MessagingState>((set) => ({
-  threads: SEED,
+  threads: seedList(SEED),
   sendMessage: (threadId, text, from) => {
     set((s) => ({
       threads: s.threads.map((t) => {

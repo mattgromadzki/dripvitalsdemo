@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Prescription, RxStatusFull } from "@/lib/types";
 import { PRESCRIPTIONS as SEED } from "@/lib/data/prescriptions";
+import { seedList } from "@/lib/config/runtime";
 
 interface PrescriptionsState {
   prescriptions: Prescription[];
@@ -20,7 +21,7 @@ function nextId(): string {
 }
 
 export const usePrescriptions = create<PrescriptionsState>((set, get) => ({
-  prescriptions: SEED,
+  prescriptions: seedList(SEED),
   add: (input) => {
     const created: Prescription = { id: nextId(), ...input };
     set((s) => ({ prescriptions: [created, ...s.prescriptions] }));

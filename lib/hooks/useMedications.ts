@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { Medication } from "@/lib/types";
 import { MEDICATIONS_SEED as SEED } from "@/lib/data/medications";
+import { seedList } from "@/lib/config/runtime";
 
 interface MedicationsState {
   meds: Medication[];
@@ -25,7 +26,7 @@ function highest(meds: Medication[]): number {
 }
 
 export const useMedications = create<MedicationsState>((set) => ({
-  meds: SEED,
+  meds: seedList(SEED),
   nextId: highest(SEED) + 1,
   add: (input) => {
     let created: Medication = { id: "MED-999", ...input };

@@ -3,6 +3,7 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { StaffMember, SecurityPolicy } from "@/lib/types";
 import { STAFF as SEED, SECURITY_POLICIES as POLICY_SEED } from "@/lib/data/staff";
+import { seedList } from "@/lib/config/runtime";
 
 interface StaffState {
   staff: StaffMember[];
@@ -19,7 +20,7 @@ function nextId(): string {
 }
 
 export const useStaff = create<StaffState>((set) => ({
-  staff: SEED,
+  staff: seedList(SEED),
   policies: POLICY_SEED,
   add: (input) => {
     const created: StaffMember = { id: nextId(), ...input };
