@@ -43,8 +43,13 @@ export async function sendEmail(input: SendEmailInput, brandId?: string): Promis
   const c = getEmailCreds(brandId);
   const fallbackFrom = brandId ? getBrand(brandId).from : "DripVitals <care@dripvitals.com>";
   try {
-    if (c.provider === "sendgrid" && c.apiKey) return await sendgrid(c.apiKey, c.from || fallbackFrom, input);
-    if (c.provider === "resend" && c.apiKey) return await resend(c.apiKey, c.from || fallbackFrom, input);
+    if (c.provider === "sendgrid" && c.apiKey) return await sendgrid(c.apiKey, input.from || c.from || fallbackFrom, input);
+    if (c.provider === "resend" && c.apiKey) return await resend(c.apiKey, input.from || c.from || fallbackFrom, input);
   } catch { return { ok: false, error: "Could not reach the email provider.", provider: c.provider }; }
   return { ok: true, id: "mock_email_" + Date.now().toString(36), provider: "mock" };
+}
+
+/** From-address for automated order/billing emails (e.g. orders@email.dripvitals.com). */
+export function ordersFrom(): string | undefined {
+  return process.env.EMAIL_FROM_ORDERS || undefined;
 }

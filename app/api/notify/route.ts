@@ -1,5 +1,5 @@
 import { getTemplate, renderTemplate } from "@/lib/notify/templates";
-import { sendEmail } from "@/lib/email/provider";
+import { sendEmail, ordersFrom } from "@/lib/email/provider";
 import { requirePerm } from "@/lib/auth/authorize";
 import { resolveBrandId } from "@/lib/brands/resolve";
 import { getBrand } from "@/lib/brands/registry";
@@ -32,6 +32,7 @@ export async function POST(req: Request) {
 
   const subject = renderTemplate(tmpl.subject, data);
   const html = renderTemplate(tmpl.html, data);
-  const res = await sendEmail({ to: b.to, toName: b.toName, subject, html }, brandId);
+  const from = /order|ship|track|receipt|refill|payment|billing|dunning/i.test(b.type) ? ordersFrom() : undefined;
+  const res = await sendEmail({ to: b.to, toName: b.toName, subject, html, from }, brandId);
   return Response.json(res);
 }

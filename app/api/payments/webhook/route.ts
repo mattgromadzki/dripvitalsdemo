@@ -2,7 +2,7 @@ import { record, list, markPatientPaidByEmail } from "@/lib/payments/stripeLedge
 import { getPendingOrder, patientByEmail, appendSubscription, buildSubscription, updateSubscriptionCard } from "@/lib/payments/hppStore";
 import { corepayConfigured, corepayInquiry } from "@/lib/payments/corepay";
 import { getTemplate, renderTemplate } from "@/lib/notify/templates";
-import { sendEmail } from "@/lib/email/provider";
+import { sendEmail, ordersFrom } from "@/lib/email/provider";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       const tmpl = await getTemplate("payment_receipt");
       if (tmpl && email) {
         const data = { name: patientName || pending?.firstName || "there", amount: money(amountCents, currency), plan: planName, date: new Date().toLocaleDateString(), receiptUrl: "" };
-        await sendEmail({ to: email, toName: patientName || undefined, subject: renderTemplate(tmpl.subject, data), html: renderTemplate(tmpl.html, data) });
+        await sendEmail({ to: email, toName: patientName || undefined, subject: renderTemplate(tmpl.subject, data), html: renderTemplate(tmpl.html, data), from: ordersFrom() });
       }
       return Response.json({ ok: true });
     }

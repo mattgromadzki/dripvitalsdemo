@@ -21,7 +21,7 @@ export interface EmailMessage {
   createdAt: string;
   attachments?: Attachment[];
 }
-export interface SendEmailInput { to: string; toName?: string; subject: string; html: string; templateId?: string }
+export interface SendEmailInput { to: string; toName?: string; subject: string; html: string; templateId?: string; from?: string }
 export interface SendEmailResult { ok: boolean; id?: string; error?: string; provider: string }
 
 export function htmlToPreview(html: string): string {

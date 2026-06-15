@@ -3,7 +3,7 @@ import { charge } from "@/lib/payments/provider";
 import { advance, money } from "@/lib/subscriptions/util";
 import { record, patientEmail } from "@/lib/payments/stripeLedger";
 import { getTemplate, renderTemplate } from "@/lib/notify/templates";
-import { sendEmail } from "@/lib/email/provider";
+import { sendEmail, ordersFrom } from "@/lib/email/provider";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
       await record({ id: `pay_${res.paymentId || s.id + now}`, kind: "payment", provider: res.provider, paymentId: res.paymentId, email, name: s.patientName, patientId: s.patientId, planName: s.planName, amountCents: s.amountCents, currency: "usd", status: "paid", createdAt: stamp });
       if (email && receipt) {
         const d = { name: s.patientName, amount: money(s.amountCents), plan: s.planName, date: new Date().toLocaleDateString(), receiptUrl: "" };
-        await sendEmail({ to: email, toName: s.patientName, subject: renderTemplate(receipt.subject, d), html: renderTemplate(receipt.html, d) });
+        await sendEmail({ to: email, toName: s.patientName, subject: renderTemplate(receipt.subject, d), html: renderTemplate(receipt.html, d), from: ordersFrom() });
       }
     } else {
       s.failedAttempts = (s.failedAttempts || 0) + 1;
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
       await record({ id: `fail_${s.id}_${now}`, kind: "payment", provider: res.provider, email, name: s.patientName, patientId: s.patientId, planName: s.planName, amountCents: s.amountCents, currency: "usd", status: "failed", createdAt: stamp });
       if (email && dunning) {
         const d = { name: s.patientName, amount: money(s.amountCents), plan: s.planName };
-        await sendEmail({ to: email, toName: s.patientName, subject: renderTemplate(dunning.subject, d), html: renderTemplate(dunning.html, d) });
+        await sendEmail({ to: email, toName: s.patientName, subject: renderTemplate(dunning.subject, d), html: renderTemplate(dunning.html, d), from: ordersFrom() });
       }
     }
   }
