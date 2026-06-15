@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/security/ratelimit";
 import { findPatientByEmail, verifyPatientPassword, patientAuthPersistent } from "@/lib/auth/patientAccounts";
 import { signPatientToken, PATIENT_COOKIE } from "@/lib/auth/patientSession";
 
@@ -7,6 +8,7 @@ function json(obj: unknown, status = 200): Response {
 }
 
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, "login"); if (limited) return limited;
   let b: { email?: string; password?: string; pidHint?: string; nameHint?: string };
   try { b = await req.json(); } catch { return json({ ok: false, error: "Invalid request." }, 400); }
   const email = (b.email || "").trim().toLowerCase();

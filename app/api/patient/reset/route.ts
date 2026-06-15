@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/security/ratelimit";
 import { findPatientByEmail, setPatientPassword, patientAuthPersistent } from "@/lib/auth/patientAccounts";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,7 @@ function json(obj: unknown, status = 200): Response {
 // Demo password reset for patients (no emailed token yet — see note). Sets a
 // hashed override when Upstash is configured; otherwise succeeds without persisting.
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, "reset"); if (limited) return limited;
   let b: { email?: string; newPassword?: string };
   try { b = await req.json(); } catch { return json({ ok: false, error: "Invalid request." }, 400); }
   const email = (b.email || "").trim().toLowerCase();

@@ -1,9 +1,11 @@
+import { rateLimit } from "@/lib/security/ratelimit";
 import { registerStart, markComplete, updateProgress, listPending, isPersistent } from "@/lib/notify/pendingIntakes";
 
 export const dynamic = "force-dynamic";
 
 // POST { action: "start" | "progress" | "complete", id, name?, email?, phone?, progress? }
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, "intake"); if (limited) return limited;
   let b: { action?: string; id?: string; name?: string; email?: string; phone?: string; progress?: string };
   try { b = await req.json(); } catch { return Response.json({ ok: false, error: "Invalid body." }, { status: 400 }); }
   if (!b?.id || !b?.action) return Response.json({ ok: false, error: "id and action are required." }, { status: 400 });

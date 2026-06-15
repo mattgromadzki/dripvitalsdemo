@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/security/ratelimit";
 import { getByEmail, lockState, recordFailedLogin, clearLoginFailures, consumeBackupCode, LOCK_MINUTES } from "@/lib/auth/accounts";
 import { verifyPassword, signToken } from "@/lib/auth/serverCrypto";
 import { verifyTotp, normalizeBackupCode } from "@/lib/auth/totp";
@@ -10,6 +11,7 @@ function json(obj: unknown, status = 200): Response {
 const minsLeft = (until: number) => Math.max(1, Math.ceil((until - Date.now()) / 60_000));
 
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, "login"); if (limited) return limited;
   let b: { email?: string; password?: string; code?: string };
   try { b = await req.json(); } catch { return json({ ok: false, error: "Invalid request." }, 400); }
   const email = (b.email || "").trim().toLowerCase();

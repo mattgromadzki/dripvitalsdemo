@@ -1,3 +1,4 @@
+import { rateLimit } from "@/lib/security/ratelimit";
 import { getByEmail } from "@/lib/auth/accounts";
 import { createResetToken } from "@/lib/auth/resetTokens";
 import { sendEmail } from "@/lib/email/provider";
@@ -18,6 +19,7 @@ function origin(req: Request): string {
 // account exists, a one-time token link is emailed. If no email provider is
 // configured (demo), the link is returned so the flow is still testable.
 export async function POST(req: Request) {
+  const limited = await rateLimit(req, "reset"); if (limited) return limited;
   let b: { email?: string };
   try { b = await req.json(); } catch { return json({ ok: false, error: "Invalid request." }, 400); }
   const email = (b.email || "").trim().toLowerCase();
