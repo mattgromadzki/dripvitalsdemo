@@ -15,6 +15,7 @@ interface Readiness {
   shipping: { ready: boolean; env: string[] };
   sentry: boolean;
   authSecret: boolean;
+  mfaEnforced: boolean;
   appUrl: boolean;
   cron: boolean;
   demoData: boolean;
@@ -118,6 +119,9 @@ export default function ReadinessPage() {
 
           <Group title="Security & operations">
             <Item name="Auth secret" state={d.authSecret ? "ready" : "missing"} label={d.authSecret ? "Set" : "Missing"} detail="Signs login sessions" env={["AUTH_SECRET"]} />
+            <Item name="Staff two-factor (2FA)" state={d.mfaEnforced ? "ready" : "warn"}
+              label={d.mfaEnforced ? "Enforced" : "Optional"}
+              detail={d.mfaEnforced ? "All staff must set up 2FA before they can access the EMR" : "2FA is available but not required — set REQUIRE_STAFF_2FA=true to force enrollment for every staff member"} />
             <Item name="App URL" state={d.appUrl ? "ready" : "missing"} label={d.appUrl ? "Set" : "Not set"} detail="Used in links & emails" env={["NEXT_PUBLIC_APP_URL"]} />
             <Item name="Scheduled jobs" state={d.cron ? "ready" : "missing"} label={d.cron ? "Set" : "Not set"} detail="Refill reminders & cron" env={["CRON_SECRET"]} />
             <Item name="Error monitoring (Sentry)" state={d.sentry ? "ready" : "info"} label={d.sentry ? "On" : "Off"} detail="Optional but recommended" env={["SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN"]} />
