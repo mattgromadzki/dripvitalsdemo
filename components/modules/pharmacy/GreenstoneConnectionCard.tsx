@@ -141,9 +141,19 @@ export function GreenstoneConnectionCard() {
           {result.source === "mock" ? (
             <span>Returned a <strong>mock</strong> response (no token in this deployment). Order id <span className="font-mono">{String(result.orderId)}</span>.</span>
           ) : result.ok ? (
-            <span>✓ Sandbox accepted the order. Real <strong>order_id</strong>: <span className="font-mono">{String(result.orderId)}</span>.{result.message ? ` ${result.message}` : ""}</span>
+            result.orderId != null && String(result.orderId) !== "undefined" ? (
+              <span>✓ Sandbox accepted the order. Real <strong>order_id</strong>: <span className="font-mono">{String(result.orderId)}</span>.</span>
+            ) : (
+              <span>✓ Sandbox accepted the order, but no recognizable <strong>order_id</strong> field was in the response — see the raw response below.</span>
+            )
           ) : (
             <span>✗ {result.error || "Submission failed."}</span>
+          )}
+          {result.raw != null && (
+            <details className="mt-2 text-[11px]">
+              <summary className="cursor-pointer text-ink-muted">Raw pharmacy response</summary>
+              <pre className="mt-1 overflow-auto whitespace-pre-wrap break-all max-h-56">{JSON.stringify(result.raw, null, 2)}</pre>
+            </details>
           )}
         </div>
       )}

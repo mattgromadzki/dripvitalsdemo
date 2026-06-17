@@ -35,7 +35,7 @@ export interface GsOrderInput {
   deliveryType?: "direct" | "clinic";
 }
 
-export interface GsSubmitResult { ok: boolean; orderId?: number | string; message?: string; warnings?: string[]; error?: string; source: "greenstone" | "mock" }
+export interface GsSubmitResult { ok: boolean; orderId?: number | string; message?: string; warnings?: string[]; error?: string; source: "greenstone" | "mock"; raw?: unknown }
 export interface GsStatusResult { ok: boolean; orderId?: number | string; status?: string; trackingNumber?: string; trackingUrl?: string; document?: unknown; error?: string; source: "greenstone" | "mock" }
 
 // Map a 5Axis status to the patient-facing tracker stage.

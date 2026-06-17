@@ -80,7 +80,11 @@ export async function greenstoneSubmit(input: GsOrderInput): Promise<GsSubmitRes
     if (!r.ok || j?.success !== 1) {
       return { ok: false, error: j?.message || `Pharmacy rejected the order (HTTP ${r.status}).`, warnings: j?.warnings, source: "greenstone" };
     }
-    return { ok: true, orderId: j.order_id, message: j.message, warnings: j.warnings, source: "greenstone" };
+    const d = (j && typeof j.data === "object" && j.data) ? j.data : {};
+    const orderId =
+      j.order_id ?? j.orderId ?? j.id ??
+      d.order_id ?? d.orderId ?? d._id ?? d.id;
+    return { ok: true, orderId, message: j.message, warnings: j.warnings, source: "greenstone", raw: j };
   } catch {
     return { ok: false, error: "Could not reach the pharmacy API.", source: "greenstone" };
   }
