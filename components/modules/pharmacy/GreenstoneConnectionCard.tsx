@@ -31,6 +31,7 @@ function sampleOrder(): GsOrderInput {
       dispense_quantity: "1",
       dispense_unit: "vial",
       sig: "Connection test from DripVitals — please disregard.",
+      doctor: "DRIP-TEST",
       doctor_name: "Dr. Test Provider",
       doctor_npi: "1234567890",
       number_refills: 0,

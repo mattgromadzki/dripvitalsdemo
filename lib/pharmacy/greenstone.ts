@@ -56,6 +56,7 @@ function buildDocument(input: GsOrderInput) {
       dispense_quantity: s.dispense_quantity,
       dispense_unit: s.dispense_unit,
       sig: s.sig,
+      doctor: s.doctor,
       doctor_name: s.doctor_name,
       doctor_npi: s.doctor_npi,
       number_refills: s.number_refills ?? 0,
@@ -63,7 +64,7 @@ function buildDocument(input: GsOrderInput) {
       daw: s.daw,
     })),
     delivery_type: input.deliveryType || "direct",
-    creation_timeStamp: Math.floor(Date.now() / 1000),
+    creation_timeStamp: Date.now(), // milliseconds since epoch, per 5Axis spec
   };
 }
 

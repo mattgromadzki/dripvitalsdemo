@@ -11,6 +11,7 @@ export interface GsScript {
   dispense_quantity: string;
   dispense_unit: string;
   sig?: string;
+  doctor?: string;        // internal doctor ID from our system (required by 5Axis for some tokens)
   doctor_name: string;
   doctor_npi: string;
   number_refills?: number;
