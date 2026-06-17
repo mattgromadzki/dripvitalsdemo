@@ -64,6 +64,7 @@ function buildDocument(input: GsOrderInput) {
       daw: s.daw,
     })),
     delivery_type: input.deliveryType || "direct",
+    order_recieved_at: new Date().toISOString().slice(0, 19).replace("T", " "), // "YYYY-MM-DD HH:MM:SS" (note: spec spells it "recieved")
     creation_timeStamp: Date.now(), // milliseconds since epoch, per 5Axis spec
   };
 }
