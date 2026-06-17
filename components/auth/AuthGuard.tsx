@@ -10,12 +10,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const user = useAuth((s) => s.user);
   const hydrated = useAuth((s) => s.hydrated);
   const hydrate = useAuth((s) => s.hydrate);
+  const mustEnroll = useAuth((s) => s.mustEnroll);
 
   useEffect(() => { hydrate(); }, [hydrate]);
 
   useEffect(() => {
     if (hydrated && !user) router.replace("/login");
-  }, [hydrated, user, router]);
+    else if (hydrated && user && mustEnroll) router.replace("/enroll-2fa");
+  }, [hydrated, user, mustEnroll, router]);
 
   if (!hydrated) {
     return (
@@ -25,5 +27,6 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     );
   }
   if (!user) return null; // redirecting to /login
+  if (mustEnroll) return null; // redirecting to /enroll-2fa
   return <>{children}</>;
 }

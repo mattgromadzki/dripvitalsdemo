@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { getSession } from "@/lib/auth/authorize";
 import { getByEmail, beginTotp, confirmTotp, disableTotp, consumeBackupCode } from "@/lib/auth/accounts";
-import { hashPassword, verifyPassword } from "@/lib/auth/serverCrypto";
+import { hashPassword, verifyPassword, signToken } from "@/lib/auth/serverCrypto";
 import { generateSecret, otpauthUrl, verifyTotp, generateBackupCodes, normalizeBackupCode } from "@/lib/auth/totp";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,13 @@ export async function POST(req: Request) {
       const codes = generateBackupCodes();
       const hashed = codes.map((c) => hashPassword(normalizeBackupCode(c)));
       await confirmTotp(email, hashed);
-      return json({ ok: true, backupCodes: codes }); // shown once
+      // Re-issue the session so the 2FA enrollment gate releases without a re-login.
+      const exp2 = Date.now() + 1000 * 60 * 60 * 24 * 30;
+      const tok = signToken({ email: acct.email, name: acct.name, role: acct.role, exp: exp2, twofa: true });
+      const maxAge2 = Math.floor((exp2 - Date.now()) / 1000);
+      const res2 = json({ ok: true, backupCodes: codes }); // shown once
+      res2.headers.append("Set-Cookie", `dv_session=${tok}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge2}`);
+      return res2;
     }
     case "disable": {
       if (!acct.totpSecret) return json({ ok: true }); // already off

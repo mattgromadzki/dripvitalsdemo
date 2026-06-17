@@ -21,7 +21,7 @@ function b64url(buf: Buffer | string): string {
   return Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export interface SessionClaims { email: string; name: string; role: string; exp: number; }
+export interface SessionClaims { email: string; name: string; role: string; exp: number; twofa?: boolean; }
 
 export function signToken(claims: SessionClaims): string {
   const payload = b64url(JSON.stringify(claims));

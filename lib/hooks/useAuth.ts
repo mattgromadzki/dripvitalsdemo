@@ -19,6 +19,7 @@ let hydrating = false;
 interface AuthState {
   user: AuthUser | null;
   hydrated: boolean;
+  mustEnroll: boolean;
   hydrate: () => void;
   login: (email: string, password: string, code?: string) => Promise<{ ok: boolean; error?: string; twofa?: boolean; locked?: boolean }>;
   logout: () => Promise<void>;
@@ -30,6 +31,7 @@ interface AuthState {
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   hydrated: false,
+  mustEnroll: false,
 
   hydrate: async () => {
     if (hydrating) return;
@@ -38,17 +40,17 @@ export const useAuth = create<AuthState>((set) => ({
       const r = await fetch("/api/auth/me", { cache: "no-store" });
       if (r.ok) {
         const d = await r.json();
-        if (d?.user) { set({ user: { ...d.user, initials: initialsOf(d.user.name) }, hydrated: true }); return; }
+        if (d?.user) { set({ user: { ...d.user, initials: initialsOf(d.user.name) }, hydrated: true, mustEnroll: !!d.mustEnroll }); return; }
       }
     } catch { /* ignore */ }
-    set({ user: null, hydrated: true });
+    set({ user: null, hydrated: true, mustEnroll: false });
   },
 
   login: async (email, password, code) => {
     try {
       const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, code }) });
       const d = await r.json();
-      if (d?.ok && d.user) { set({ user: { ...d.user, initials: initialsOf(d.user.name) }, hydrated: true }); return { ok: true }; }
+      if (d?.ok && d.user) { set({ user: { ...d.user, initials: initialsOf(d.user.name) }, hydrated: true, mustEnroll: !!d.mustEnroll }); return { ok: true }; }
       return { ok: false, error: d?.error, twofa: !!d?.twofa, locked: !!d?.locked };
     } catch { return { ok: false, error: "Network error — please try again." }; }
   },

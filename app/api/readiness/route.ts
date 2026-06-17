@@ -51,6 +51,7 @@ export async function GET(req: Request) {
     shipping: { ready: has("USPS_CLIENT_ID", "USPS_CLIENT_SECRET"), env: ["USPS_CLIENT_ID", "USPS_CLIENT_SECRET"] },
     sentry: any("SENTRY_DSN"),
     authSecret: has("AUTH_SECRET"),
+    mfaEnforced: process.env.REQUIRE_STAFF_2FA === "true",
     appUrl: any("APP_URL", "NEXT_PUBLIC_APP_URL"),
     cron: has("CRON_SECRET"),
     demoData: process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false",

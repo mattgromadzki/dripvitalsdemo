@@ -12,5 +12,6 @@ export async function GET(req: Request) {
   const token = readCookie(req, "dv_session");
   const claims = token ? verifyToken(token) : null;
   if (!claims) return new Response(JSON.stringify({ ok: false }), { status: 401, headers: { "Content-Type": "application/json" } });
-  return Response.json({ ok: true, user: { email: claims.email, name: claims.name, role: claims.role } });
+  const mustEnroll = process.env.REQUIRE_STAFF_2FA === "true" && !claims.twofa;
+  return Response.json({ ok: true, mustEnroll, twofa: !!claims.twofa, user: { email: claims.email, name: claims.name, role: claims.role } });
 }

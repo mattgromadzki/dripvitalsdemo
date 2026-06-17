@@ -47,9 +47,10 @@ export async function POST(req: Request) {
 
   await clearLoginFailures(email);
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
-  const token = signToken({ email: acct.email, name: acct.name, role: acct.role, exp });
+  const token = signToken({ email: acct.email, name: acct.name, role: acct.role, exp, twofa: !!acct.totpSecret });
   const maxAge = Math.floor((exp - Date.now()) / 1000);
-  const res = json({ ok: true, user: { email: acct.email, name: acct.name, role: acct.role } });
+  const mustEnroll = process.env.REQUIRE_STAFF_2FA === "true" && !acct.totpSecret;
+  const res = json({ ok: true, mustEnroll, user: { email: acct.email, name: acct.name, role: acct.role } });
   res.headers.append("Set-Cookie", `dv_session=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`);
   return res;
 }

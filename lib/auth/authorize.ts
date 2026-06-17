@@ -44,15 +44,28 @@ function deny(status: number, error: string): Response {
   return Response.json({ ok: false, error }, { status });
 }
 
+/** When REQUIRE_STAFF_2FA=true, staff must enroll 2FA before using the app. */
+export function enforce2fa(): boolean {
+  return process.env.REQUIRE_STAFF_2FA === "true";
+}
+function needsEnrollment(claims: SessionClaims | null): boolean {
+  return enforce2fa() && !!claims && !claims.twofa;
+}
+const ENROLL_MSG = "Two-factor authentication setup is required before continuing.";
+
 /** Returns null if the request is authenticated, else a 401 Response. */
 export function requireAuth(req: Request): Response | null {
-  return getSession(req) ? null : deny(401, "Sign in required.");
+  const claims = getSession(req);
+  if (!claims) return deny(401, "Sign in required.");
+  if (needsEnrollment(claims)) return deny(403, ENROLL_MSG);
+  return null;
 }
 
 /** Returns null if the caller holds the permission, else a 401/403 Response. */
 export async function requirePerm(req: Request, perm: string): Promise<Response | null> {
   const claims = getSession(req);
   if (!claims) return deny(401, "Sign in required.");
+  if (needsEnrollment(claims)) return deny(403, ENROLL_MSG);
   if (!(await can(claims, perm))) return deny(403, "You don't have permission for this action.");
   return null;
 }
