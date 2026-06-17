@@ -68,7 +68,7 @@ export const BRANDS: Record<string, Brand> = {
     from: "DripVitals <care@dripvitals.com>",
     replyTo: "care@dripvitals.com",
     supportEmail: "care@dripvitals.com",
-    portalUrl: "https://app.dripvitals.com/patient-portal",
+    portalUrl: "https://portal.dripvitals.com",
     intakeFormSlug: "glp1-eligibility",
     pharmacyId: "dripvitals",
     theme: { brand: "#2C7C9E", accent: "#6FB6CE" },

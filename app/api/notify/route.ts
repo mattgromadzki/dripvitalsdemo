@@ -28,7 +28,11 @@ export async function POST(req: Request) {
   const brandId = resolveBrandId({ brandId: b.brandId, host: req.headers.get("host") });
   const brand = getBrand(brandId);
   const firstName = (b.toName || b.data?.name || "").trim().split(/\s+/)[0] || "there";
-  const data = { clinic: brand.name, firstName, supportEmail: brand.supportEmail, portalUrl: brand.portalUrl, ...(b.data || {}) };
+  const portalUrl = process.env.PATIENT_PORTAL_URL || brand.portalUrl;
+  const data: Record<string, string> = { clinic: brand.name, firstName, supportEmail: brand.supportEmail, portalUrl, ...(b.data || {}) };
+  // Build the set-password deep link server-side so it always points at the
+  // configured patient portal, regardless of which host staff triggered it from.
+  if (b.type === "welcome") data.setPasswordUrl = `${portalUrl}?setpw=${encodeURIComponent(b.to)}`;
 
   const subject = renderTemplate(tmpl.subject, data);
   const html = renderTemplate(tmpl.html, data);

@@ -39,9 +39,9 @@ async function notify(type: string, to: string, toName: string, data: Record<str
 export async function alertWelcome(patient: PatientLike) {
   if (!patient?.email) return;
   const name = nameOf(patient);
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const setPasswordUrl = `${origin}/patient-portal?setpw=${encodeURIComponent(patient.email)}`;
-  const ok = await notify("welcome", patient.email, name, { name, setPasswordUrl }, patient.brandId);
+  // setPasswordUrl is built server-side in /api/notify from the configured
+  // patient portal URL, so it always points at the right host.
+  const ok = await notify("welcome", patient.email, name, { name }, patient.brandId);
   recordLog("Welcome email", patient.email, ok);
 }
 
