@@ -6,13 +6,33 @@ import { usePermission } from "@/lib/rbac/usePermission";
 import { ROLES } from "@/lib/rbac/permissions";
 import { toast } from "@/lib/hooks/useToast";
 import { Toast } from "@/components/ui/Toast";
+import { useDoctors } from "@/lib/hooks/useDoctors";
+import type { Doctor } from "@/lib/types";
 
 interface Acct { email: string; name: string; role: string; active: boolean; twofa?: boolean; locked?: boolean; }
 const roleLabel = (id: string) => ROLES.find((r) => r.id === id)?.label || id;
 
+// Build a starter doctor profile from a new provider account. NPI and licenses
+// are left blank for the admin to fill in (those can't be auto-generated).
+function makeDoctorStub(name: string, email: string): Omit<Doctor, "id"> {
+  const clean = name.trim().replace(/^\s*(dr\.?|mr\.?|mrs\.?|ms\.?)\s+/i, "");
+  const parts = clean.split(/\s+/).filter(Boolean);
+  const first = parts[0] || clean || "New";
+  const last = parts.length > 1 ? parts.slice(1).join(" ") : "";
+  return {
+    first, last, middle: "", title: "MD", role: "Associate Physician",
+    email: email.trim(), phone: "", npi: "",
+    yearsExperience: 0, specialties: [],
+    active: true, epcs: false, surescripts: false, onCall: false, acceptingNew: true,
+    patients: 0, color: "var(--color-brand)", licenses: [],
+  };
+}
+
 export default function TeamPage() {
   const canManage = usePermission("users.manage");
   const me = useAuth((s) => s.user?.email)?.toLowerCase();
+  const addDoctor = useDoctors((s) => s.add);
+  const doctors = useDoctors((s) => s.doctors);
 
   const [accts, setAccts] = useState<Acct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +65,12 @@ export default function TeamPage() {
   }
 
   async function addMember() {
+    const isProvider = role === "provider";
     if (await post({ action: "create", name, email, role, password: pw }, "✓ Team member added")) {
+      if (isProvider && !doctors.some((d) => d.email.trim().toLowerCase() === email.trim().toLowerCase())) {
+        addDoctor(makeDoctorStub(name, email));
+        toast("✓ Doctor profile created — add their NPI & licenses in Doctors");
+      }
       setName(""); setEmail(""); setPw(""); setRole("support");
     }
   }
