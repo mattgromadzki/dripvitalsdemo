@@ -5,6 +5,7 @@ import type { Key, ReactNode } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
 import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
+import { GreenstoneConnectionCard } from "@/components/modules/pharmacy/GreenstoneConnectionCard";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { toast } from "@/lib/hooks/useToast";
 import { useIntegrations } from "@/lib/hooks/useIntegrations";
@@ -119,6 +120,9 @@ export default function IntegrationsPage() {
           <button className="btn btn-primary btn-sm" onClick={() => toast("➕ Browse integration catalog…")}>+ Add Integration</button>
         </div>
       </div>
+
+      {/* Live pharmacy connector — GreenstoneRX (5Axis) */}
+      <GreenstoneConnectionCard />
 
       {/* Error banner */}
       {erroredIntegrations.length > 0 && (
