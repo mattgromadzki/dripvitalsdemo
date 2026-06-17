@@ -13,6 +13,8 @@ const ALLOW = new Set([
   "treatments", "intake-forms",
   // communications
   "emails", "sms",
+  // pharmacy push events (5Axis webhooks)
+  "pharmacy-events",
   // config catalogs / reference data
   "medications", "pharmacies", "doctors", "providers", "staff",
   "integrations", "rbac", "knowledge-base", "reviews", "leads",

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { useAuth, DEMO_ACCOUNTS } from "@/lib/hooks/useAuth";
+import { SEED_DEMO } from "@/lib/config/runtime";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -54,6 +55,7 @@ export default function LoginPage() {
           <input className="fi mb-4" type="password" value={password} autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="••••••••" />
           <button className="btn btn-primary w-full" onClick={submit} disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
 
+          {SEED_DEMO && (
           <div className="mt-5 pt-4 border-t border-border">
             <div className="text-[10.5px] uppercase tracking-wide text-ink-muted font-bold mb-1.5">Demo accounts</div>
             <div className="text-[11.5px] text-ink-muted leading-relaxed">
@@ -65,6 +67,7 @@ export default function LoginPage() {
               <div className="mt-1.5 text-ink-muted-2">Password for all: <b className="text-ink">demo1234</b> · click one to autofill</div>
             </div>
           </div>
+          )}
         </>
       )}
     </AuthShell>

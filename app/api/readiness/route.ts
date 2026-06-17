@@ -38,6 +38,7 @@ export async function GET(req: Request) {
 
   const lifefile = has("LIFEFILE_API_USER", "LIFEFILE_API_PASS", "LIFEFILE_API_BASE");
   const emed = has("EMED_USERNAME", "EMED_PASSWORD", "EMED_BASE_URL");
+  const greenstone = has("GREENSTONE_API_TOKEN");
 
   return Response.json({
     ok: true,
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
     redis: signalsEnabled(),
     brands,
     payments,
-    pharmacy: { ready: lifefile || emed, which: lifefile ? "LifeFile" : emed ? "eMed" : null, env: ["LIFEFILE_API_USER", "LIFEFILE_API_PASS", "LIFEFILE_API_BASE"] },
+    pharmacy: { ready: lifefile || emed || greenstone, which: greenstone ? "GreenstoneRX (5Axis)" : lifefile ? "LifeFile" : emed ? "eMed" : null, env: ["GREENSTONE_API_TOKEN", "GREENSTONE_PHARMACY_NCPDPID", "GREENSTONE_CLINIC"] },
     address: { ready: has("SMARTY_AUTH_ID", "SMARTY_AUTH_TOKEN"), env: ["SMARTY_AUTH_ID", "SMARTY_AUTH_TOKEN"] },
     shipping: { ready: has("USPS_CLIENT_ID", "USPS_CLIENT_SECRET"), env: ["USPS_CLIENT_ID", "USPS_CLIENT_SECRET"] },
     sentry: any("SENTRY_DSN"),

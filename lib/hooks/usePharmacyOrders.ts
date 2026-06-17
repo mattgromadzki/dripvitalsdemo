@@ -4,7 +4,7 @@ import type { EmedRxRef } from "@/lib/pharmacy/types";
 
 // Maps our fulfillment order id -> what was sent to a pharmacy connector.
 export interface SentOrder {
-  connector: "emed" | "lifefile";
+  connector: "emed" | "lifefile" | "greenstone";
   pharmacyName: string;
   orderId: number | string;   // eMed OrderId or Life File order ref
   internalRxIds: number[];   // our system-wide internal Rx IDs (10001+)

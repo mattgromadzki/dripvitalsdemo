@@ -34,3 +34,16 @@ export async function setLifeFileStatus(id: number | string, statusId: string): 
     return await r.json();
   } catch { return { ok: false, error: "Network error.", source: "lifefile" }; }
 }
+
+// ── GreenstoneRX (5Axis) ──────────────────────────────────────────────────
+import type { GsOrderInput, GsSubmitResult, GsStatusResult } from "./greenstoneTypes";
+export async function submitGreenstone(input: GsOrderInput): Promise<GsSubmitResult> {
+  try {
+    const r = await fetch("/api/pharmacy/greenstone/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    return await r.json();
+  } catch { return { ok: false, error: "Network error.", source: "greenstone" }; }
+}
+export async function getGreenstoneStatus(id: number | string): Promise<GsStatusResult> {
+  try { return await (await fetch(`/api/pharmacy/greenstone/order/${id}`)).json(); }
+  catch { return { ok: false, error: "Network error.", source: "greenstone" }; }
+}

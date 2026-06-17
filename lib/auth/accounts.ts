@@ -43,18 +43,48 @@ function parse(v: unknown): StaffAccount | null {
   try { return typeof v === "string" ? JSON.parse(v) : (v as StaffAccount); } catch { return null; }
 }
 
+function demoEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+}
+
 async function ensureSeeded(): Promise<void> {
   if (seeded) return;
   seeded = true;
+
+  const ownerEmail = (process.env.OWNER_EMAIL || "").trim().toLowerCase();
+  const ownerPwd = process.env.OWNER_PASSWORD || "";
+  const ownerName = process.env.OWNER_NAME || "Owner";
+  const demoOn = demoEnabled();
   const r = redis();
+
   if (r) {
-    const all = await r.hgetall<Record<string, unknown>>(KEY);
-    if (all && Object.keys(all).length) return; // already seeded
-    const map: Record<string, string> = {};
-    for (const d of DEMO) map[d.email] = JSON.stringify({ ...d, pwd: hashPassword("demo1234"), active: true });
-    await r.hset(KEY, map);
-  } else {
-    if (mem.size) return;
+    const all = (await r.hgetall<Record<string, unknown>>(KEY)) || {};
+    const hadAccounts = Object.keys(all).length > 0;
+
+    // Production bootstrap: create the real owner from env if it doesn't exist yet.
+    if (ownerEmail && ownerPwd && !all[ownerEmail]) {
+      await r.hset(KEY, { [ownerEmail]: JSON.stringify({ email: ownerEmail, name: ownerName, role: "owner", pwd: hashPassword(ownerPwd), active: true }) });
+    }
+    // When demo is OFF, purge any demo accounts that are still present.
+    if (!demoOn) {
+      const present = DEMO.map((d) => d.email).filter((e) => all[e]);
+      if (present.length) await r.hdel(KEY, ...present);
+    }
+    // Seed demo accounts only when demo is ON and the store is empty.
+    if (!hadAccounts && demoOn) {
+      const map: Record<string, string> = {};
+      for (const d of DEMO) map[d.email] = JSON.stringify({ ...d, pwd: hashPassword("demo1234"), active: true });
+      await r.hset(KEY, map);
+    }
+    return;
+  }
+
+  // In-memory fallback (no Redis configured).
+  if (ownerEmail && ownerPwd && !mem.has(ownerEmail)) {
+    mem.set(ownerEmail, { email: ownerEmail, name: ownerName, role: "owner", pwd: hashPassword(ownerPwd), active: true });
+  }
+  if (!demoOn) for (const d of DEMO) mem.delete(d.email);
+  if (!mem.size && demoOn) {
     for (const d of DEMO) mem.set(d.email, { ...d, pwd: hashPassword("demo1234"), active: true });
   }
 }
@@ -129,6 +159,13 @@ export async function setActive(email: string, active: boolean): Promise<boolean
   const a = await getByEmail(email);
   if (!a) return false;
   a.active = active; await save(a); return true;
+}
+
+export async function deleteAccount(email: string): Promise<boolean> {
+  const e = email.trim().toLowerCase();
+  const r = redis();
+  if (r) { await r.hdel(KEY, e); return true; }
+  return mem.delete(e);
 }
 
 export function isPersistent(): boolean {
