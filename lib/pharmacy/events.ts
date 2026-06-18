@@ -57,3 +57,8 @@ export async function appendPharmacyEvent(evt: PharmacyEvent): Promise<void> {
   const all = await readAll();
   await writeAll([evt, ...all].slice(0, 3000));
 }
+
+// Read all pharmacy events (server-side, e.g. for patient-scoped filtering).
+export async function listPharmacyEvents(): Promise<PharmacyEvent[]> {
+  return readAll();
+}

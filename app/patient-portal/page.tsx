@@ -604,6 +604,92 @@ function ChatPage({ threadOpen, openThread, closeThread, messages, draft, setDra
 }
 
 /* ── TREATMENTS ── */
+interface PortalPharmEvent { id: string; event?: string; status?: string; stage?: string; trackingNumber?: string; trackingUrl?: string; carrier?: string; at: string }
+
+function stageMeta(stage?: string): { label: string; pill: "pending" | "active" | "danger" } {
+  switch ((stage || "").toLowerCase()) {
+    case "requested": return { label: "Order received", pill: "pending" };
+    case "filling":   return { label: "Being filled", pill: "pending" };
+    case "ready":     return { label: "Packed & shipped", pill: "pending" };
+    case "shipped":   return { label: "In transit", pill: "pending" };
+    case "delivered": return { label: "Delivered", pill: "active" };
+    case "issue":     return { label: "Shipping issue", pill: "danger" };
+    default:          return { label: "Update", pill: "pending" };
+  }
+}
+
+// Live shipment tracking for the signed-in patient, fed by GreenstoneRX webhooks.
+function PortalShipmentTracking({ toast }: { toast: (s: string) => void }) {
+  const [events, setEvents] = useState<PortalPharmEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetch("/api/patient/pharmacy-events", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => setEvents(Array.isArray(j?.events) ? j.events : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="card" style={{ marginBottom: 18 }}><div className="card-h">Active shipment</div><div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 6 }}>Loading…</div></div>;
+  }
+  if (events.length === 0) {
+    return (
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h">Active shipment</div>
+        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>No active shipments right now. We&rsquo;ll text and email you the moment your next order ships.</div>
+      </div>
+    );
+  }
+
+  const latest = events[0];
+  const meta = stageMeta(latest.stage);
+  const tracked = events.find((e) => e.trackingNumber);
+
+  return (
+    <>
+      <div className="card" style={{ borderColor: "var(--blue)", borderWidth: "1.5px", marginBottom: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 14 }}>
+          <div>
+            <div className="card-h" style={{ color: "var(--blue-dk)", marginBottom: 0 }}>Active shipment</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{meta.label}</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Updated {new Date(latest.at).toLocaleString()}</div>
+          </div>
+          <span className={`pill ${meta.pill}`}>{meta.label}</span>
+        </div>
+        {tracked?.trackingNumber && (
+          <div style={{ fontSize: 12.5, marginBottom: 12 }}>
+            Tracking: <span style={{ fontFamily: "monospace" }}>{tracked.trackingNumber}</span>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10 }}>
+          {tracked?.trackingUrl
+            ? <a className="btn btn-primary" href={tracked.trackingUrl} target="_blank" rel="noreferrer">Track package →</a>
+            : <button className="btn btn-secondary" onClick={() => toast("Tracking will appear here as soon as your order ships")}>Track package</button>}
+        </div>
+      </div>
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card-h">Status history</div>
+        <div className="timeline">
+          {events.map((e, i) => {
+            const m = stageMeta(e.stage);
+            const dot = e.stage === "delivered" ? "done" : i === 0 ? "now" : "done";
+            return (
+              <TimelineItem
+                key={e.id}
+                dot={dot}
+                title={m.label}
+                desc={`${e.status || e.event || ""}${e.trackingNumber ? ` · ${e.trackingNumber}` : ""}`}
+                date={new Date(e.at).toLocaleDateString()}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function TreatmentsPage({ tab, setTab, openModal, toast }: { tab: TxTab; setTab: (t: TxTab) => void; openModal: (m: ModalType) => void; toast: (s: string) => void }) {
   return (
     <section className="page active">
@@ -658,20 +744,7 @@ function TreatmentsPage({ tab, setTab, openModal, toast }: { tab: TxTab; setTab:
 
       {tab === "orders" && (
         <div className="inner-tab-content active">
-          <div className="card" style={{ borderColor: "var(--blue)", borderWidth: "1.5px", marginBottom: 18 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, gap: 14 }}>
-              <div>
-                <div className="card-h" style={{ color: "var(--blue-dk)", marginBottom: 0 }}>Active shipment</div>
-                <div style={{ fontSize: 17, fontWeight: 700, marginTop: 6 }}>Order #DV-2845</div>
-                <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>3-Month Semaglutide · Refill #2</div>
-              </div>
-              <span className="pill pending">In Transit</span>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-primary" onClick={() => toast("Tracking opened: USPS 1Z999AA10123456784")}>Track package →</button>
-              <button className="btn btn-secondary" onClick={() => toast("Delivery options opened")}>Manage delivery</button>
-            </div>
-          </div>
+          <PortalShipmentTracking toast={toast} />
           <div className="card">
             <div className="card-h">Order history</div>
             <div className="timeline">
