@@ -3021,3 +3021,24 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal .arrive-sub { font-size: 12.5px; color: var(--text-2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
 .dv-portal .arrive-btn { background: var(--green); color: #fff; border: none; border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: filter .12s; }
 .dv-portal .arrive-btn:hover { filter: brightness(1.06); }
+
+/* ── Treatments: Cards/List view toggle + list view ───────────────────── */
+.view-toggle { display: inline-flex; border: 1px solid var(--color-border); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.vt-btn { border: none; background: #fff; color: var(--color-ink-muted); font-size: 12.5px; font-weight: 600; padding: 7px 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: background .12s, color .12s; }
+.vt-btn + .vt-btn { border-left: 1px solid var(--color-border); }
+.vt-btn:hover { color: var(--color-ink); }
+.vt-btn.on { background: var(--color-brand); color: #fff; }
+
+.tx-list { display: flex; flex-direction: column; border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; background: #fff; }
+.tx-list-row { display: grid; grid-template-columns: 2.4fr 1fr 0.8fr 1fr 1fr 1.5fr auto; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--color-border); font-size: 13px; }
+.tx-list-row:last-child { border-bottom: none; }
+.tx-list-head { background: var(--color-surface-2); text-transform: uppercase; font-size: 10.5px; letter-spacing: .5px; color: var(--color-ink-muted); font-weight: 700; }
+.tx-list-row.inactive { opacity: .55; }
+.tx-list-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tx-list-ic { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+.tx-list-title { font-weight: 600; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-list-meta { font-size: 11.5px; color: var(--color-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-list-price { font-weight: 700; color: var(--color-ink); }
+.tx-list-dim { color: var(--color-ink-muted); }
+.tx-list-form { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-list-actions { display: flex; gap: 6px; justify-content: flex-end; }

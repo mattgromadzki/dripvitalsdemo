@@ -269,6 +269,7 @@ function TreatmentsList({ onEdit, onOpenForm }: {
 
   const [filter, setFilter] = useState<TxFilter>("all");
   const [search, setSearch] = useState("");
+  const [txView, setTxView] = useState<"cards" | "list">("cards");
 
   const filtered = useMemo(() => treatments.filter((t) => {
     if (filter === "active"     && !t.active)     return false;
@@ -326,19 +327,52 @@ function TreatmentsList({ onEdit, onOpenForm }: {
           <span className="search-w-icon">🔍</span>
           <input type="text" placeholder="Search treatments…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <div className="view-toggle">
+          <button className={`vt-btn${txView === "cards" ? " on" : ""}`} onClick={() => setTxView("cards")} title="Card view">▦ Cards</button>
+          <button className={`vt-btn${txView === "list" ? " on" : ""}`} onClick={() => setTxView("list")} title="List view">☰ List</button>
+        </div>
       </div>
 
-      <div className="tx-grid">
-        {filtered.length === 0 ? (
-          <div style={{ gridColumn: "1/-1" }}>
-            <div className="empty-state">
-              <div className="empty-ic">🔍</div>
-              <div className="empty-title">No treatments match your filter</div>
-              <div className="empty-sub">Try clearing your filter or search.</div>
-            </div>
+      {filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-ic">🔍</div>
+          <div className="empty-title">No treatments match your filter</div>
+          <div className="empty-sub">Try clearing your filter or search.</div>
+        </div>
+      ) : txView === "list" ? (
+        <div className="tx-list">
+          <div className="tx-list-row tx-list-head">
+            <span>Treatment</span><span>Status</span><span>Price</span><span>Billing</span><span>Subscribers</span><span>Intake form</span><span></span>
           </div>
-        ) : (
-          filtered.map((t, i) => {
+          {filtered.map((t) => {
+            const c = COLOR_MAP[t.color] || COLOR_MAP.brand;
+            const linkedForm = forms.find((f) => f.treatmentIds.includes(t.id));
+            return (
+              <div key={t.id} className={`tx-list-row${t.active ? "" : " inactive"}`}>
+                <div className="tx-list-name">
+                  <span className="tx-list-ic" style={{ background: c.bg, color: c.fg }}>{t.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="tx-list-title">{t.name}</div>
+                    <div className="tx-list-meta">{t.med}{t.strength ? ` · ${t.strength}` : ""}</div>
+                  </div>
+                </div>
+                <div>{t.active ? <span className="pill pill-green"><span className="dot" />Active</span> : <span className="pill pill-muted">Inactive</span>}</div>
+                <div className="tx-list-price">{t.price}</div>
+                <div className="tx-list-dim">{BILLING_LABEL[t.billing] || t.billing}</div>
+                <div className="tx-list-dim">{t.subscribers}</div>
+                <div className="tx-list-dim tx-list-form">{linkedForm ? linkedForm.name : "—"}</div>
+                <div className="tx-list-actions">
+                  <button className="tx-action-btn" onClick={() => onEdit(t.id)} title="Edit">✏</button>
+                  <button className="tx-action-btn" onClick={() => { dup(t.id); toast("Treatment duplicated"); }} title="Duplicate">⊕</button>
+                  <button className="tx-action-btn danger" onClick={() => { if (confirm("Delete this treatment? This cannot be undone.")) { del(t.id); toast("Treatment deleted"); } }} title="Delete">🗑</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="tx-grid">
+          {filtered.map((t, i) => {
             const c = COLOR_MAP[t.color] || COLOR_MAP.brand;
             const linkedForm = forms.find((f) => f.treatmentIds.includes(t.id));
             return (
@@ -411,9 +445,9 @@ function TreatmentsList({ onEdit, onOpenForm }: {
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }
