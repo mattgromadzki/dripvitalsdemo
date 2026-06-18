@@ -19,7 +19,9 @@ export async function POST(req: Request) {
 
   if (email && patientAuthPersistent()) {
     const p = await findPatientByEmail(email);
-    if (p) {
+    if (!p) {
+      console.warn("[patient-reset] no patient matches the submitted email — nothing sent.");
+    } else {
       const token = await createResetToken(email);
       if (token) {
         const base = (process.env.PATIENT_PORTAL_URL || getBrand().portalUrl || "").replace(/\/+$/, "");
@@ -31,9 +33,15 @@ export async function POST(req: Request) {
           <p style="margin:20px 0;"><a href="${url}" style="background:#4a8ec7;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Reset your password</a></p>
           <p style="color:#666;font-size:13px;">If you didn&rsquo;t request this, you can safely ignore this email — your password won&rsquo;t change.</p>
         </div>`;
-        try { await sendEmail({ to: email, toName: p.name, subject: "Reset your DripVitals password", html, from: process.env.EMAIL_FROM }); } catch { /* best-effort */ }
+        const res = await sendEmail({ to: email, toName: p.name, subject: "Reset your DripVitals password", html, from: process.env.EMAIL_FROM })
+          .catch((e) => ({ ok: false as const, provider: "email", error: String(e) }));
+        if (!res.ok) console.error("[patient-reset] email send FAILED via", res.provider, "—", res.error);
+        else if (res.provider === "mock") console.warn("[patient-reset] email was MOCKED (no SENDGRID_API_KEY/RESEND_API_KEY configured) — no real email was sent.");
+        else console.info("[patient-reset] reset email accepted by", res.provider);
       }
     }
+  } else if (email) {
+    console.warn("[patient-reset] patient auth store is not persistent (Redis not configured) — reset is disabled.");
   }
   return json({ ok: true });
 }
