@@ -10,8 +10,18 @@ import { ROLES, PERMISSION_GROUPS, ALL_PERMS } from "@/lib/rbac/permissions";
 
 const AV = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#ef4444", "#0ea5e9", "#db2777", "#14b8a6"];
 function avatar(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0; return { initial: (name.trim()[0] || "?").toUpperCase(), color: AV[h % AV.length] }; }
+function lastSeen(ms?: number): string {
+  if (!ms) return "Never";
+  const diff = Date.now() - ms;
+  if (diff < 6e4) return "Just now";
+  if (diff < 36e5) return `${Math.floor(diff / 6e4)}m ago`;
+  if (diff < 864e5) return `${Math.floor(diff / 36e5)}h ago`;
+  const d = Math.floor(diff / 864e5);
+  if (d < 7) return `${d}d ago`;
+  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
-interface Account { email: string; name: string; role: string; active: boolean; twofa: boolean; locked: boolean; }
+interface Account { email: string; name: string; role: string; active: boolean; twofa: boolean; locked: boolean; lastLogin?: number; }
 
 export default function RolesPage() {
   // Role → permission matrix stays in the local RBAC store.
@@ -84,7 +94,7 @@ export default function RolesPage() {
         <div className="bg-surface border border-border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse min-w-[760px]">
-              <thead><tr className="bg-surface-2">{["Member", "Role", "2FA", "Status", "Actions"].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wide text-ink-muted font-bold px-3 py-2.5 border-b border-border">{h}</th>)}</tr></thead>
+              <thead><tr className="bg-surface-2">{["Member", "Role", "2FA", "Status", "Last active", "Actions"].map((h) => <th key={h} className="text-left text-[10px] uppercase tracking-wide text-ink-muted font-bold px-3 py-2.5 border-b border-border">{h}</th>)}</tr></thead>
               <tbody>
                 {accounts.map((m) => { const av = avatar(m.name); return (
                   <tr key={m.email} className="border-b border-border last:border-none hover:bg-surface-2">
@@ -92,6 +102,7 @@ export default function RolesPage() {
                     <td className="px-3 py-2.5"><select className="fsel py-1" value={m.role} onChange={(e) => act({ action: "role", email: m.email, role: e.target.value }, "Role updated")}>{ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}{!ROLES.some((r) => r.id === m.role) && <option value={m.role}>{m.role}</option>}</select></td>
                     <td className="px-3 py-2.5">{m.twofa ? <Pill intent="green" dot>On</Pill> : <Pill intent="amber" dot>Off</Pill>}</td>
                     <td className="px-3 py-2.5">{m.locked ? <Pill intent="red">Locked</Pill> : m.active ? <Pill intent="green">Active</Pill> : <Pill intent="red">Suspended</Pill>}</td>
+                    <td className="px-3 py-2.5 text-ink-muted text-[12px] whitespace-nowrap">{lastSeen(m.lastLogin)}</td>
                     <td className="px-3 py-2.5 text-[11px] whitespace-nowrap">
                       {m.active
                         ? <button className="text-red hover:underline" onClick={() => act({ action: "active", email: m.email, active: false }, "Account suspended")}>suspend</button>
@@ -102,11 +113,11 @@ export default function RolesPage() {
                   </tr>
                 ); })}
                 {!loading && !loadErr && accounts.length === 0 && (
-                  <tr><td colSpan={5} className="px-3 py-10 text-center text-[12.5px] text-ink-muted">No team members yet. Use <span className="font-semibold text-ink">Add member</span> to create staff logins.</td></tr>
+                  <tr><td colSpan={6} className="px-3 py-10 text-center text-[12.5px] text-ink-muted">No team members yet. Use <span className="font-semibold text-ink">Add member</span> to create staff logins.</td></tr>
                 )}
-                {loading && <tr><td colSpan={5} className="px-3 py-10 text-center text-[12.5px] text-ink-muted">Loading team…</td></tr>}
+                {loading && <tr><td colSpan={6} className="px-3 py-10 text-center text-[12.5px] text-ink-muted">Loading team…</td></tr>}
                 {loadErr && !loading && (
-                  <tr><td colSpan={5} className="px-3 py-10 text-center text-[12.5px] text-red">{loadErr}{loadErr.toLowerCase().includes("author") ? " You need the “Manage users & roles” permission." : ""}</td></tr>
+                  <tr><td colSpan={6} className="px-3 py-10 text-center text-[12.5px] text-red">{loadErr}{loadErr.toLowerCase().includes("author") ? " You need the “Manage users & roles” permission." : ""}</td></tr>
                 )}
               </tbody>
             </table>

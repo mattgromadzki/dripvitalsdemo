@@ -8,11 +8,12 @@ export interface StaffAccount {
   backupCodes?: string[];  // hashed, single-use recovery codes
   failedAttempts?: number; // consecutive failed logins
   lockedUntil?: number;    // epoch ms; login blocked until then
+  lastLogin?: number;      // epoch ms of last successful login
 }
 
 export interface StaffAccountPublic {
   email: string; name: string; role: string; active: boolean;
-  twofa: boolean; locked: boolean;
+  twofa: boolean; locked: boolean; lastLogin?: number;
 }
 
 export const MAX_LOGIN_ATTEMPTS = 5;
@@ -134,8 +135,8 @@ export async function listAccounts(): Promise<StaffAccountPublic[]> {
     all = Array.from(mem.values());
   }
   const now = Date.now();
-  return all.map(({ email, name, role, active, totpSecret, lockedUntil }) => ({
-    email, name, role, active, twofa: !!totpSecret, locked: (lockedUntil || 0) > now,
+  return all.map(({ email, name, role, active, totpSecret, lockedUntil, lastLogin }) => ({
+    email, name, role, active, twofa: !!totpSecret, locked: (lockedUntil || 0) > now, lastLogin,
   }));
 }
 
@@ -203,6 +204,14 @@ export async function clearLoginFailures(email: string): Promise<void> {
     await save(acct);
   }
 }
+/** Stamp the time of a successful login. */
+export async function recordLogin(email: string): Promise<void> {
+  const acct = await getByEmail(email);
+  if (!acct) return;
+  acct.lastLogin = Date.now();
+  await save(acct);
+}
+
 export async function unlockAccount(email: string): Promise<boolean> {
   const acct = await getByEmail(email);
   if (!acct) return false;

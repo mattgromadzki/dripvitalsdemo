@@ -1,5 +1,5 @@
 import { rateLimit } from "@/lib/security/ratelimit";
-import { getByEmail, lockState, recordFailedLogin, clearLoginFailures, consumeBackupCode, LOCK_MINUTES } from "@/lib/auth/accounts";
+import { getByEmail, lockState, recordFailedLogin, clearLoginFailures, recordLogin, consumeBackupCode, LOCK_MINUTES } from "@/lib/auth/accounts";
 import { verifyPassword, signToken } from "@/lib/auth/serverCrypto";
 import { verifyTotp, normalizeBackupCode } from "@/lib/auth/totp";
 
@@ -46,6 +46,7 @@ export async function POST(req: Request) {
   }
 
   await clearLoginFailures(email);
+  await recordLogin(email);
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
   const token = signToken({ email: acct.email, name: acct.name, role: acct.role, exp, twofa: !!acct.totpSecret });
   const maxAge = Math.floor((exp - Date.now()) / 1000);
