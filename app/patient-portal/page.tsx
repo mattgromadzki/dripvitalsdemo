@@ -88,6 +88,8 @@ export default function PatientPortalPage() {
   const patientLogin = usePatientAuth((s) => s.login);
   const patientLogout = usePatientAuth((s) => s.logout);
   const requestReset = usePatientAuth((s) => s.requestReset);
+  const requestResetEmail = usePatientAuth((s) => s.requestResetEmail);
+  const confirmReset = usePatientAuth((s) => s.confirmReset);
   const resetPassword = usePatientAuth((s) => s.resetPassword);
   const me = patients.find((p) => p.id === sessionPid) ?? null;
   const pid = me?.id ?? "";
@@ -126,11 +128,21 @@ export default function PatientPortalPage() {
   useEffect(() => { hydrateAuth(); }, [hydrateAuth]);
   const [authView, setAuthView] = useState<"login" | "forgot" | "reset">("login");
   const [authEmail, setAuthEmail] = useState("");
-  // Deep link from the welcome email (?setpw=<email>) opens the set-password view.
+  const [resetToken, setResetToken] = useState("");
+  // Deep links: ?reset=<token> (emailed reset link) or ?setpw=<email> (welcome
+  // invite). Both open the set-password view; the token path is verified server-side.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const setpw = new URLSearchParams(window.location.search).get("setpw");
-    if (setpw) { setAuthEmail(setpw); setAuthView("reset"); }
+    const params = new URLSearchParams(window.location.search);
+    const reset = params.get("reset");
+    const setpw = params.get("setpw");
+    if (reset) { setResetToken(reset); setAuthView("reset"); }
+    else if (setpw) { setAuthEmail(setpw); setAuthView("reset"); }
+    if (reset || setpw) {
+      const u = new URL(window.location.href);
+      u.searchParams.delete("reset"); u.searchParams.delete("setpw");
+      window.history.replaceState({}, "", u.toString());
+    }
   }, []);
   const [authPw, setAuthPw] = useState("");
   const [authErr, setAuthErr] = useState<string | null>(null);
@@ -243,8 +255,16 @@ export default function PatientPortalPage() {
     if (!res.ok) { setAuthErr(res.error || "Sign in failed."); return; }
     setAuthErr(null); setAuthPw(""); nav("home");
   }
-  function doRequestReset() { requestReset(); setResetSent(true); }
+  async function doRequestReset() { await requestResetEmail(authEmail); setResetSent(true); }
   async function doResetPassword() {
+    if (resetToken) {
+      const res = await confirmReset(resetToken, resetPw);
+      if (!res.ok) { setAuthErr(res.error || "Could not reset password."); return; }
+      setAuthErr(null); setResetPw(""); setResetToken(""); setResetSent(false);
+      toast("Password updated — you're signed in.");
+      nav("home");
+      return;
+    }
     const res = await resetPassword(authEmail, resetPw, patients);
     if (!res.ok) { setAuthErr(res.error || "Could not reset password."); return; }
     setAuthErr(null); setResetPw(""); setResetSent(false); setAuthView("login");
@@ -321,12 +341,9 @@ export default function PatientPortalPage() {
                     <button className="login-btn" onClick={doRequestReset}>Send reset link</button>
                   </>
                 ) : (
-                  <>
-                    <div style={{ background: "var(--amber-soft, #fef0dd)", color: "var(--amber, #b86e1e)", fontSize: 12.5, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>
-                      Demo: no real email is sent. Continue below to set a new password.
-                    </div>
-                    <button className="login-btn" onClick={() => { setAuthErr(null); setAuthView("reset"); }}>Continue to reset →</button>
-                  </>
+                  <div style={{ background: "var(--blue-soft, #e7f0fb)", color: "var(--blue-dk, #2c5d8a)", fontSize: 12.5, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>
+                    If an account exists for that email, we&rsquo;ve sent a password reset link. Check your inbox — the link expires in 30 minutes.
+                  </div>
                 )}
                 <div className="login-helpers"><a href="#" onClick={(e) => { e.preventDefault(); setAuthView("login"); setAuthErr(null); }}>← Back to sign in</a></div>
               </>
@@ -334,9 +351,11 @@ export default function PatientPortalPage() {
 
             {authView === "reset" && (
               <>
-                <div className="login-h">Set a new password</div>
+                <div className="login-h">{resetToken ? "Choose a new password" : "Set a new password"}</div>
                 {authErr && <div style={{ background: "var(--red-soft)", color: "var(--red)", fontSize: 13, fontWeight: 600, padding: "9px 12px", borderRadius: 9, marginBottom: 10 }}>{authErr}</div>}
-                <input className="login-input" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email address" />
+                {!resetToken && (
+                  <input className="login-input" type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Email address" />
+                )}
                 <input className="login-input" type="password" value={resetPw} onChange={(e) => setResetPw(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doResetPassword(); }} placeholder="New password (min 8 characters)" />
                 <button className="login-btn" onClick={doResetPassword}>Update password</button>
                 <div className="login-helpers"><a href="#" onClick={(e) => { e.preventDefault(); setAuthView("login"); setAuthErr(null); }}>← Back to sign in</a></div>

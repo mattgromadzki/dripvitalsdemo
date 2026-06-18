@@ -21,6 +21,8 @@ interface PatientAuthState {
   logout: () => Promise<void>;
   accountExists: (email: string, patients: Patient[]) => boolean;
   requestReset: () => { ok: boolean };
+  requestResetEmail: (email: string) => Promise<{ ok: boolean }>;
+  confirmReset: (token: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   resetPassword: (email: string, newPassword: string, patients: Patient[]) => Promise<{ ok: boolean; error?: string }>;
 }
 
@@ -60,6 +62,21 @@ export const usePatientAuth = create<PatientAuthState>((set) => ({
 
   accountExists: (email, patients) => !!findByEmail(patients, email),
   requestReset: () => ({ ok: true }),
+
+  requestResetEmail: async (email) => {
+    try { await fetch("/api/patient/reset/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }); } catch { /* ignore */ }
+    return { ok: true }; // always succeed (no account enumeration)
+  },
+
+  confirmReset: async (token, password) => {
+    if (password.length < 8) return { ok: false, error: "Password must be at least 8 characters." };
+    try {
+      const r = await fetch("/api/patient/reset/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password }) });
+      const d = await r.json();
+      if (d?.ok && d.patient?.id) { set({ patientId: d.patient.id, hydrated: true }); return { ok: true }; }
+      return { ok: false, error: d?.error || "Could not reset password." };
+    } catch { return { ok: false, error: "Network error — please try again." }; }
+  },
 
   resetPassword: async (email, newPassword, patients) => {
     const p = findByEmail(patients, email);
