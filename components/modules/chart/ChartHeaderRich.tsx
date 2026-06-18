@@ -24,7 +24,11 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
   const meta = LIFECYCLE_META[current];
   const initials = (patient.first[0] || "") + (patient.last[0] || "");
   const a = extra.address;
-  const addr = a ? `${a.street}, ${a.city}, ${a.state} ${a.zip}` : "—";
+  const street = patient.address || a?.street || "";
+  const city = patient.city || a?.city || "";
+  const zipc = patient.zip || a?.zip || "";
+  const addr = street ? `${street}${patient.apt ? `, ${patient.apt}` : ""}, ${city}, ${patient.state} ${zipc}` : "—";
+  const dobShown = patient.dob || extra.dob;
 
   return (
     <div className="bg-surface border border-border rounded-lg shadow-xs mb-3.5 relative">
@@ -39,7 +43,7 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
           <div className="text-[12.5px] text-ink-muted mt-0.5 flex gap-2.5 flex-wrap items-center">
             <span className="font-mono text-[11px] text-ink-2 bg-surface-2 border border-border px-1.5 py-px rounded font-semibold">{patient.id}</span>
             <span>{extra.gender} · Age {patient.age}</span>
-            <span>DOB {extra.dob}</span>
+            <span>DOB {dobShown}</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-2.5">

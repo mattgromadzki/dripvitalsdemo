@@ -8,7 +8,7 @@ import type { Patient, PatientExtra } from "@/lib/types";
 export function getPatientExtra(p: Patient): PatientExtra {
   // Stable pseudo-random based on patient ID — same patient gets same numbers
   const seed = p.id.charCodeAt(p.id.length - 1) + p.id.charCodeAt(p.id.length - 2);
-  const goalWt = Math.max(p.wt - 20, Math.round(p.wt * 0.85));
+  const goalWt = p.goalWt ?? Math.max(p.wt - 20, Math.round(p.wt * 0.85));
   const streakWeeks = Math.max(1, Math.min(p.week, (seed % 12) + 4));
   const riskScore = p.status === "active"
     ? 70 + (seed % 25)              // 70-94
@@ -17,12 +17,13 @@ export function getPatientExtra(p: Patient): PatientExtra {
     : 50 + (seed % 20);             // 50-69
   const riskLabel = riskScore >= 80 ? "Low" : riskScore >= 60 ? "Moderate" : "High";
 
-  // Address synthesis
+  // Address — use the real captured address when present; synthesize only for
+  // demo seed patients that have no address on file.
   const STREETS = ["Ocean Drive", "Bayview Ave", "Sunset Blvd", "Park St", "Coral Way", "Magnolia Ln"];
-  const street = `${100 + (seed * 7) % 9900} ${STREETS[seed % STREETS.length]}`;
   const CITIES: Record<string, string> = { FL: "Miami", GA: "Atlanta", TX: "Austin", CA: "Los Angeles", NY: "New York" };
-  const city = CITIES[p.state] || "Miami";
-  const zip = String(10000 + (seed * 131) % 89999).slice(0, 5);
+  const street = p.address || `${100 + (seed * 7) % 9900} ${STREETS[seed % STREETS.length]}`;
+  const city = p.city || CITIES[p.state] || "Miami";
+  const zip = p.zip || String(10000 + (seed * 131) % 89999).slice(0, 5);
 
   // Side effects — patients with "Urgent" tags get a moderate unresolved one
   const hasUrgent = p.tags.some((t) => t.toLowerCase().startsWith("urgent"));
@@ -222,7 +223,7 @@ export function getPatientExtra(p: Patient): PatientExtra {
   }
 
   return {
-    dob: deriveDOB(p.age),
+    dob: p.dob || deriveDOB(p.age),
     gender: p.gender === "F" ? "Female" : p.gender === "M" ? "Male" : "Non-binary",
     careCoordinator: ["Jordan Blake", "Taylor Nguyen", "Sam Rivera", "Casey Morgan", "Riley Chen"][seed % 5],
     lastLogin: ["Today, 9:14 AM", "Yesterday, 7:02 PM", "May 29, 2026", "May 27, 2026", "May 24, 2026"][seed % 5],

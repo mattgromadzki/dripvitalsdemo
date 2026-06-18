@@ -162,7 +162,7 @@ export function PatientFormModal({ open, onClose, patient, onSave }: PatientForm
       plan: PLAN_FOR[form.program] || form.program,
       dose, week: 0, provider: patient?.provider || "Dr. Rivera", doctorId: patient?.doctorId || 1, pharmacyId: patient?.pharmacyId || 1,
       // Vitals
-      wt: lb, wtStart: lb, bmi: isWeightLoss ? bmi : 0,
+      wt: lb, wtStart: lb, bmi,
       bp: patient?.bp || "—", hr: patient?.hr || 0, a1c: patient?.a1c,
       // Dates
       since: patient?.since || NOW.toISOString().slice(0, 10),
@@ -306,27 +306,30 @@ export function PatientFormModal({ open, onClose, patient, onSave }: PatientForm
         </Field>
       </Section>
 
+      <Section title="Vitals (optional)">
+        <Row cols={2}>
+          <Field label="Current Weight (lb)">
+            <input className="fi" type="number" step="0.1" placeholder="182" value={form.weightCurrent} onChange={(e) => field("weightCurrent", e.target.value)} />
+          </Field>
+          <Field label="Goal Weight (lb)">
+            <input className="fi" type="number" step="0.1" placeholder="150" value={form.goalWeight} onChange={(e) => field("goalWeight", e.target.value)} />
+          </Field>
+        </Row>
+        <Row cols={3}>
+          <Field label="Height (ft)">
+            <input className="fi" type="number" placeholder="5" value={form.heightFt} onChange={(e) => field("heightFt", e.target.value)} />
+          </Field>
+          <Field label="Height (in)">
+            <input className="fi" type="number" placeholder="7" value={form.heightIn} onChange={(e) => field("heightIn", e.target.value)} />
+          </Field>
+          <Field label="BMI (auto)">
+            <input className="fi" readOnly value={bmi || ""} placeholder="—" style={{ background: "var(--color-surface-3)", fontWeight: 700 }} />
+          </Field>
+        </Row>
+      </Section>
+
       {isWeightLoss && (
-        <Section title="Weight Loss Snapshot (optional)">
-          <Row cols={2}>
-            <Field label="Current Weight (lb)">
-              <input className="fi" type="number" step="0.1" placeholder="182" value={form.weightCurrent} onChange={(e) => field("weightCurrent", e.target.value)} />
-            </Field>
-            <Field label="Goal Weight (lb)">
-              <input className="fi" type="number" step="0.1" placeholder="150" value={form.goalWeight} onChange={(e) => field("goalWeight", e.target.value)} />
-            </Field>
-          </Row>
-          <Row cols={3}>
-            <Field label="Height (ft)">
-              <input className="fi" type="number" placeholder="5" value={form.heightFt} onChange={(e) => field("heightFt", e.target.value)} />
-            </Field>
-            <Field label="Height (in)">
-              <input className="fi" type="number" placeholder="7" value={form.heightIn} onChange={(e) => field("heightIn", e.target.value)} />
-            </Field>
-            <Field label="BMI (auto)">
-              <input className="fi" readOnly value={bmi || ""} placeholder="—" style={{ background: "var(--color-surface-3)", fontWeight: 700 }} />
-            </Field>
-          </Row>
+        <Section title="GLP-1 History (optional)">
           <Row cols={2}>
             <Field label="Previous GLP-1 Use">
               <select className="fsel" value={form.priorGLP1} onChange={(e) => field("priorGLP1", e.target.value as FormState["priorGLP1"])}>
