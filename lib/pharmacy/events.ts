@@ -16,10 +16,13 @@ export interface PharmacyEvent {
   event: string;
   orderId?: string | number;
   internalOrderId?: string;
+  patientId?: string;
+  patientName?: string;
   status?: string;
   stage?: string;
   trackingNumber?: string;
   trackingUrl?: string;
+  carrier?: string;
   comment?: string;
   at: string;
 }
