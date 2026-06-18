@@ -3,7 +3,6 @@
 import { create } from "@/lib/hooks/zustand-shim";
 import type { ShopProduct, ShopProductInput } from "@/lib/types";
 import { SHOP_PRODUCTS as SEED } from "@/lib/data/shopProducts";
-import { seedList } from "@/lib/config/runtime";
 
 interface ShopState {
   products: ShopProduct[];
@@ -23,7 +22,9 @@ function nextId(): string {
 }
 
 export const useShop = create<ShopState>((set, get) => ({
-  products: seedList(SEED),
+  // The Shop catalog is real storefront data (not demo data), so it always
+  // seeds regardless of NEXT_PUBLIC_SEED_DEMO_DATA. Admin edits layer on top.
+  products: SEED,
 
   add: (input) => {
     const product: ShopProduct = { id: nextId(), ...input };
