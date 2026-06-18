@@ -1,6 +1,7 @@
 "use client";
 import { create } from "@/lib/hooks/zustand-shim";
 import { DEFAULT_ROLE_PERMS } from "@/lib/rbac/permissions";
+import { seedList } from "@/lib/config/runtime";
 
 export interface Member { id: string; name: string; email: string; role: string; twoFactor: boolean; status: "active" | "invited" | "suspended"; lastActive: string; }
 
@@ -25,7 +26,7 @@ interface State {
 }
 export const useRbac = create<State>((set) => ({
   rolePerms: JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMS)),
-  members: SEED,
+  members: seedList(SEED),
   seq: 7,
   togglePerm: (role, key) => set((s) => {
     const cur = s.rolePerms[role] || [];
