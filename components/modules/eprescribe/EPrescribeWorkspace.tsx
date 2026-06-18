@@ -13,6 +13,9 @@ import { usePharmacies } from "@/lib/hooks/usePharmacies";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
+import { useDoctors } from "@/lib/hooks/useDoctors";
+import { submitGreenstone } from "@/lib/pharmacy/client";
+import type { GsOrderInput } from "@/lib/pharmacy/greenstoneTypes";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { ClinicalSafetyStrip } from "@/components/clinical/ClinicalSafetyStrip";
 import { useClinical } from "@/lib/hooks/useClinical";
@@ -30,7 +33,7 @@ import {
   type SupplyOption,
   type SavedDocument,
 } from "@/lib/data/eprescribeCatalog";
-import type { TreatmentRequest, Patient, PatientExtra, PatientDocument, Pharmacy, Prescription } from "@/lib/types";
+import type { TreatmentRequest, Patient, PatientExtra, PatientDocument, Pharmacy, Prescription, Doctor } from "@/lib/types";
 
 const ROUTE_OPTIONS = ["Subcutaneous (SQ)", "Intramuscular (IM)", "Oral (PO)", "Topical", "Sublingual (SL)"];
 const FREQ_OPTIONS  = ["Once daily (QD)", "Twice daily (BID)", "Three times daily (TID)", "Once weekly", "Every 2 weeks", "Monthly", "As needed (PRN)"];
@@ -179,7 +182,11 @@ export function EPrescribeWorkspace(
 
   // ── Pharmacy + prescriber ───────────────────────────────────────────
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string>("");
-  const [prescriber, setPrescriber] = useState("Dr. Carlos Rivera, MD");
+  const doctors = useDoctors((st) => st.doctors);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+  const selectedDoctor = doctors.find((d) => d.id === selectedDoctorId) || null;
+  const prescriber = selectedDoctor ? doctorLabel(selectedDoctor) : "";
+  const [sending, setSending] = useState(false);
 
   // ── Review modal & saved docs ───────────────────────────────────────
   const [reviewOpen,   setReviewOpen]   = useState(false);
@@ -235,6 +242,13 @@ export function EPrescribeWorkspace(
     const compounding = pharmacies.find((p) => p.type === "compounding" && p.status === "connected");
     setSelectedPharmacyId(compounding?.id || pharmacies[0]?.id || "");
   }, [pharmacies, selectedPharmacyId]);
+
+  // Default prescriber = first active provider with a valid 10-digit NPI
+  useEffect(() => {
+    if (selectedDoctorId) return;
+    const withNpi = doctors.find((d) => d.active && /^\d{10}$/.test((d.npi || "").trim()));
+    setSelectedDoctorId(withNpi?.id || doctors[0]?.id || "");
+  }, [doctors, selectedDoctorId]);
 
   // Step indicator state
   const total = orderCart.length;
@@ -357,11 +371,66 @@ export function EPrescribeWorkspace(
     setReviewOpen(true);
   }
 
-  function submitOrder() {
+  // Map the live form state to a 5Axis order document for GreenstoneRX. Returns
+  // an { error } object if a required piece is missing so we can block cleanly.
+  function buildGreenstoneInput(): GsOrderInput | { error: string } {
+    if (!patient) return { error: "No patient selected." };
+    if (!selectedDoctor) return { error: "Select a signing provider." };
+    const npi = (selectedDoctor.npi || "").trim();
+    if (!/^\d{10}$/.test(npi)) return { error: `${doctorLabel(selectedDoctor)} has no valid 10-digit NPI — add it on the Doctor record before sending to GreenstoneRX.` };
+    const addr = extra?.address;
+    if (!addr?.street || !addr?.city || !addr?.state || !addr?.zip) return { error: "Patient address is incomplete — GreenstoneRX needs street, city, state, and ZIP." };
+    const parts = patient.name.trim().split(/\s+/);
+    const firstName = parts[0] || patient.name;
+    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : (parts[0] || patient.name);
+    const today = new Date().toISOString().slice(0, 10);
+    const nowMs = Date.now();
+    return {
+      internalOrderId: `DV-${patient.id}-${nowMs}`,
+      internalCustomerId: patient.id,
+      firstName,
+      lastName,
+      dob: extra?.dob,
+      gender: extra?.gender,
+      email: patient.email,
+      phoneNumber: patient.phone,
+      address: { address: addr.street, city: addr.city, state: addr.state, zipCode: addr.zip },
+      scripts: meds.map((m) => ({
+        name: `${m.drug.name} ${m.strength}`.trim(),
+        dispense_quantity: String(m.qty),
+        dispense_unit: m.unit || "unit",
+        sig: m.sig,
+        doctor: selectedDoctor.id,
+        doctor_name: doctorLabel(selectedDoctor),
+        doctor_npi: npi,
+        number_refills: m.refills,
+        date_prescribed: today,
+        timeStamp: nowMs,
+      })),
+      deliveryType: "direct",
+    };
+  }
+
+  async function submitOrder() {
     if (!patient || !selectedPharmacyId) return;
     if (screening.danger && !alertsAck) { toast("⛔ Acknowledge the contraindication alert before signing"); return; }
     const selectedPharmacy = pharmacies.find((p) => p.id === selectedPharmacyId);
     if (!selectedPharmacy) return;
+
+    // If this pharmacy transmits via the GreenstoneRX (5Axis) API, send the
+    // order for real BEFORE writing the signed records — only persist on success.
+    const isGreenstone = selectedPharmacy.connector === "greenstone";
+    let gsOrderId: string | number | undefined;
+    if (isGreenstone) {
+      if (meds.length === 0) { toast("⚠ GreenstoneRX orders need at least one medication"); return; }
+      const built = buildGreenstoneInput();
+      if ("error" in built) { toast(`⚠ ${built.error}`); return; }
+      setSending(true);
+      const res = await submitGreenstone(built);
+      setSending(false);
+      if (!res.ok) { toast(`⚠ GreenstoneRX rejected the order: ${res.error || "unknown error"}`); return; }
+      gsOrderId = res.orderId;
+    }
 
     const today = new Date();
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -408,8 +477,8 @@ export function EPrescribeWorkspace(
       pharmacyName:    selectedPharmacy.name,
       pharmacyLocation: selectedPharmacy.location,
       prescriberName:  prescriber,
-      prescriberNpi:   "1234567890",
-      prescriberDea:   "AR4827193",
+      prescriberNpi:   selectedDoctor?.npi || "",
+      prescriberDea:   selectedDoctor?.dea || "",
       patient: {
         name:    patient.name,
         id:      patient.id,
@@ -465,7 +534,7 @@ export function EPrescribeWorkspace(
       category: "rx",
       title: savedDoc.title,
       date: savedDoc.createdDate,
-      meta: `${meds.length} medication${meds.length === 1 ? "" : "s"}, ${sups.length} suppl${sups.length === 1 ? "y" : "ies"} · ${selectedPharmacy.name} · Ref ${refNum}`,
+      meta: `${meds.length} medication${meds.length === 1 ? "" : "s"}, ${sups.length} suppl${sups.length === 1 ? "y" : "ies"} · ${selectedPharmacy.name} · Ref ${refNum}${gsOrderId ? ` · GS ${gsOrderId}` : ""}`,
       icon: "℞",
       rxId: refNum,
       pharmacy: selectedPharmacy.name,
@@ -474,7 +543,9 @@ export function EPrescribeWorkspace(
     setSavedDocs((d) => [drawerDoc, ...d]);
     setFinalRefNum(refNum);
     setSubmittedDocId(savedDoc.id);
-    toast(`✓ Order ${refNum} submitted via Surescripts · saved to chart Documents`);
+    toast(isGreenstone
+      ? `✓ Order ${refNum} transmitted to GreenstoneRX · pharmacy order ${gsOrderId} · saved to chart`
+      : `✓ Order ${refNum} submitted via Surescripts · saved to chart Documents`);
   }
 
   function closeReviewAndReset() {
@@ -912,11 +983,13 @@ export function EPrescribeWorkspace(
           {/* Prescriber */}
           <Card icon="✍" iconBg="var(--color-purple-soft)" iconColor="var(--color-purple)" title="Signing Provider" sub="Provider whose DEA / NPI signs this Rx">
             <Field label="Prescriber">
-              <select className="fsel" value={prescriber} onChange={(e) => setPrescriber(e.target.value)}>
-                <option>Dr. Carlos Rivera, MD</option>
-                <option>Dr. Priya Patel, MD</option>
-                <option>Dr. James Lee, DO</option>
-                <option>Angela Wang, NP</option>
+              <select className="fsel" value={selectedDoctorId} onChange={(e) => setSelectedDoctorId(e.target.value)}>
+                {doctors.length === 0 && <option value="">No providers on file</option>}
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {doctorLabel(d)}{/^\d{10}$/.test((d.npi || "").trim()) ? "" : " — NPI missing"}
+                  </option>
+                ))}
               </select>
               <div className="text-[10.5px] text-ink-muted mt-1.5">
                 The selected provider will be the legal prescriber of record. State licensure is checked automatically against patient's state of residence.
@@ -1116,7 +1189,7 @@ export function EPrescribeWorkspace(
                   I&rsquo;ve reviewed the contraindication alert
                 </label>
               )}
-              <button className="btn btn-primary" onClick={submitOrder} disabled={screening.danger && !alertsAck}>✓ Confirm &amp; Send</button>
+              <button className="btn btn-primary" onClick={submitOrder} disabled={(screening.danger && !alertsAck) || sending}>{sending ? "Sending…" : "✓ Confirm & Send"}</button>
             </>
           )
         }
@@ -1127,6 +1200,8 @@ export function EPrescribeWorkspace(
               patient, extra, meds, sups,
               pharmacy: selectedPharmacy,
               prescriber,
+              prescriberNpi: selectedDoctor?.npi || "",
+              prescriberDea: selectedDoctor?.dea || "",
               refNum: finalRefNum || "DVRx-PENDING",
               dateWritten: previewToday(),
               signedAt: finalRefNum ? signedAtNow() : "",
@@ -1153,17 +1228,26 @@ export function EPrescribeWorkspace(
   );
 }
 
+// Display label for a prescriber, e.g. "Dr. Carlos Rivera, MD" or "Angela Wang, NP".
+function doctorLabel(d: Doctor): string {
+  const name = `${d.first} ${d.last}`.trim();
+  const usesDr = d.title === "MD" || d.title === "DO";
+  return `${usesDr ? "Dr. " : ""}${name}, ${d.title}`;
+}
+
 // ─── Preview-payload builder (used by Review modal pre-submission) ─────
 // Constructs the same rxPayload shape that submitOrder() writes to the
 // shared documents store, but from live form state — so the user sees the
 // exact prescription content before signing it.
-function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber, refNum, dateWritten, signedAt, allergies }: {
+function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber, prescriberNpi, prescriberDea, refNum, dateWritten, signedAt, allergies }: {
   patient:     Patient;
   extra:       PatientExtra | null;
   meds:        MedicationLine[];
   sups:        SupplyLine[];
   pharmacy:    Pharmacy | null;
   prescriber:  string;
+  prescriberNpi: string;
+  prescriberDea: string;
   refNum:      string;
   dateWritten: string;
   signedAt:    string;
@@ -1174,8 +1258,8 @@ function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber,
     pharmacyName:     pharmacy?.name     || "—",
     pharmacyLocation: pharmacy?.location || "",
     prescriberName:   prescriber,
-    prescriberNpi:    "1234567890",
-    prescriberDea:    "AR4827193",
+    prescriberNpi:    prescriberNpi || "—",
+    prescriberDea:    prescriberDea || "—",
     patient: {
       name:      patient.name,
       id:        patient.id,

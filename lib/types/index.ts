@@ -333,6 +333,7 @@ export interface Pharmacy {
   contactPhone?: string;
   apiEndpoint?: string;     // for the API config block
   apiKey?: string;          // masked display
+  connector?: "greenstone" | "emed" | "lifefile"; // which API driver transmits orders, if any
   status: PharmacyConnectionStatus;
   lastSync?: string;
   type: "compounding" | "retail" | "specialty" | "mail-order";

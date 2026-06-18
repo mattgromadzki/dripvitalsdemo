@@ -28,6 +28,7 @@ export const PHARMACIES: Pharmacy[] = [
     dba: "GreenstoneRX",
     npi: "",
     ncpdp: "DRIP",
+    connector: "greenstone",
     dea: "",
     fax: "",
     website: "https://5axis.health",
