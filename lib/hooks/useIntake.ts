@@ -25,6 +25,6 @@ interface State {
 export const useIntake = create<State>((set) => ({
   submissions: SEED,
   decide: (id, status, note) => set((s) => ({
-    submissions: s.submissions.map((x) => x.id === id ? { ...x, status, providerNote: note, decidedBy: "Dr. Rivera", decidedAt: new Date().toISOString() } : x),
+    submissions: s.submissions.map((x) => x.id === id ? { ...x, status, providerNote: note, decidedBy: "Dr. Tancinco", decidedAt: new Date().toISOString() } : x),
   })),
 }));

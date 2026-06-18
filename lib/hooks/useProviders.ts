@@ -4,10 +4,8 @@ import { create } from "@/lib/hooks/zustand-shim";
 export interface Provider { id: string; name: string; npi: string; states: string[]; active: boolean; }
 
 const SEED: Provider[] = [
-  { id: "PR-1", name: "Dr. Maria Rivera", npi: "1234567890", active: true, states: ["FL","GA","TX","NY","CA","CO","AZ","WA","IL","PA","NC","MI","NJ","VA","MA","OH"] },
-  { id: "PR-2", name: "Dr. James Park", npi: "2233445566", active: true, states: ["TX","OK","NM","LA","AR","CA","NV","KS","MO"] },
-  { id: "PR-3", name: "Dr. Sarah Chen", npi: "3344556677", active: true, states: ["CA","OR","WA","NV","AZ","HI","ID","UT"] },
-  { id: "PR-4", name: "Dr. Alan Brooks", npi: "4455667788", active: true, states: ["NY","NJ","CT","PA","MA","FL","RI","MD","DC"] },
+  // Default prescriber. Only states with a confirmed, active license belong here.
+  { id: "PR-1", name: "Dr. Emmanuel Noel Tancinco", npi: "1639393895", active: true, states: ["FL"] },
 ];
 
 interface State {

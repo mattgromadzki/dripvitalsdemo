@@ -38,7 +38,7 @@ export default function LabsPage() {
   const list = useMemo(() => orders.filter((o) => filter === "all" || o.status === filter), [orders, filter]);
   const sel = openId ? orders.find((o) => o.id === openId) || null : null;
 
-  function placeOrder() { const p = patients.find((x) => x.id === npPatient); if (!p) { toast("Choose a patient"); return; } order(p.name, p.id, npPanel, p.provider || "Dr. Rivera"); setAddOpen(false); setNpPatient(""); toast("Lab ordered"); }
+  function placeOrder() { const p = patients.find((x) => x.id === npPatient); if (!p) { toast("Choose a patient"); return; } order(p.name, p.id, npPanel, p.provider || "Dr. Tancinco"); setAddOpen(false); setNpPatient(""); toast("Lab ordered"); }
 
   const KPI = ({ label, value, intent }: { label: string; value: string; intent?: string }) => <div className="bg-surface border border-border rounded-2xl px-4 py-3 min-w-[140px]"><div className={`text-[22px] font-extrabold leading-none ${intent || ""}`}>{value}</div><div className="text-[11px] text-ink-muted mt-1.5">{label}</div></div>;
   const flagPill = (f: string) => f === "high" ? <Pill intent="red">High</Pill> : f === "low" ? <Pill intent="amber">Low</Pill> : <Pill intent="green">Normal</Pill>;

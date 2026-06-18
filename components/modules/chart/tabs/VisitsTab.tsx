@@ -33,7 +33,7 @@ export function VisitsTab({ patient }: { patient: Patient; extra: PatientExtra }
       dateOrdered,
       type: "GLP-1 Check-in",
       status: "draft",
-      provider: patient.provider || "Dr. Rivera",
+      provider: patient.provider || "Dr. Tancinco",
       s: "", o: pre.o, a: pre.a, p: pre.p,
     });
     router.push(`/soap?note=${created.id}`);

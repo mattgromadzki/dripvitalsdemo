@@ -29,7 +29,7 @@ export default function DashboardPage() {
     <div className="px-7 py-6">
       <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
         <div>
-          <div className="text-[22px] font-bold tracking-tight text-ink mb-1">Good morning, Dr. Rivera</div>
+          <div className="text-[22px] font-bold tracking-tight text-ink mb-1">Good morning, Dr. Tancinco</div>
           <div className="text-[13px] text-ink-muted">Monday, May 24, 2026 · {stats.pending} intake{stats.pending === 1 ? "" : "s"} awaiting review</div>
         </div>
         <div className="flex gap-2">

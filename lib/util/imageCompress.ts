@@ -1,13 +1,24 @@
-"use client";
+// Reads an image File and returns a compressed data URL suitable for storing
+// inline (e.g. as a treatment thumbnail).
+//
+// Why this is careful about size: thumbnails are stored INSIDE the treatments
+// array, which is persisted to localStorage (~5 MB quota) and POSTed to the
+// server (Vercel caps request bodies at ~4.5 MB). A single un-shrunk image can
+// blow past those limits, and both persist paths swallow the resulting error —
+// so the thumbnail silently fails to save. Two failure modes are fixed here:
+//   1. PNG/unknown types are re-encoded to JPEG. canvas.toDataURL IGNORES the
+//      quality arg for PNG, so PNG uploads were never actually compressed.
+//   2. The output is iteratively shrunk (quality, then dimension) until it fits
+//      under a small byte budget, so many thumbnails can coexist safely.
 
-/**
- * Read a user-uploaded image File and return a compressed base64 data URL.
- * - Max edge `maxDim` (default 480px) — preserves aspect ratio.
- * - JPEG quality `quality` (default 0.78) — good balance for product photos.
- *
- * This keeps thumbnails small (~25–60 KB each) so localStorage doesn't blow
- * past the typical 5–10 MB per-origin quota even with many treatments.
- */
+const TARGET_BYTES = 70 * 1024; // ~70 KB per thumbnail
+
+function dataUrlBytes(dataUrl: string): number {
+  const comma = dataUrl.indexOf(",");
+  const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  return Math.floor((b64.length * 3) / 4); // base64 → bytes
+}
+
 export async function fileToCompressedDataURL(
   file: File,
   maxDim = 480,
@@ -16,6 +27,7 @@ export async function fileToCompressedDataURL(
   if (!file.type.startsWith("image/")) {
     throw new Error("File is not an image");
   }
+
   const dataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload  = () => resolve(reader.result as string);
@@ -30,26 +42,41 @@ export async function fileToCompressedDataURL(
     el.src = dataUrl;
   });
 
-  // Compute scaled dimensions while preserving aspect ratio.
-  let { width, height } = img;
-  if (width > maxDim || height > maxDim) {
-    if (width >= height) {
-      height = Math.round((height * maxDim) / width);
-      width  = maxDim;
-    } else {
-      width  = Math.round((width * maxDim) / height);
-      height = maxDim;
+  // WebP supports lossy quality in toDataURL; everything else (incl. PNG) → JPEG
+  // so the quality arg actually takes effect and transparency-free photos stay small.
+  const mime = file.type === "image/webp" ? "image/webp" : "image/jpeg";
+
+  function render(dim: number, q: number): string {
+    let { width, height } = img;
+    if (width > dim || height > dim) {
+      if (width >= height) { height = Math.round((height * dim) / width); width = dim; }
+      else { width = Math.round((width * dim) / height); height = dim; }
     }
+    const canvas = document.createElement("canvas");
+    canvas.width  = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not get canvas context");
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL(mime, q);
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width  = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not get canvas context");
-  ctx.drawImage(img, 0, 0, width, height);
-
-  // PNG keeps transparency but is much larger. JPEG is fine for product photos.
-  const mime = file.type === "image/png" || file.type === "image/webp" ? file.type : "image/jpeg";
-  return canvas.toDataURL(mime, quality);
+  // Shrink quality first, then dimension, until under the byte budget.
+  let dim = maxDim;
+  let q = quality;
+  let out = render(dim, q);
+  let guard = 0;
+  while (dataUrlBytes(out) > TARGET_BYTES && guard < 8) {
+    if (q > 0.4) {
+      q = Math.round((q - 0.12) * 100) / 100;
+    } else if (dim > 200) {
+      dim = Math.round(dim * 0.8);
+      q = quality; // reset quality at the smaller dimension
+    } else {
+      break; // can't shrink further; accept what we have
+    }
+    out = render(dim, q);
+    guard++;
+  }
+  return out;
 }

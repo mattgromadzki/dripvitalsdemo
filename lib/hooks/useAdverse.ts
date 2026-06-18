@@ -28,6 +28,6 @@ export const useAdverse = create<State>((set) => ({
     reports: [{ ...r, id: "AE-" + s.seq, status: "open", escalated: !!escalationReason(r.symptom, r.severity), reportedAt: new Date().toISOString() }, ...s.reports],
     seq: s.seq + 1,
   })),
-  setStatus: (id, status, note) => set((s) => ({ reports: s.reports.map((x) => x.id === id ? { ...x, status, providerNote: note ?? x.providerNote, decidedBy: "Dr. Rivera", decidedAt: new Date().toISOString() } : x) })),
+  setStatus: (id, status, note) => set((s) => ({ reports: s.reports.map((x) => x.id === id ? { ...x, status, providerNote: note ?? x.providerNote, decidedBy: "Dr. Tancinco", decidedAt: new Date().toISOString() } : x) })),
   toggleEscalate: (id) => set((s) => ({ reports: s.reports.map((x) => x.id === id ? { ...x, escalated: !x.escalated } : x) })),
 }));

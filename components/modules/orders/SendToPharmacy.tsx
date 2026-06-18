@@ -32,7 +32,7 @@ export function SendToPharmacyModal({ open, onClose, order, patient, onSent }: {
   const [refills, setRefills] = useState("0");
   const [controlled, setControlled] = useState(false);
   const [ndc, setNdc] = useState("");
-  const [npi, setNpi] = useState("1234567890");
+  const [npi, setNpi] = useState("1639393895");
   const [dea, setDea] = useState("");
   const [signed, setSigned] = useState(false);
   const [prodIdx, setProdIdx] = useState(3); // Acetaminophen (simple, non-controlled)
@@ -44,7 +44,7 @@ export function SendToPharmacyModal({ open, onClose, order, patient, onSent }: {
 
   const addr = `${patient.address || ""}${patient.apt ? ", " + patient.apt : ""}`.trim();
   const hasAddress = !!(patient.address && patient.city && patient.zip);
-  const provider = (patient.provider || "Dr. Rivera").replace(/^Dr\.?\s*/i, "");
+  const provider = (patient.provider || "Dr. Tancinco").replace(/^Dr\.?\s*/i, "");
   const provFirst = provider.split(" ")[0] || "Provider";
   const provLast = provider.split(" ").slice(1).join(" ") || "Clinic";
   const today = new Date().toISOString().slice(0, 10);
@@ -71,7 +71,7 @@ export function SendToPharmacyModal({ open, onClose, order, patient, onSent }: {
         Prescriber: {
           FirstName: provFirst, LastName: provLast, Phone: "555-555-5555", Address: "1 Clinic Way",
           City: patient.city || "Miami", State: patient.state, Zip: patient.zip || "33101",
-          NPI: npi.trim() || "1234567890", ...(controlled ? { DEA: dea.trim() } : {}), SignatureJpg: PLACEHOLDER_JPG,
+          NPI: npi.trim() || "1639393895", ...(controlled ? { DEA: dea.trim() } : {}), SignatureJpg: PLACEHOLDER_JPG,
         },
         Drug: [{
           Name: order.medication, DosageForm: "Solution", Sig: sig.trim() || "Use as directed",
@@ -101,7 +101,7 @@ export function SendToPharmacyModal({ open, onClose, order, patient, onSent }: {
         order: {
           general: { referenceId: `${order.id} · Rx ${rxId}`, memo: `DripVitals Rx #${rxId}` },
           ...(lfControlled ? { document: { pdfBase64: PLACEHOLDER_JPG } } : {}),
-          prescriber: { npi: npi.trim() || "1234567890", lastName: provLast, firstName: provFirst, state: patient.state, ...(dea.trim() ? { dea: dea.trim() } : {}) },
+          prescriber: { npi: npi.trim() || "1639393895", lastName: provLast, firstName: provFirst, state: patient.state, ...(dea.trim() ? { dea: dea.trim() } : {}) },
           patient: { lastName: "TEST", firstName: "TEST", gender: genderLF(patient.gender), dateOfBirth: patient.dob || "1980-01-01", address1: addr, city: patient.city || "", state: patient.state, zip: patient.zip || "", phoneMobile: patient.phone, email: patient.email },
           shipping: { recipientType: "patient", recipientFirstName: "TEST", recipientLastName: "TEST", recipientPhone: patient.phone, addressLine1: addr, city: patient.city || "", state: patient.state, zipCode: patient.zip || "", country: "US", service },
           billing: { payorType: "pat" },

@@ -30,7 +30,7 @@ export function LabsTab({ patient }: { patient: Patient; extra: PatientExtra }) 
   const [panelId, setPanelId] = useState(PANELS[0].id);
 
   function placeOrder() {
-    order(patient.name, patient.id, panelId, patient.provider || "Dr. Rivera");
+    order(patient.name, patient.id, panelId, patient.provider || "Dr. Tancinco");
     setOrdering(false);
     toast("🧪 Lab ordered");
   }
