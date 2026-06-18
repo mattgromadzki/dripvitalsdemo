@@ -17,6 +17,7 @@ export interface GsScript {
   number_refills?: number;
   date_prescribed: string; // YYYY-MM-DD
   daw?: string;
+  timeStamp?: number; // script timestamp, ms
 }
 export interface GsAddress { address: string; line2?: string; city: string; state: string; zipCode: string }
 

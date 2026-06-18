@@ -18,14 +18,17 @@ interface Status {
 }
 
 function sampleOrder(): GsOrderInput {
+  const now = Date.now();
   return {
-    internalOrderId: `TEST-${Date.now()}`,
+    internalOrderId: `TEST-${now}`,
+    internalCustomerId: `DRIP-PAT-TEST-${now}`,
     firstName: "Connection",
     lastName: "Test",
     dob: "1990-01-01",
+    gender: "Female",
     email: "test@dripvitals.com",
     phoneNumber: "3055550100",
-    address: { address: "100 Test St", city: "Miami", state: "FL", zipCode: "33128" },
+    address: { address: "100 Test St", line2: "Suite 100", city: "Miami", state: "FL", zipCode: "33128" },
     scripts: [{
       name: "Semaglutide 0.25 mg (CONNECTION TEST — do not fill)",
       dispense_quantity: "1",
@@ -36,6 +39,8 @@ function sampleOrder(): GsOrderInput {
       doctor_npi: "1234567890",
       number_refills: 0,
       date_prescribed: new Date().toISOString().slice(0, 10),
+      daw: "0",
+      timeStamp: now,
     }],
     deliveryType: "clinic",
   };

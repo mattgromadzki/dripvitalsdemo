@@ -62,6 +62,7 @@ function buildDocument(input: GsOrderInput) {
       number_refills: s.number_refills ?? 0,
       date_prescribed: s.date_prescribed,
       daw: s.daw,
+      timeStamp: s.timeStamp,
     })),
     delivery_type: input.deliveryType || "direct",
     order_recieved_at: new Date().toISOString().slice(0, 19).replace("T", " "), // "YYYY-MM-DD HH:MM:SS" (note: spec spells it "recieved")
