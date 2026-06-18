@@ -160,12 +160,12 @@ export function PatientFormModal({ open, onClose, patient, onSave }: PatientForm
       transferDose: isWeightLoss && form.priorGLP1 === "yes" ? form.transferDose.trim() : undefined,
       // Program
       plan: PLAN_FOR[form.program] || form.program,
-      dose, week: 0, provider: patient?.provider || "Dr. Rivera", doctorId: patient?.doctorId || 1, pharmacyId: patient?.pharmacyId || 1,
+      dose, week: 0, provider: patient?.provider || "Unassigned", doctorId: patient?.doctorId || 0, pharmacyId: patient?.pharmacyId || 1,
       // Vitals
       wt: lb, wtStart: lb, bmi,
       bp: patient?.bp || "—", hr: patient?.hr || 0, a1c: patient?.a1c,
       // Dates
-      since: patient?.since || NOW.toISOString().slice(0, 10),
+      since: patient?.since || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       startDate: patient?.startDate || "—",
       lastVisit: patient?.lastVisit || "—", lastOrder: patient?.lastOrder || "—",
       nextRefill: patient?.nextRefill || "—", _refillDays: patient?._refillDays ?? 999,

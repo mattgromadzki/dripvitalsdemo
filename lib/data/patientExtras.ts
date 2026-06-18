@@ -225,8 +225,8 @@ export function getPatientExtra(p: Patient): PatientExtra {
   return {
     dob: p.dob || deriveDOB(p.age),
     gender: p.gender === "F" ? "Female" : p.gender === "M" ? "Male" : "Non-binary",
-    careCoordinator: ["Jordan Blake", "Taylor Nguyen", "Sam Rivera", "Casey Morgan", "Riley Chen"][seed % 5],
-    lastLogin: ["Today, 9:14 AM", "Yesterday, 7:02 PM", "May 29, 2026", "May 27, 2026", "May 24, 2026"][seed % 5],
+    careCoordinator: p.week === 0 ? "Unassigned" : ["Jordan Blake", "Taylor Nguyen", "Sam Rivera", "Casey Morgan", "Riley Chen"][seed % 5],
+    lastLogin: p.week === 0 ? "Never" : ["Today, 9:14 AM", "Yesterday, 7:02 PM", "May 29, 2026", "May 27, 2026", "May 24, 2026"][seed % 5],
     govId: `***-**-${String(seed * 7).padStart(4, "0").slice(0, 4)}`,
     idVerified: p.status === "active" || p.status === "inactive",
     goalWt,
