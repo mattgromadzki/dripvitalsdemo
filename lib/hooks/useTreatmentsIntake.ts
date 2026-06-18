@@ -273,10 +273,12 @@ export function useHydrateTreatmentsStore() {
   return hydrated;
 }
 
-// Reset the store to seed defaults and clear localStorage. Useful for a
-// "Reset to defaults" admin button when an admin wants to wipe their test
-// changes and start from the seeded forms again.
-export function resetTreatmentsStoreToDefaults() {
+// Reset the store to seed defaults, clear localStorage, AND overwrite the
+// server-persisted copies. serverPersist pulls "intake-forms" / "treatments"
+// from the server on every load and applies them over the seed, so resetting
+// locally is not enough — we must replace the saved server copy too, and wait
+// for that write to finish before the caller reloads the page.
+export async function resetTreatmentsStoreToDefaults() {
   if (typeof window !== "undefined") {
     try { window.localStorage.removeItem(LS_KEY); } catch { /* ignore */ }
   }
@@ -289,5 +291,15 @@ export function resetTreatmentsStoreToDefaults() {
     forms:      SEED_FORMS,
     clients:    SEED_CLIENTS,
   });
+  if (typeof window !== "undefined") {
+    const put = (domain: string, data: unknown) =>
+      fetch(`/api/store/${domain}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+    try {
+      await Promise.all([
+        put("intake-forms", SEED_FORMS),
+        put("treatments", SEED_TREATMENTS),
+      ]);
+    } catch { /* ignore — local reset still applied */ }
+  }
 }
 

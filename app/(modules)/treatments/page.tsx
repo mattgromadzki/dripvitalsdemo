@@ -176,9 +176,9 @@ export default function TreatmentsIntakePage() {
                 v6 · BMI calc
               </span>
               <button
-                onClick={() => {
-                  if (!confirm("Reset all treatments, forms, and clients to factory defaults? This will wipe any changes you've made and reload the page.")) return;
-                  resetTreatmentsStoreToDefaults();
+                onClick={async () => {
+                  if (!confirm("Reset all treatments, forms, and clients to the latest defaults? This replaces the saved copy (on all devices) and reloads the page.")) return;
+                  await resetTreatmentsStoreToDefaults();
                   window.location.reload();
                 }}
                 title="Wipe localStorage and reload with seed data"
