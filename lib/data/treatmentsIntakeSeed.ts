@@ -54,6 +54,10 @@ export const SEED_TREATMENTS: BaskTreatment[] = [
   { id:7, name:"3-Month NAD+ Injections", med:"NAD+", strength:"100mg/mL", duration:"3", billing:"quarterly", price:"$649", compare:"$747", desc:"Quarterly NAD+ program with loading dose protocol. Ideal for sustained cellular health benefits.", icon:"⚡", color:"amber", active:true, compounded:true, featured:false, subscribers:29, includes:["NAD+ 100mg/mL (24 vials)","Loading dose protocol weeks 1–2","Quarterly physician check-in","Metabolic panel included","Priority cold-chain shipping"], pharmacy:"Partner Network FL", freq:"Twice weekly" },
   { id:8, name:"12-Month Semaglutide Program", med:"Semaglutide", strength:"0.25–2.0mg", duration:"12", billing:"monthly", price:"$149", compare:"$189", desc:"Annual commitment program with the best per-month pricing. Full escalation protocol to maximum dose.", icon:"💪", color:"teal", active:true, compounded:true, featured:false, subscribers:44, includes:["Full-year semaglutide supply","Monthly physician visits","Quarterly labs included","Unlimited messaging","Body composition tracking"], pharmacy:"Partner Network FL", freq:"Once weekly" },
   { id:9, name:"3-Month Metformin + Lifestyle", med:"Metformin", strength:"500–1000mg", duration:"3", billing:"quarterly", price:"$129", compare:"$180", desc:"Metformin starter program combined with structured lifestyle coaching for blood sugar management.", icon:"🌿", color:"brand", active:false, compounded:false, featured:false, subscribers:12, includes:["Metformin 500mg BID (90-day supply)","Lifestyle coaching curriculum","Glucose tracking integration","Monthly check-in visit"], pharmacy:"CVS", freq:"Twice daily" },
+  { id:10, name:"1-Month Sermorelin Therapy", med:"Sermorelin", strength:"0.5mg/night", duration:"1", billing:"monthly", price:"$199", compare:"", desc:"Nightly sermorelin (GHRH) therapy to support sleep quality, recovery, energy, and healthy aging by stimulating your body's own growth hormone.", icon:"🌙", color:"purple", active:true, compounded:true, featured:false, subscribers:21, includes:["Sermorelin 0.5mg/night (30-day supply)","Injection training guide","Physician consultation","Cold-chain shipping included"], pharmacy:"Partner Network FL", freq:"Nightly, 5 nights/week" },
+  { id:11, name:"3-Month Sermorelin Therapy", med:"Sermorelin", strength:"0.5mg/night", duration:"3", billing:"quarterly", price:"$499", compare:"$597", desc:"Quarterly sermorelin program — our most popular option for sustained sleep, recovery, and vitality benefits.", icon:"🌙", color:"purple", active:true, compounded:true, featured:true, subscribers:34, includes:["Sermorelin 0.5mg/night (90-day supply)","Quarterly physician check-in","Optional IGF-1 baseline lab","Priority cold-chain shipping"], pharmacy:"Partner Network FL", freq:"Nightly, 5 nights/week" },
+  { id:12, name:"1-Month Glutathione Injections", med:"Glutathione", strength:"200mg/mL", duration:"1", billing:"monthly", price:"$179", compare:"", desc:"Master-antioxidant glutathione injections to support skin brightness, detoxification, and cellular health.", icon:"✨", color:"teal", active:true, compounded:true, featured:false, subscribers:26, includes:["Glutathione 200mg/mL (8 vials)","Injection training guide","Physician consultation","Cold-chain shipping included"], pharmacy:"Partner Network FL", freq:"Twice weekly" },
+  { id:13, name:"3-Month Glutathione Injections", med:"Glutathione", strength:"200mg/mL", duration:"3", billing:"quarterly", price:"$449", compare:"$537", desc:"Quarterly glutathione program for sustained antioxidant and skin-health benefits.", icon:"✨", color:"teal", active:true, compounded:true, featured:false, subscribers:19, includes:["Glutathione 200mg/mL (24 vials)","Quarterly physician check-in","Priority cold-chain shipping","Skin-health progress check-ins"], pharmacy:"Partner Network FL", freq:"Twice weekly" },
 ];
 
 export const SEED_FORMS: BaskIntakeForm[] = [
@@ -115,19 +119,57 @@ export const SEED_FORMS: BaskIntakeForm[] = [
   },
   {
     id: 2, name: "NAD+ Wellness Intake", slug: "nad-wellness",
-    desc: "Intake screening for clients interested in NAD+ injection therapy.",
+    desc: "Screening for clients interested in NAD+ injection therapy for energy, cognition, and healthy aging.",
     active: true, treatmentIds: [6,7], submissions: 48, qualified: 42,
+    hardRules: [
+      { id:"nad-h1", icon:"🤰", title:"Pregnant or Breastfeeding", desc:"Safety of NAD+ injections in pregnancy and lactation has not been established.", active:true },
+      { id:"nad-h2", icon:"👶", title:"Under 18 Years of Age", desc:"Therapy is offered to adults only.", active:true },
+      { id:"nad-h3", icon:"⚠️", title:"Known Allergy to NAD+ / Prior Reaction", desc:"Hypersensitivity to NAD+ or excipients is a contraindication.", active:true },
+    ],
+    reviewRules: [
+      { id:"nad-r1", icon:"🫘", title:"Kidney or Liver Disease", desc:"NAD+ is metabolized hepatically and renally — provider review advised.", active:true },
+      { id:"nad-r2", icon:"🎗️", title:"Active Cancer Treatment", desc:"Coordinate with the patient's oncology team before starting.", active:true },
+    ],
+    settings: { applies:"NAD+ Injection Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
+    notifications: DEFAULT_NOTIFICATIONS,
     questions: [
-      // Engagement first
-      { id:203, type:"multiple", text:"What are your primary wellness goals?", helper:"", impact:"none", required:true, options:["Energy & focus","Anti-aging","Athletic recovery","Cognitive performance","General wellness"] },
-      { id:206, type:"yesno",    text:"Are you comfortable with self-injection?", helper:"NAD+ is delivered via subcutaneous injection", impact:"none", required:true },
-      // Screening
+      { id:230, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
+      { id:203, type:"multiple", text:"What are your primary wellness goals?", helper:"This helps your provider tailor your protocol", impact:"none", required:true, options:["Energy & focus","Anti-aging","Athletic recovery","Cognitive performance","General wellness"] },
+      { id:231, type:"yesno",    text:"Have you received NAD+ therapy (injection or IV) before?", helper:"", impact:"none", required:true },
+      { id:206, type:"yesno",    text:"Are you comfortable giving yourself a subcutaneous injection?", helper:"We provide step-by-step training and support", impact:"none", required:true },
+
       { id:204, type:"section",  text:"Health Screening", helper:"", sectionIcon:"🏥", impact:"none", required:false },
-      { id:205, type:"yesno",    text:"Do you have any kidney or liver disease?", helper:"NAD+ is metabolized by these organs", impact:"review", required:true },
-      // Identity at the end
-      { id:200, type:"section",  text:"About you", helper:"", sectionIcon:"👤", impact:"none", required:false },
+      { id:205, type:"yesno",    text:"Do you have any kidney or liver disease?", helper:"NAD+ is processed by these organs", impact:"review", required:true },
+      { id:232, type:"yesno",    text:"Are you currently undergoing cancer treatment (e.g., chemotherapy)?", helper:"We'll coordinate with your care team", impact:"review", required:true },
+      { id:233, type:"yesno",    text:"Are you currently pregnant, planning to become pregnant, or breastfeeding?", helper:"NAD+ injections are not recommended during pregnancy or nursing", impact:"disqualifier", required:true },
+      { id:234, type:"checkbox", text:"Do any of these apply to you?", helper:"Select all that apply.", impact:"review", required:true, options:[
+        { label:"None of these apply", flag:"ok" },
+        { label:"High blood pressure", flag:"ok" },
+        { label:"Heart disease or irregular heartbeat", flag:"review" },
+        { label:"Chronic kidney disease", flag:"review" },
+        { label:"Liver disease", flag:"review" },
+        { label:"Autoimmune condition", flag:"review" },
+        { label:"Currently feel unwell or have an active infection", flag:"review" },
+      ] },
+
+      { id:235, type:"section",  text:"Allergies & Medications", helper:"", sectionIcon:"💊", impact:"none", required:false },
+      { id:236, type:"yesno",    text:"Are you allergic to NAD+ or have you reacted to a previous NAD+ injection?", helper:"", impact:"disqualifier", required:true },
+      { id:237, type:"long_text",text:"Please list all medications and supplements you currently take.", helper:"Include doses if known. Write \"None\" if not applicable.", impact:"none", required:true },
+      { id:238, type:"long_text",text:"Please list any allergies (medications, foods, or other).", helper:"Write \"None\" if not applicable.", impact:"none", required:true },
+
+      { id:200, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:201, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
-      { id:202, type:"date",     text:"What is your date of birth?", helper:"Must be 18 or older", impact:"disqualifier", required:true },
+      { id:202, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
+      { id:239, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
+      { id:240, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+
+      { id:241, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
+      { id:242, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
+        { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
+        { label:"I understand NAD+ injections may cause side effects (e.g., flushing, nausea, injection-site reactions)", flag:"ok" },
+        { label:"I understand this is a wellness therapy and not a substitute for care from my primary physician", flag:"ok" },
+        { label:"I authorize a DripVitals provider to review my intake and determine eligibility", flag:"ok" },
+      ] },
     ],
   },
   {
@@ -138,6 +180,120 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:302, type:"yesno",    text:"Have you been diagnosed with pre-diabetes or insulin resistance?", helper:"", impact:"none", required:true },
       { id:300, type:"section",  text:"About you", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:301, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
+    ],
+  },
+  {
+    id: 4, name: "Sermorelin Therapy Intake", slug: "sermorelin-therapy",
+    desc: "Screening for clients interested in sermorelin (growth hormone–releasing hormone) therapy for sleep, recovery, and healthy aging.",
+    active: true, treatmentIds: [10,11], submissions: 0, qualified: 0,
+    hardRules: [
+      { id:"ser-h1", icon:"🎗️", title:"Active Cancer or Malignancy", desc:"Growth hormone secretagogues are contraindicated with active malignancy.", active:true },
+      { id:"ser-h2", icon:"🧠", title:"Active Pituitary Tumor / Disorder", desc:"Sermorelin acts on the pituitary; active pituitary pathology requires specialist clearance.", active:true },
+      { id:"ser-h3", icon:"🤰", title:"Pregnant or Breastfeeding", desc:"Not established as safe in pregnancy or lactation.", active:true },
+      { id:"ser-h4", icon:"👶", title:"Under 18 Years of Age", desc:"Adult anti-aging use only.", active:true },
+      { id:"ser-h5", icon:"⚠️", title:"Known Allergy to Sermorelin", desc:"Hypersensitivity to sermorelin or its components is a contraindication.", active:true },
+    ],
+    reviewRules: [
+      { id:"ser-r1", icon:"🩸", title:"Diabetes / Insulin Resistance", desc:"Growth hormone affects insulin sensitivity — review and monitoring advised.", active:true },
+      { id:"ser-r2", icon:"🦋", title:"Untreated Thyroid Disorder", desc:"Thyroid status affects the GH response — confirm treated and stable.", active:true },
+      { id:"ser-r3", icon:"💊", title:"Chronic Corticosteroid Use", desc:"Glucocorticoids can blunt the response to sermorelin.", active:true },
+    ],
+    settings: { applies:"Sermorelin Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
+    notifications: DEFAULT_NOTIFICATIONS,
+    questions: [
+      { id:400, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
+      { id:401, type:"multiple", text:"What are you hoping to improve with sermorelin?", helper:"", impact:"none", required:true, options:["Sleep quality","Energy & vitality","Muscle recovery & lean mass","Body composition","Anti-aging / general wellness"] },
+      { id:402, type:"yesno",    text:"Have you used sermorelin or any growth hormone therapy before?", helper:"", impact:"review", required:true },
+      { id:403, type:"yesno",    text:"Are you comfortable with a nightly subcutaneous self-injection?", helper:"Sermorelin is typically taken at bedtime; we provide training", impact:"none", required:true },
+
+      { id:404, type:"section",  text:"Health Screening", helper:"", sectionIcon:"🏥", impact:"none", required:false },
+      { id:405, type:"yesno",    text:"Do you currently have, or have you ever been diagnosed with, active cancer or a malignancy?", helper:"Growth hormone therapies are not used with active cancer", impact:"disqualifier", required:true },
+      { id:406, type:"yesno",    text:"Have you been diagnosed with a pituitary gland tumor or disorder?", helper:"", impact:"disqualifier", required:true },
+      { id:407, type:"yesno",    text:"Are you currently pregnant, planning to become pregnant, or breastfeeding?", helper:"Sermorelin is not recommended during pregnancy or nursing", impact:"disqualifier", required:true },
+      { id:408, type:"yesno",    text:"Do you have untreated or unstable thyroid disease?", helper:"Thyroid status can affect how sermorelin works", impact:"review", required:true },
+      { id:409, type:"checkbox", text:"Do any of these apply to you?", helper:"Select all that apply.", impact:"review", required:true, options:[
+        { label:"None of these apply", flag:"ok" },
+        { label:"High blood pressure (controlled)", flag:"ok" },
+        { label:"Type 2 diabetes or insulin resistance", flag:"review" },
+        { label:"Thyroid disorder (hypo- or hyperthyroidism)", flag:"review" },
+        { label:"Heart disease", flag:"review" },
+        { label:"Chronic kidney disease", flag:"review" },
+        { label:"Liver disease", flag:"review" },
+        { label:"Currently taking corticosteroids / steroids", flag:"review" },
+        { label:"Personal history of cancer (in remission)", flag:"review" },
+      ] },
+
+      { id:410, type:"section",  text:"Allergies & Medications", helper:"", sectionIcon:"💊", impact:"none", required:false },
+      { id:411, type:"yesno",    text:"Are you allergic to sermorelin or any of its components?", helper:"", impact:"disqualifier", required:true },
+      { id:412, type:"long_text",text:"Please list all medications and supplements you currently take.", helper:"Include doses if known. Write \"None\" if not applicable.", impact:"none", required:true },
+      { id:413, type:"long_text",text:"Please list any allergies (medications, foods, or other).", helper:"Write \"None\" if not applicable.", impact:"none", required:true },
+
+      { id:420, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
+      { id:421, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
+      { id:422, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
+      { id:423, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
+      { id:424, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+
+      { id:430, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
+      { id:431, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
+        { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
+        { label:"I understand sermorelin may cause side effects (e.g., injection-site reactions, flushing, headache)", flag:"ok" },
+        { label:"I understand this therapy is prescribed at provider discretion and may require lab work", flag:"ok" },
+        { label:"I authorize a DripVitals provider to review my intake and determine eligibility", flag:"ok" },
+      ] },
+    ],
+  },
+  {
+    id: 5, name: "Glutathione Injection Intake", slug: "glutathione-injection",
+    desc: "Screening for clients interested in glutathione injections for skin brightness, antioxidant, and detox support.",
+    active: true, treatmentIds: [12,13], submissions: 0, qualified: 0,
+    hardRules: [
+      { id:"glu-h1", icon:"🤰", title:"Pregnant or Breastfeeding", desc:"Safety in pregnancy and lactation has not been established.", active:true },
+      { id:"glu-h2", icon:"👶", title:"Under 18 Years of Age", desc:"Therapy is offered to adults only.", active:true },
+      { id:"glu-h3", icon:"⚠️", title:"Known Allergy to Glutathione / Prior Reaction", desc:"Hypersensitivity to glutathione or excipients is a contraindication.", active:true },
+    ],
+    reviewRules: [
+      { id:"glu-r1", icon:"🫁", title:"Asthma / Bronchospasm History", desc:"Injectable antioxidants (and sulfite-containing formulations) may trigger bronchospasm in sensitive patients.", active:true },
+      { id:"glu-r2", icon:"🧪", title:"Sulfa / Sulfite Allergy", desc:"Possible cross-sensitivity — provider review advised.", active:true },
+    ],
+    settings: { applies:"Glutathione Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
+    notifications: DEFAULT_NOTIFICATIONS,
+    questions: [
+      { id:500, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
+      { id:501, type:"multiple", text:"What are your main goals with glutathione?", helper:"", impact:"none", required:true, options:["Skin brightening & complexion","Antioxidant & detox support","Immune support","Anti-aging","General wellness"] },
+      { id:502, type:"yesno",    text:"Are you comfortable giving yourself a subcutaneous injection?", helper:"We provide step-by-step training and support", impact:"none", required:true },
+
+      { id:504, type:"section",  text:"Health Screening", helper:"", sectionIcon:"🏥", impact:"none", required:false },
+      { id:505, type:"yesno",    text:"Do you have asthma or a history of wheezing or bronchospasm?", helper:"Some patients can be sensitive to injectable antioxidants", impact:"review", required:true },
+      { id:506, type:"yesno",    text:"Do you have a known allergy to sulfa drugs or sulfites?", helper:"", impact:"review", required:true },
+      { id:507, type:"yesno",    text:"Are you currently pregnant, planning to become pregnant, or breastfeeding?", helper:"Glutathione injections are not recommended during pregnancy or nursing", impact:"disqualifier", required:true },
+      { id:508, type:"checkbox", text:"Do any of these apply to you?", helper:"Select all that apply.", impact:"review", required:true, options:[
+        { label:"None of these apply", flag:"ok" },
+        { label:"Asthma or chronic respiratory condition", flag:"review" },
+        { label:"Chronic kidney disease", flag:"review" },
+        { label:"Liver disease", flag:"review" },
+        { label:"Currently undergoing cancer treatment (e.g., chemotherapy)", flag:"review" },
+        { label:"Autoimmune condition", flag:"review" },
+      ] },
+
+      { id:510, type:"section",  text:"Allergies & Medications", helper:"", sectionIcon:"💊", impact:"none", required:false },
+      { id:511, type:"yesno",    text:"Are you allergic to glutathione or have you reacted to a previous glutathione injection?", helper:"", impact:"disqualifier", required:true },
+      { id:512, type:"long_text",text:"Please list all medications and supplements you currently take.", helper:"Include doses if known. Write \"None\" if not applicable.", impact:"none", required:true },
+      { id:513, type:"long_text",text:"Please list any allergies (medications, foods, or other).", helper:"Write \"None\" if not applicable.", impact:"none", required:true },
+
+      { id:520, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
+      { id:521, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
+      { id:522, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
+      { id:523, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
+      { id:524, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+
+      { id:530, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
+      { id:531, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
+        { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
+        { label:"I understand glutathione injections may cause side effects (e.g., injection-site reactions, rarely bronchospasm)", flag:"ok" },
+        { label:"I understand skin-lightening effects are not guaranteed and this is provided as a wellness therapy", flag:"ok" },
+        { label:"I authorize a DripVitals provider to review my intake and determine eligibility", flag:"ok" },
+      ] },
     ],
   },
 ];
