@@ -1,5 +1,6 @@
 import { rateLimit } from "@/lib/security/ratelimit";
 import { findPatientByEmail, verifyPatientPassword, patientAuthPersistent } from "@/lib/auth/patientAccounts";
+import { getPatientById } from "@/lib/crm/patients";
 import { signPatientToken, PATIENT_COOKIE } from "@/lib/auth/patientSession";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30;
   const token = signPatientToken({ pid, email, name, exp });
   const maxAge = Math.floor((exp - Date.now()) / 1000);
-  const res = json({ ok: true, patient: { id: pid, name, email } });
+  let full = null; try { full = await getPatientById(pid); } catch { /* ignore */ }
+  const res = json({ ok: true, patient: full || { id: pid, name, email } });
   res.headers.append("Set-Cookie", `${PATIENT_COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`);
   return res;
 }

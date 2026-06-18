@@ -43,6 +43,11 @@ export async function listPatients(): Promise<Patient[]> {
   return Array.from(mem.values());
 }
 
+export async function getPatientById(id: string): Promise<Patient | null> {
+  if (!id) return null;
+  try { const all = await listPatients(); return all.find((p) => p.id === id) || null; } catch { return null; }
+}
+
 export function isPersistent(): boolean {
   return hasDb() || !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
 }

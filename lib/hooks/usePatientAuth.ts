@@ -15,6 +15,7 @@ function findByEmail(patients: Patient[], email: string): Patient | null {
 
 interface PatientAuthState {
   patientId: string | null;
+  patient: Patient | null;
   hydrated: boolean;
   hydrate: () => Promise<void>;
   login: (email: string, password: string, patients: Patient[]) => Promise<{ ok: boolean; error?: string }>;
@@ -30,6 +31,7 @@ let hydrating = false;
 
 export const usePatientAuth = create<PatientAuthState>((set) => ({
   patientId: null,
+  patient: null,
   hydrated: false,
 
   hydrate: async () => {
@@ -37,9 +39,9 @@ export const usePatientAuth = create<PatientAuthState>((set) => ({
     hydrating = true;
     try {
       const r = await fetch("/api/patient/me", { cache: "no-store" });
-      if (r.ok) { const d = await r.json(); if (d?.patient?.id) { set({ patientId: d.patient.id, hydrated: true }); return; } }
+      if (r.ok) { const d = await r.json(); if (d?.patient?.id) { set({ patientId: d.patient.id, patient: d.patient, hydrated: true }); return; } }
     } catch { /* ignore */ }
-    set({ patientId: null, hydrated: true });
+    set({ patientId: null, patient: null, hydrated: true });
   },
 
   login: async (email, password, patients) => {
@@ -50,13 +52,13 @@ export const usePatientAuth = create<PatientAuthState>((set) => ({
         body: JSON.stringify({ email, password, pidHint: p?.id, nameHint: p ? `${p.first} ${p.last}` : undefined }),
       });
       const d = await r.json();
-      if (d?.ok && d.patient?.id) { set({ patientId: d.patient.id, hydrated: true }); return { ok: true }; }
+      if (d?.ok && d.patient?.id) { set({ patientId: d.patient.id, patient: d.patient, hydrated: true }); return { ok: true }; }
       return { ok: false, error: d?.error || "Sign in failed." };
     } catch { return { ok: false, error: "Network error — please try again." }; }
   },
 
   logout: async () => {
-    set({ patientId: null });
+    set({ patientId: null, patient: null });
     try { await fetch("/api/patient/logout", { method: "POST" }); } catch { /* ignore */ }
   },
 
@@ -73,7 +75,7 @@ export const usePatientAuth = create<PatientAuthState>((set) => ({
     try {
       const r = await fetch("/api/patient/reset/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password }) });
       const d = await r.json();
-      if (d?.ok && d.patient?.id) { set({ patientId: d.patient.id, hydrated: true }); return { ok: true }; }
+      if (d?.ok && d.patient?.id) { set({ patientId: d.patient.id, patient: d.patient, hydrated: true }); return { ok: true }; }
       return { ok: false, error: d?.error || "Could not reset password." };
     } catch { return { ok: false, error: "Network error — please try again." }; }
   },

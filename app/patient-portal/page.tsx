@@ -83,6 +83,7 @@ export default function PatientPortalPage() {
   // exactly what they entered here.
   const patients = usePatients((s) => s.patients);
   const sessionPid = usePatientAuth((s) => s.patientId);
+  const authPatient = usePatientAuth((s) => s.patient);
   const authHydrated = usePatientAuth((s) => s.hydrated);
   const hydrateAuth = usePatientAuth((s) => s.hydrate);
   const patientLogin = usePatientAuth((s) => s.login);
@@ -91,7 +92,7 @@ export default function PatientPortalPage() {
   const requestResetEmail = usePatientAuth((s) => s.requestResetEmail);
   const confirmReset = usePatientAuth((s) => s.confirmReset);
   const resetPassword = usePatientAuth((s) => s.resetPassword);
-  const me = patients.find((p) => p.id === sessionPid) ?? null;
+  const me = patients.find((p) => p.id === sessionPid) ?? authPatient ?? null;
   const pid = me?.id ?? "";
   const extra = useMemo(() => (me ? getPatientExtra(me) : null), [me]);
   const seed = useMemo(() => (me && extra ? seedRecordFromPatient(me, extra) : emptyRecord()), [me, extra]);

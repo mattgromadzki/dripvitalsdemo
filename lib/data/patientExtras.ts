@@ -26,7 +26,7 @@ export function getPatientExtra(p: Patient): PatientExtra {
   const zip = p.zip || String(10000 + (seed * 131) % 89999).slice(0, 5);
 
   // Side effects — patients with "Urgent" tags get a moderate unresolved one
-  const hasUrgent = p.tags.some((t) => t.toLowerCase().startsWith("urgent"));
+  const hasUrgent = (p.tags || []).some((t) => t.toLowerCase().startsWith("urgent"));
   const sideEffects = hasUrgent
     ? [
         { sx: "Severe nausea after dose increase", severity: "moderate" as const, resolved: false, date: "2026-05-08" },
