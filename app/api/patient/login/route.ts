@@ -18,15 +18,17 @@ export async function POST(req: Request) {
   let pid = "", name = "Patient";
   if (patientAuthPersistent()) {
     const p = await findPatientByEmail(email);
-    if (!p) return json({ ok: false, error: "No account found with that email." });
+    if (!p) { console.warn("[patient-login] no patient in the roster matches:", email); return json({ ok: false, error: "No account found with that email." }); }
     pid = p.id; name = p.name;
   } else {
     // Demo fallback (no Upstash): trust the client-resolved id hint.
+    console.warn("[patient-login] patient store is NOT persistent (no DB/Redis) — relying on client id hint");
     if (!b.pidHint) return json({ ok: false, error: "No account found with that email." });
     pid = b.pidHint; name = b.nameHint || "Patient";
   }
 
-  if (!(await verifyPatientPassword(email, password))) return json({ ok: false, error: "Incorrect password." });
+  if (!(await verifyPatientPassword(email, password))) { console.warn("[patient-login] password mismatch for", email); return json({ ok: false, error: "Incorrect password." }); }
+  console.info("[patient-login] success for", email, "→ pid", pid);
 
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30;
   const token = signPatientToken({ pid, email, name, exp });
