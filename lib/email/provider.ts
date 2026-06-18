@@ -7,7 +7,7 @@ import { getBrand } from "@/lib/brands/registry";
    Mock when no key. */
 function validEmail(e: string) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); }
 function parseFrom(from?: string): { email: string; name?: string } {
-  const f = from || "DripVitals <care@dripvitals.com>";
+  const f = from || "DripVitals <care@email.dripvitals.com>";
   const m = f.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
   return m ? { name: m[1] || undefined, email: m[2] } : { email: f.trim() };
 }
@@ -41,7 +41,7 @@ async function resend(key: string, from: string, input: SendEmailInput): Promise
 export async function sendEmail(input: SendEmailInput, brandId?: string): Promise<SendEmailResult> {
   if (!validEmail(input.to)) return { ok: false, error: "Invalid recipient email.", provider: "email" };
   const c = getEmailCreds(brandId);
-  const fallbackFrom = brandId ? getBrand(brandId).from : "DripVitals <care@dripvitals.com>";
+  const fallbackFrom = brandId ? getBrand(brandId).from : "DripVitals <care@email.dripvitals.com>";
   try {
     if (c.provider === "sendgrid" && c.apiKey) return await sendgrid(c.apiKey, input.from || c.from || fallbackFrom, input);
     if (c.provider === "resend" && c.apiKey) return await resend(c.apiKey, input.from || c.from || fallbackFrom, input);

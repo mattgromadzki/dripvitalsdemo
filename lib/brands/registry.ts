@@ -65,9 +65,9 @@ export const BRANDS: Record<string, Brand> = {
     slug: "dripvitals",
     domains: ["dripvitals.com", "www.dripvitals.com", "app.dripvitals.com"],
     envKey: null, // uses base SENDGRID_API_KEY / EMAIL_FROM / TWILIO_* (backwards compatible)
-    from: "DripVitals <care@dripvitals.com>",
-    replyTo: "care@dripvitals.com",
-    supportEmail: "care@dripvitals.com",
+    from: "DripVitals <care@email.dripvitals.com>",
+    replyTo: "care@email.dripvitals.com",
+    supportEmail: "support@email.dripvitals.com",
     portalUrl: "https://portal.dripvitals.com",
     intakeFormSlug: "glp1-eligibility",
     pharmacyId: "dripvitals",
