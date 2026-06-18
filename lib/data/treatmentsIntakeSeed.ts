@@ -65,13 +65,21 @@ export const SEED_TREATMENTS: BaskTreatment[] = [
   { id:19, name:"1-Month Oral Minoxidil", med:"Minoxidil (oral)", strength:"1.25–2.5mg daily", duration:"1", billing:"monthly", price:"$59", compare:"", desc:"Low-dose oral minoxidil to support hair regrowth and density.", icon:"💊", color:"teal", active:true, compounded:false, featured:false, subscribers:25, includes:["Oral minoxidil (30-day supply)","Async physician visit","Free shipping"], pharmacy:"Partner Network FL", freq:"Once daily" },
   { id:20, name:"1-Month Finasteride", med:"Finasteride", strength:"1mg daily", duration:"1", billing:"monthly", price:"$45", compare:"", desc:"Daily finasteride to slow hair loss and support regrowth in eligible patients.", icon:"💊", color:"blue", active:true, compounded:false, featured:false, subscribers:33, includes:["Finasteride 1mg (30-day supply)","Async physician visit","Free shipping"], pharmacy:"Partner Network FL", freq:"Once daily" },
   { id:21, name:"1-Month Hair Regrowth Spray", med:"Finasteride / Minoxidil / Ketoconazole (topical)", strength:"topical", duration:"1", billing:"monthly", price:"$89", compare:"", desc:"Compounded topical spray combining finasteride, minoxidil, and ketoconazole for an all-in-one daily hair routine.", icon:"💆", color:"purple", active:true, compounded:true, featured:true, subscribers:28, includes:["Compounded Fin/Min/Keto topical spray (30-day supply)","Application guide","Physician consultation","Free shipping"], pharmacy:"Partner Network FL", freq:"Daily (topical)" },
+  { id:22, name:"3-Month Oral Semaglutide", med:"Semaglutide (oral)", strength:"7–14mg daily", duration:"3", billing:"quarterly", price:"$599", compare:"$687", desc:"Quarterly oral semaglutide bundle — needle-free GLP-1 weight management at the best per-month price.", icon:"💊", color:"brand", active:true, compounded:true, featured:false, subscribers:14, includes:["Oral semaglutide (90-day supply)","3 physician visits included","Priority shipping","Progress check-ins"], pharmacy:"Partner Network FL", freq:"Once daily" },
+  { id:23, name:"3-Month Oral Tirzepatide", med:"Tirzepatide (oral)", strength:"varies", duration:"3", billing:"quarterly", price:"$879", compare:"$987", desc:"Quarterly oral tirzepatide bundle (dual GIP/GLP-1) — best value for committed, needle-free weight management.", icon:"💊", color:"purple", active:true, compounded:true, featured:false, subscribers:9, includes:["Oral tirzepatide (90-day supply)","3 physician visits included","Priority shipping","Progress check-ins"], pharmacy:"Partner Network FL", freq:"Once daily" },
+  { id:24, name:"3-Month Lipotropic (MIC + B12) Injections", med:"Lipotropic (MIC + B12)", strength:"—", duration:"3", billing:"quarterly", price:"$329", compare:"$387", desc:"Quarterly lipotropic bundle to support fat metabolism and energy, billed quarterly for savings.", icon:"🔥", color:"amber", active:true, compounded:true, featured:false, subscribers:11, includes:["Lipotropic MIC + B12 (12 doses)","Quarterly physician check-in","Cold-chain shipping included"], pharmacy:"Partner Network FL", freq:"Once weekly" },
+  { id:25, name:"3-Month NAD+ Nasal Spray", med:"NAD+ (intranasal)", strength:"—", duration:"3", billing:"quarterly", price:"$399", compare:"$447", desc:"Quarterly intranasal NAD+ bundle for sustained energy and cognitive support.", icon:"💨", color:"amber", active:true, compounded:true, featured:false, subscribers:7, includes:["NAD+ nasal spray (90-day supply)","Quarterly physician check-in","Discreet shipping"], pharmacy:"Partner Network FL", freq:"Daily" },
+  { id:26, name:"3-Month NAD+ Face Cream", med:"NAD+ (topical)", strength:"—", duration:"3", billing:"quarterly", price:"$229", compare:"$267", desc:"Quarterly NAD+ face cream bundle for ongoing skin renewal and a youthful complexion.", icon:"🧴", color:"pink", active:true, compounded:true, featured:false, subscribers:8, includes:["NAD+ face cream (90-day supply)","Application guide","Discreet shipping"], pharmacy:"Partner Network FL", freq:"Daily" },
+  { id:27, name:"3-Month Oral Minoxidil", med:"Minoxidil (oral)", strength:"1.25–2.5mg daily", duration:"3", billing:"quarterly", price:"$149", compare:"$177", desc:"Quarterly oral minoxidil bundle to support hair regrowth and density.", icon:"💊", color:"teal", active:true, compounded:false, featured:false, subscribers:13, includes:["Oral minoxidil (90-day supply)","Quarterly physician visit","Free shipping"], pharmacy:"Partner Network FL", freq:"Once daily" },
+  { id:28, name:"3-Month Finasteride", med:"Finasteride", strength:"1mg daily", duration:"3", billing:"quarterly", price:"$119", compare:"$135", desc:"Quarterly finasteride bundle to slow hair loss and support regrowth in eligible patients.", icon:"💊", color:"blue", active:true, compounded:false, featured:false, subscribers:16, includes:["Finasteride 1mg (90-day supply)","Quarterly physician visit","Free shipping"], pharmacy:"Partner Network FL", freq:"Once daily" },
+  { id:29, name:"3-Month Hair Regrowth Spray", med:"Finasteride / Minoxidil / Ketoconazole (topical)", strength:"topical", duration:"3", billing:"quarterly", price:"$229", compare:"$267", desc:"Quarterly bundle of the compounded Fin/Min/Keto topical spray — best value for the all-in-one hair routine.", icon:"💆", color:"purple", active:true, compounded:true, featured:false, subscribers:15, includes:["Compounded Fin/Min/Keto topical spray (90-day supply)","Application guide","Quarterly physician check-in","Free shipping"], pharmacy:"Partner Network FL", freq:"Daily (topical)" },
 ];
 
 export const SEED_FORMS: BaskIntakeForm[] = [
   {
     id: 1, name: "GLP-1 Medication Intake", slug: "glp-1-medication",
     desc: "Primary intake form for weight-management clients seeking semaglutide or tirzepatide.",
-    active: true, treatmentIds: [1,2,3,4,5,8,14,15], submissions: 284, qualified: 198,
+    active: true, treatmentIds: [1,2,3,4,5,8,14,15,22,23], submissions: 284, qualified: 198,
     hardRules: SEED_HARD_RULES, drugRules: SEED_DRUG_RULES, reviewRules: SEED_REVIEW_RULES,
     settings: DEFAULT_SETTINGS, notifications: DEFAULT_NOTIFICATIONS,
     questions: [
@@ -296,7 +304,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
   {
     id: 6, name: "Lipotropic Injection Intake", slug: "lipotropic-injection",
     desc: "Screening for clients interested in lipotropic (MIC + B12) injections for metabolism, energy, and weight support.",
-    active: true, treatmentIds: [16], submissions: 0, qualified: 0,
+    active: true, treatmentIds: [16,24], submissions: 0, qualified: 0,
     hardRules: [
       { id:"lip-h1", icon:"🤰", title:"Pregnant or Breastfeeding", desc:"Lipotropic injections are not recommended during pregnancy or nursing.", active:true },
       { id:"lip-h2", icon:"👶", title:"Under 18 Years of Age", desc:"Therapy is offered to adults only.", active:true },
@@ -343,7 +351,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
   {
     id: 7, name: "NAD+ Topical & Nasal Intake", slug: "nad-topical-nasal",
     desc: "Screening for clients interested in needle-free NAD+ products (nasal spray and face cream).",
-    active: true, treatmentIds: [17,18], submissions: 0, qualified: 0,
+    active: true, treatmentIds: [17,18,25,26], submissions: 0, qualified: 0,
     hardRules: [
       { id:"nadt-h1", icon:"👶", title:"Under 18 Years of Age", desc:"Offered to adults only.", active:true },
       { id:"nadt-h2", icon:"⚠️", title:"Allergy to NAD+ / Prior Reaction", desc:"Hypersensitivity to NAD+ or product components is a contraindication.", active:true },
@@ -381,7 +389,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
   {
     id: 8, name: "Hair Loss Treatment Intake", slug: "hair-loss-treatment",
     desc: "Screening for clients interested in hair-loss treatments (oral minoxidil, finasteride, and topical finasteride/minoxidil/ketoconazole).",
-    active: true, treatmentIds: [19,20,21], submissions: 0, qualified: 0,
+    active: true, treatmentIds: [19,20,21,27,28,29], submissions: 0, qualified: 0,
     hardRules: [
       { id:"hair-h1", icon:"🤰", title:"Pregnant, May Become Pregnant, or Breastfeeding", desc:"Finasteride can cause birth defects and must not be used or handled by anyone who is or may become pregnant.", active:true },
       { id:"hair-h2", icon:"👶", title:"Under 18 Years of Age", desc:"Offered to adults only.", active:true },
