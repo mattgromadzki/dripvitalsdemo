@@ -20,7 +20,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "profile",        label: "Profile" },
   { key: "clinical",       label: "Clinical" },
   { key: "labs",           label: "Labs" },
-  { key: "visits",         label: "Visits & Notes" },
+  { key: "visits",         label: "Notes" },
   { key: "progress",       label: "Progress" },
   { key: "messages",       label: "Messages" },
   { key: "billing",        label: "Billing" },

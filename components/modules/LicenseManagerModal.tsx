@@ -193,7 +193,7 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
       <div className="text-[11px] text-ink-muted bg-surface-2 border border-border rounded px-3 py-2 mt-3 flex items-center gap-2">
         <span className="text-[13px]">💡</span>
         <span>
-          Visits in the Visit Queue will only route to this provider in states where their license is active and unexpired.
+          Intake submissions will only route to this provider in states where their license is active and unexpired.
         </span>
       </div>
     </Modal>

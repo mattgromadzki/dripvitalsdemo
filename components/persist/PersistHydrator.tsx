@@ -11,7 +11,6 @@ import { useShipments } from "@/lib/hooks/useShipments";
 import { useTasks } from "@/lib/hooks/useTasks";
 import { useClinical } from "@/lib/hooks/useClinical";
 import { useSubscriptions } from "@/lib/hooks/useSubscriptions";
-import { useVisitQueue } from "@/lib/hooks/useVisitQueue";
 import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import { useMedications } from "@/lib/hooks/useMedications";
 import { usePharmacies } from "@/lib/hooks/usePharmacies";
@@ -50,7 +49,6 @@ export function PersistHydrator() {
     serverPersist(useTasks, "tasks", "tasks");
     serverPersist(useSubscriptions, "subscriptions", "subscriptions");
     serverPersist(useClinical, "clinical", "charts");
-    serverPersist(useVisitQueue, "visit-queue", "visits");
     // Communications — so the patient-chart Messages tab and the Email/SMS pages
     // mirror each other and survive reloads / sync across devices.
     serverPersist(useEmails, "emails", "emails");

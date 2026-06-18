@@ -168,8 +168,8 @@ export const SECURITY_POLICIES: SecurityPolicy[] = [
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   Admin:               ["Full EMR", "Prescriptions", "Labs", "Billing", "Analytics", "Staff Mgmt", "System Settings"],
-  "Provider (MD)":     ["Full EMR", "Prescriptions", "Controlled Rx (DEA)", "Labs", "Video Visits", "SOAP Notes", "View Billing"],
-  "Provider (NP)":     ["Full EMR", "Prescriptions", "Labs", "Video Visits", "SOAP Notes"],
+  "Provider (MD)":     ["Full EMR", "Prescriptions", "Controlled Rx (DEA)", "Labs", "SOAP Notes", "View Billing"],
+  "Provider (NP)":     ["Full EMR", "Prescriptions", "Labs", "SOAP Notes"],
   Nurse:               ["View EMR", "Vitals Entry", "Messaging", "Task Manager"],
   "Care Coordinator":  ["Patient Portal", "Task Manager", "Messaging", "Scheduling"],
   Pharmacist:          ["View Prescriptions", "Inventory", "Refill Mgmt"],
