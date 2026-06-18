@@ -467,6 +467,46 @@ function NavBtn({ active, onClick, ico, badge, children }: { active: boolean; on
 }
 
 /* ── HOME ── */
+// Compact "arriving soon" banner on Home — surfaces the soonest in-transit
+// shipment for the signed-in patient with a one-tap tracking link.
+function HomeArrivingBanner() {
+  const [ship, setShip] = useState<PortalShipmentRec | null>(null);
+  useEffect(() => {
+    fetch("/api/patient/shipments", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        const list: PortalShipmentRec[] = Array.isArray(j?.shipments) ? j.shipments : [];
+        const active = list.filter((s) => s.status !== "delivered" && s.status !== "exception");
+        active.sort((a, b) => {
+          const rank = (s: PortalShipmentRec) => (s.status === "out_for_delivery" ? 0 : 1);
+          if (rank(a) !== rank(b)) return rank(a) - rank(b);
+          return (a.estDelivery || "").localeCompare(b.estDelivery || "");
+        });
+        setShip(active[0] || null);
+      })
+      .catch(() => {});
+  }, []);
+  if (!ship) return null;
+  const ofd = ship.status === "out_for_delivery";
+  const eta = ship.estDelivery ? new Date(ship.estDelivery) : null;
+  const etaLabel = eta && !isNaN(eta.getTime()) ? eta.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }) : null;
+  const sub = [
+    ship.carrier,
+    ofd ? "Out for delivery today" : etaLabel ? `Est. ${etaLabel}` : ship.statusLabel,
+    ship.trackingNumber,
+  ].filter(Boolean).join(" · ");
+  return (
+    <div className="arrive-banner">
+      <div className="arrive-ico">🚚</div>
+      <div className="arrive-body">
+        <div className="arrive-title">{ofd ? "Arriving today" : "Arriving soon"}</div>
+        <div className="arrive-sub">{sub}</div>
+      </div>
+      {ship.trackingUrl && <a className="arrive-btn" href={ship.trackingUrl} target="_blank" rel="noreferrer">Track →</a>}
+    </div>
+  );
+}
+
 function HomePage({ nav, weight, openModal }: { nav: (p: Page) => void; weight: string; openModal: (m: ModalType) => void }) {
   return (
     <section className="page active">
@@ -487,6 +527,8 @@ function HomePage({ nav, weight, openModal }: { nav: (p: Page) => void; weight: 
           <div className="hero-vial">💉</div>
         </div>
       </div>
+
+      <HomeArrivingBanner />
 
       <div className="row three">
         <StatCard lbl="Starting weight" val={<>215 <span style={{ fontSize: 14, color: "var(--muted)" }}>lbs</span></>} />
