@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { usePatients } from "@/lib/hooks/usePatients";
-import { useDoctors, doctorDisplayName, licenseForState } from "@/lib/hooks/useDoctors";
+import { useDoctors, doctorDisplayName, licenseForState, getLicenseStatus } from "@/lib/hooks/useDoctors";
 import { toast } from "@/lib/hooks/useToast";
 import { usePermission } from "@/lib/rbac/usePermission";
 import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
 import { SendIntakeFormModal } from "@/components/modules/chart/SendIntakeFormModal";
 import { LIFECYCLE_META, LIFECYCLE_ORDER, deriveLifecycle } from "@/lib/data/lifecycle";
-import type { Patient, PatientExtra } from "@/lib/types";
+import type { Patient, PatientExtra, Doctor } from "@/lib/types";
 
 export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
   const update = usePatients((s) => s.update);
@@ -37,14 +37,20 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
     || null;
   const assignedLicense = licenseForState(assigned, patient.state);
   const assignedNpiOk = !!assigned && /^\d{10}$/.test((assigned.npi || "").trim());
-  const providerOptions = doctors.filter((d) => d.active || d.id === assigned?.id);
+  // A provider can only be assigned if they hold a current (non-expired) license
+  // in the patient's state.
+  const licensedInState = (d: Doctor): boolean => {
+    const lic = licenseForState(d, patient.state);
+    return !!lic && getLicenseStatus(lic).key !== "expired";
+  };
+  const eligibleDoctors = doctors.filter((d) => d.active && licensedInState(d));
+  const assignedEligible = !!assigned && licensedInState(assigned);
   function assignProvider(id: string) {
     if (!id) { update(patient.id, { providerId: undefined, provider: "Unassigned" }); toast("Provider unassigned"); return; }
     const d = doctors.find((x) => x.id === id);
-    if (!d) return;
+    if (!d || !licensedInState(d)) { toast(`That provider isn't licensed in ${patient.state}.`); return; }
     update(patient.id, { providerId: d.id, provider: doctorDisplayName(d) });
-    const lic = licenseForState(d, patient.state);
-    toast(lic ? `Assigned ${doctorDisplayName(d)}` : `Assigned ${doctorDisplayName(d)} — not licensed in ${patient.state}`);
+    toast(`Assigned ${doctorDisplayName(d)}`);
   }
 
   return (
@@ -131,14 +137,20 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
             <span className="text-ink-muted min-w-[100px] flex-shrink-0">Provider</span>
             <div className="flex-1 min-w-0">
               {canEdit ? (
-                <select className="fsel py-1 w-full max-w-[230px]" value={assigned?.id || ""} onChange={(e) => assignProvider(e.target.value)}>
+                <select className="fsel py-1 w-full max-w-[250px]" value={assigned?.id || ""} onChange={(e) => assignProvider(e.target.value)}>
                   <option value="">Unassigned</option>
-                  {providerOptions.map((d) => (
+                  {eligibleDoctors.map((d) => (
                     <option key={d.id} value={d.id}>{doctorDisplayName(d)}{/^\d{10}$/.test((d.npi || "").trim()) ? "" : " — no NPI"}</option>
                   ))}
+                  {assigned && !assignedEligible && (
+                    <option value={assigned.id} disabled>{doctorDisplayName(assigned)} — not licensed in {patient.state}</option>
+                  )}
                 </select>
               ) : (
                 <span className="text-ink font-medium">{patient.provider || "Unassigned"}</span>
+              )}
+              {canEdit && eligibleDoctors.length === 0 && (
+                <div className="mt-1 text-[11px] text-amber font-semibold">No provider is licensed in {patient.state}. Add a {patient.state} license on a provider to assign one.</div>
               )}
               {assigned ? (
                 <div className="mt-1 text-[11px] leading-snug">

@@ -13,7 +13,7 @@ import { usePharmacies } from "@/lib/hooks/usePharmacies";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
-import { useDoctors, licenseForState } from "@/lib/hooks/useDoctors";
+import { useDoctors, licenseForState, getLicenseStatus } from "@/lib/hooks/useDoctors";
 import { submitGreenstone } from "@/lib/pharmacy/client";
 import type { GsOrderInput } from "@/lib/pharmacy/greenstoneTypes";
 import { getPatientExtra } from "@/lib/data/patientExtras";
@@ -186,6 +186,14 @@ export function EPrescribeWorkspace(
   const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
   const selectedDoctor = doctors.find((d) => d.id === selectedDoctorId) || null;
   const prescriber = selectedDoctor ? doctorLabel(selectedDoctor) : "";
+  // Only providers with a current (non-expired) license in the patient's state
+  // may prescribe for them.
+  const licensedInState = (d: Doctor): boolean => {
+    if (!patient) return false;
+    const lic = licenseForState(d, patient.state);
+    return !!lic && getLicenseStatus(lic).key !== "expired";
+  };
+  const eligibleDoctors = doctors.filter((d) => d.active && licensedInState(d));
   const [sending, setSending] = useState(false);
 
   // ── Review modal & saved docs ───────────────────────────────────────
@@ -243,14 +251,14 @@ export function EPrescribeWorkspace(
     setSelectedPharmacyId(compounding?.id || pharmacies[0]?.id || "");
   }, [pharmacies, selectedPharmacyId]);
 
-  // Default prescriber = the patient's assigned provider; else first active provider with a valid NPI
+  // Default prescriber = the patient's assigned provider; else first provider licensed in the patient's state
   useEffect(() => {
     if (selectedDoctorId) return;
     const assigned = patient?.providerId ? doctors.find((d) => d.id === patient.providerId) : null;
     if (assigned) { setSelectedDoctorId(assigned.id); return; }
-    const withNpi = doctors.find((d) => d.active && /^\d{10}$/.test((d.npi || "").trim()));
-    setSelectedDoctorId(withNpi?.id || doctors[0]?.id || "");
-  }, [doctors, selectedDoctorId, patient?.providerId]);
+    const eligible = eligibleDoctors.find((d) => /^\d{10}$/.test((d.npi || "").trim())) || eligibleDoctors[0];
+    setSelectedDoctorId(eligible?.id || "");
+  }, [doctors, selectedDoctorId, patient?.providerId, eligibleDoctors]);
 
   // Step indicator state
   const total = orderCart.length;
@@ -380,6 +388,8 @@ export function EPrescribeWorkspace(
     if (!selectedDoctor) return { error: "Select a signing provider." };
     const npi = (selectedDoctor.npi || "").trim();
     if (!/^\d{10}$/.test(npi)) return { error: `${doctorLabel(selectedDoctor)} has no valid 10-digit NPI — add it on the Doctor record before sending to GreenstoneRX.` };
+    const stateLic = licenseForState(selectedDoctor, patient.state);
+    if (!stateLic || getLicenseStatus(stateLic).key === "expired") return { error: `${doctorLabel(selectedDoctor)} isn't licensed in ${patient.state}. Assign a provider with a current ${patient.state} license before sending.` };
     const addr = extra?.address;
     if (!addr?.street || !addr?.city || !addr?.state || !addr?.zip) return { error: "Patient address is incomplete — GreenstoneRX needs street, city, state, and ZIP." };
     const parts = patient.name.trim().split(/\s+/);
@@ -987,12 +997,15 @@ export function EPrescribeWorkspace(
           <Card icon="✍" iconBg="var(--color-purple-soft)" iconColor="var(--color-purple)" title="Signing Provider" sub="Provider whose DEA / NPI signs this Rx">
             <Field label="Prescriber">
               <select className="fsel" value={selectedDoctorId} onChange={(e) => setSelectedDoctorId(e.target.value)}>
-                {doctors.length === 0 && <option value="">No providers on file</option>}
-                {doctors.map((d) => (
+                {eligibleDoctors.length === 0 && <option value="">No provider licensed in {patient?.state || "patient's state"}</option>}
+                {eligibleDoctors.map((d) => (
                   <option key={d.id} value={d.id}>
                     {doctorLabel(d)}{/^\d{10}$/.test((d.npi || "").trim()) ? "" : " — NPI missing"}
                   </option>
                 ))}
+                {selectedDoctor && !eligibleDoctors.some((d) => d.id === selectedDoctor.id) && (
+                  <option value={selectedDoctor.id} disabled>{doctorLabel(selectedDoctor)} — not licensed in {patient?.state}</option>
+                )}
               </select>
               <div className="text-[10.5px] text-ink-muted mt-1.5">
                 The selected provider will be the legal prescriber of record. State licensure is checked automatically against patient's state of residence.
