@@ -567,58 +567,63 @@ function ChatPage({ threadOpen, openThread, closeThread, messages, draft, setDra
     <section className="page active">
       {!threadOpen ? (
         <div>
-          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "1.4px", color: "var(--muted)", fontWeight: 600, marginBottom: 24 }}>SUPPORT</div>
+          <div className="chat-eyebrow">Support</div>
           <div className="chat-empty">
             <div className="chat-empty-ico">💬</div>
-            <div className="chat-empty-title">Start a conversation</div>
-            <div className="chat-empty-desc">Have a question about billing, shipping, your account, or your treatment? Our support team is here to help.</div>
-          </div>
-          <div className="chat-picker">
-            <div className="chat-picker-h">Send message to:</div>
-            <div className="chat-picker-btns" style={{ gridTemplateColumns: "1fr", maxWidth: 300, margin: "0 auto" }}>
-              <button className="chat-target" onClick={openThread}>
-                <span className="chat-target-ico">💬</span>
-                <span className="chat-target-name">Support</span>
-              </button>
-            </div>
+            <div className="chat-empty-title">We&rsquo;re here to help</div>
+            <div className="chat-empty-desc">Questions about billing, shipping, your account, or your treatment? Message your DripVitals care team — we usually reply within a few hours.</div>
+            <button className="chat-start-btn" onClick={openThread}>
+              <span className="msg-ava team">CT<span className="ava-dot" /></span>
+              <span>
+                <span className="chat-start-name">Message Support</span>
+                <span className="chat-start-sub">DripVitals Care Team · Online</span>
+              </span>
+              <span className="chat-start-arrow">→</span>
+            </button>
           </div>
         </div>
       ) : (
-        <div>
-          <button className="btn btn-secondary" onClick={closeThread} style={{ marginBottom: 16 }}>← Back</button>
+        <div className="thread">
           <div className="thread-head">
-            <div className="msg-ava team">CT</div>
+            <button className="thread-back" onClick={closeThread} aria-label="Back">←</button>
+            <div className="msg-ava team">CT<span className="ava-dot" /></div>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>Support</div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)" }}>DripVitals Care Team</div>
+              <div className="thread-name">DripVitals Care Team</div>
+              <div className="thread-status"><span className="status-dot" />Online · replies within a few hours</div>
             </div>
           </div>
           <div className="thread-body">
+            {messages.length === 0 && (
+              <div className="thread-hint">👋 Say hello — your care team will reply here.</div>
+            )}
             {messages.map((m, i) => (
-              <div key={i} className={`thread-msg ${m.from === "mine" ? "mine" : ""}`}>
-                <div className="thread-bubble">
-                  {m.attachment && (m.attachment.kind === "image"
-                    ? <img src={m.attachment.url} alt={m.attachment.name} style={{ maxWidth: 200, borderRadius: 10, display: "block", marginBottom: m.text ? 6 : 0 }} />
-                    : <a href={m.attachment.url} download={m.attachment.name} style={{ display: "flex", alignItems: "center", gap: 8, color: "inherit", textDecoration: "none", fontWeight: 600, marginBottom: m.text ? 6 : 0 }}>📄 {m.attachment.name}</a>)}
-                  {m.text && <span>{m.text}</span>}
+              <div key={i} className={`thread-row ${m.from === "mine" ? "mine" : ""}`}>
+                {m.from !== "mine" && <div className="msg-ava team xs">CT</div>}
+                <div>
+                  <div className="thread-bubble">
+                    {m.attachment && (m.attachment.kind === "image"
+                      ? <img src={m.attachment.url} alt={m.attachment.name} className="thread-img" />
+                      : <a href={m.attachment.url} download={m.attachment.name} className="thread-file">📄 {m.attachment.name}</a>)}
+                    {m.text && <span>{m.text}</span>}
+                  </div>
+                  <div className="thread-meta">{m.time}</div>
                 </div>
-                <div className="thread-meta">{m.time}</div>
               </div>
             ))}
           </div>
           <div className="thread-foot">
-            <label className="btn btn-secondary" style={{ cursor: "pointer", display: "flex", alignItems: "center" }} title="Attach photo or PDF">
+            <label className="thread-attach" title="Attach photo or PDF">
               📎
               <input type="file" accept="image/*,application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttach(f); e.target.value = ""; }} />
             </label>
             <input
               className="thread-input"
-              placeholder="Type a message..."
+              placeholder="Type a message…"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") send(); }}
             />
-            <button className="btn btn-primary" onClick={send}>Send</button>
+            <button className="thread-send" onClick={send} aria-label="Send" disabled={!draft.trim()}>↑</button>
           </div>
         </div>
       )}
@@ -641,74 +646,119 @@ function stageMeta(stage?: string): { label: string; pill: "pending" | "active" 
   }
 }
 
-// Live shipment tracking for the signed-in patient, fed by GreenstoneRX webhooks.
+interface PortalShipmentRec {
+  id: string; status: string; statusLabel: string; carrier?: string;
+  trackingNumber?: string; trackingUrl?: string; pharmacy?: string;
+  shippedAt?: string; estDelivery?: string;
+  events: { ts: string; status: string; location?: string; note?: string }[];
+}
+function shipPill(status: string): "pending" | "active" | "review" | "danger" {
+  switch ((status || "").toLowerCase()) {
+    case "delivered": return "active";
+    case "out_for_delivery": return "review";
+    case "exception": return "danger";
+    default: return "pending";
+  }
+}
+const fmtShipDate = (s?: string) => { if (!s) return ""; const d = new Date(s); return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" }); };
+const fmtShipDateTime = (s?: string) => { if (!s) return ""; const d = new Date(s); return isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); };
+
+// Live shipment tracking for the signed-in patient: EMR shipments (with a
+// public carrier tracking link) + GreenstoneRX fulfillment events.
 function PortalShipmentTracking({ toast }: { toast: (s: string) => void }) {
+  const [shipments, setShipments] = useState<PortalShipmentRec[]>([]);
   const [events, setEvents] = useState<PortalPharmEvent[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    fetch("/api/patient/pharmacy-events", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((j) => setEvents(Array.isArray(j?.events) ? j.events : []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/patient/shipments", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+      fetch("/api/patient/pharmacy-events", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})),
+    ]).then(([sh, ph]) => {
+      setShipments(Array.isArray(sh?.shipments) ? sh.shipments : []);
+      setEvents(Array.isArray(ph?.events) ? ph.events : []);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
-    return <div className="card" style={{ marginBottom: 18 }}><div className="card-h">Active shipment</div><div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 6 }}>Loading…</div></div>;
+    return <div className="card" style={{ marginBottom: 18 }}><div className="card-h">Shipments</div><div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 6 }}>Loading…</div></div>;
   }
-  if (events.length === 0) {
+  if (shipments.length === 0 && events.length === 0) {
     return (
-      <div className="card" style={{ marginBottom: 18 }}>
-        <div className="card-h">Active shipment</div>
-        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>No active shipments right now. We&rsquo;ll text and email you the moment your next order ships.</div>
+      <div className="ship-empty">
+        <div className="ship-empty-ico">📦</div>
+        <div style={{ fontWeight: 700, fontSize: 15 }}>No active shipments</div>
+        <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4, maxWidth: 360 }}>We&rsquo;ll text and email you a tracking link the moment your next order ships.</div>
       </div>
     );
   }
 
-  const latest = events[0];
-  const meta = stageMeta(latest.stage);
-  const tracked = events.find((e) => e.trackingNumber);
+  const phTracked = events.find((e) => e.trackingNumber);
+  const phLatest = events[0];
 
   return (
     <>
-      <div className="card" style={{ borderColor: "var(--blue)", borderWidth: "1.5px", marginBottom: 18 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 14 }}>
-          <div>
-            <div className="card-h" style={{ color: "var(--blue-dk)", marginBottom: 0 }}>Active shipment</div>
-            <div style={{ fontSize: 16, fontWeight: 700, marginTop: 6 }}>{meta.label}</div>
-            <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 4 }}>Updated {new Date(latest.at).toLocaleString()}</div>
+      {shipments.map((sh) => (
+        <div key={sh.id} className="ship-card">
+          <div className="ship-card-top">
+            <div>
+              <div className="ship-carrier">{sh.carrier || "Shipment"}{sh.pharmacy ? <span className="ship-pharmacy"> · {sh.pharmacy}</span> : null}</div>
+              {sh.estDelivery && <div className="ship-eta">Est. delivery {fmtShipDate(sh.estDelivery)}</div>}
+            </div>
+            <span className={`pill ${shipPill(sh.status)}`}>{sh.statusLabel}</span>
           </div>
-          <span className={`pill ${meta.pill}`}>{meta.label}</span>
+          {sh.trackingNumber && (
+            <div className="ship-track"><span className="ship-track-label">Tracking #</span><span className="ship-track-num">{sh.trackingNumber}</span></div>
+          )}
+          {sh.trackingUrl
+            ? <a className="ship-btn" href={sh.trackingUrl} target="_blank" rel="noreferrer">Track package →</a>
+            : <button className="ship-btn ghost" onClick={() => toast("A tracking link will appear once the carrier scans your package")}>Track package</button>}
+          {sh.events.length > 0 && (
+            <div className="ship-history">
+              {sh.events.slice().reverse().map((e, i) => (
+                <div key={i} className="ship-ev">
+                  <span className={`ship-ev-dot ${i === 0 ? "now" : ""}`} />
+                  <div>
+                    <div className="ship-ev-note">{e.note || e.status}</div>
+                    <div className="ship-ev-meta">{[e.location, fmtShipDateTime(e.ts)].filter(Boolean).join(" · ")}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {tracked?.trackingNumber && (
-          <div style={{ fontSize: 12.5, marginBottom: 12 }}>
-            Tracking: <span style={{ fontFamily: "monospace" }}>{tracked.trackingNumber}</span>
+      ))}
+
+      {events.length > 0 && (
+        <div className="ship-card">
+          <div className="ship-card-top">
+            <div>
+              <div className="ship-carrier">Pharmacy order{phTracked?.carrier ? ` · ${phTracked.carrier}` : ""}</div>
+              {phLatest && <div className="ship-eta">Updated {fmtShipDateTime(phLatest.at)}</div>}
+            </div>
+            <span className={`pill ${stageMeta(phLatest?.stage).pill}`}>{stageMeta(phLatest?.stage).label}</span>
           </div>
-        )}
-        <div style={{ display: "flex", gap: 10 }}>
-          {tracked?.trackingUrl
-            ? <a className="btn btn-primary" href={tracked.trackingUrl} target="_blank" rel="noreferrer">Track package →</a>
-            : <button className="btn btn-secondary" onClick={() => toast("Tracking will appear here as soon as your order ships")}>Track package</button>}
+          {phTracked?.trackingNumber && (
+            <div className="ship-track"><span className="ship-track-label">Tracking #</span><span className="ship-track-num">{phTracked.trackingNumber}</span></div>
+          )}
+          {phTracked?.trackingUrl
+            ? <a className="ship-btn" href={phTracked.trackingUrl} target="_blank" rel="noreferrer">Track package →</a>
+            : <button className="ship-btn ghost" onClick={() => toast("Tracking will appear here as soon as your order ships")}>Track package</button>}
+          <div className="ship-history">
+            {events.map((e, i) => {
+              const m = stageMeta(e.stage);
+              return (
+                <div key={e.id} className="ship-ev">
+                  <span className={`ship-ev-dot ${i === 0 ? "now" : ""}`} />
+                  <div>
+                    <div className="ship-ev-note">{m.label}{e.status ? ` — ${e.status}` : ""}</div>
+                    <div className="ship-ev-meta">{fmtShipDateTime(e.at)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
-      <div className="card" style={{ marginBottom: 18 }}>
-        <div className="card-h">Status history</div>
-        <div className="timeline">
-          {events.map((e, i) => {
-            const m = stageMeta(e.stage);
-            const dot = e.stage === "delivered" ? "done" : i === 0 ? "now" : "done";
-            return (
-              <TimelineItem
-                key={e.id}
-                dot={dot}
-                title={m.label}
-                desc={`${e.status || e.event || ""}${e.trackingNumber ? ` · ${e.trackingNumber}` : ""}`}
-                date={new Date(e.at).toLocaleDateString()}
-              />
-            );
-          })}
-        </div>
-      </div>
+      )}
     </>
   );
 }
