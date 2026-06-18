@@ -44,6 +44,7 @@ export interface Patient {
   week: number;
   provider: string;
   doctorId: number;
+  providerId?: string;   // assigned Doctor record id (DOC-xxx) used for e-prescribe
   pharmacyId: number;
 
   // Vitals
@@ -922,6 +923,7 @@ export interface PatientDocument {
     prescriberName: string;
     prescriberNpi: string;
     prescriberDea?: string;
+    prescriberLicense?: string;
     patient: {
       name: string;
       id: string;

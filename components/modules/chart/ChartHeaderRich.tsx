@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePatients } from "@/lib/hooks/usePatients";
+import { useDoctors, doctorDisplayName, licenseForState } from "@/lib/hooks/useDoctors";
 import { toast } from "@/lib/hooks/useToast";
 import { usePermission } from "@/lib/rbac/usePermission";
 import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
@@ -29,6 +30,22 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
   const zipc = patient.zip || a?.zip || "";
   const addr = street ? `${street}${patient.apt ? `, ${patient.apt}` : ""}, ${city}, ${patient.state} ${zipc}` : "—";
   const dobShown = patient.dob || extra.dob;
+
+  const doctors = useDoctors((s) => s.doctors);
+  const assigned = doctors.find((d) => d.id === patient.providerId)
+    || doctors.find((d) => doctorDisplayName(d) === patient.provider)
+    || null;
+  const assignedLicense = licenseForState(assigned, patient.state);
+  const assignedNpiOk = !!assigned && /^\d{10}$/.test((assigned.npi || "").trim());
+  const providerOptions = doctors.filter((d) => d.active || d.id === assigned?.id);
+  function assignProvider(id: string) {
+    if (!id) { update(patient.id, { providerId: undefined, provider: "Unassigned" }); toast("Provider unassigned"); return; }
+    const d = doctors.find((x) => x.id === id);
+    if (!d) return;
+    update(patient.id, { providerId: d.id, provider: doctorDisplayName(d) });
+    const lic = licenseForState(d, patient.state);
+    toast(lic ? `Assigned ${doctorDisplayName(d)}` : `Assigned ${doctorDisplayName(d)} — not licensed in ${patient.state}`);
+  }
 
   return (
     <div className="bg-surface border border-border rounded-lg shadow-xs mb-3.5 relative">
@@ -110,7 +127,30 @@ export function ChartHeaderRich({ patient, extra }: { patient: Patient; extra: P
           <Field label="State" value={patient.state} />
         </HeaderCol>
         <HeaderCol title="Care team">
-          <Field label="Provider" value={patient.provider} />
+          <div className="flex gap-2 mb-1.5 text-[12.5px]">
+            <span className="text-ink-muted min-w-[100px] flex-shrink-0">Provider</span>
+            <div className="flex-1 min-w-0">
+              {canEdit ? (
+                <select className="fsel py-1 w-full max-w-[230px]" value={assigned?.id || ""} onChange={(e) => assignProvider(e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {providerOptions.map((d) => (
+                    <option key={d.id} value={d.id}>{doctorDisplayName(d)}{/^\d{10}$/.test((d.npi || "").trim()) ? "" : " — no NPI"}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-ink font-medium">{patient.provider || "Unassigned"}</span>
+              )}
+              {assigned ? (
+                <div className="mt-1 text-[11px] leading-snug">
+                  <span className={assignedNpiOk ? "text-ink-muted" : "text-red font-semibold"}>{assignedNpiOk ? `NPI ${assigned.npi}` : "⚠ No valid NPI on file"}</span>
+                  <span className="text-ink-muted-2"> · </span>
+                  <span className={assignedLicense ? "text-ink-muted" : "text-red font-semibold"}>{assignedLicense ? `${patient.state} license ${assignedLicense.number}` : `⚠ Not licensed in ${patient.state}`}</span>
+                </div>
+              ) : (
+                <div className="mt-1 text-[11px] text-ink-muted-2">No provider assigned — required to e-prescribe.</div>
+              )}
+            </div>
+          </div>
           <Field label="Care coordinator" value={extra.careCoordinator} />
         </HeaderCol>
         <HeaderCol title="Activity" last>

@@ -82,3 +82,17 @@ export function formatLicenseExp(iso: string | undefined): string {
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${months[parseInt(m, 10) - 1]} ${parseInt(d, 10)} ${y}`;
 }
+
+// Display label, e.g. "Dr. Sofia Rivera, MD" / "Jane Doe, NP".
+export function doctorDisplayName(d: { first: string; last: string; title: string }): string {
+  const name = `${d.first} ${d.last}`.trim();
+  const usesDr = d.title === "MD" || d.title === "DO";
+  return `${usesDr ? "Dr. " : ""}${name}, ${d.title}`;
+}
+
+// The doctor's state license matching a patient's state (case-insensitive), if any.
+export function licenseForState(d: Doctor | null | undefined, state: string): DoctorStateLicense | undefined {
+  if (!d || !state) return undefined;
+  const s = state.trim().toUpperCase();
+  return (d.licenses || []).find((l) => (l.state || "").trim().toUpperCase() === s);
+}

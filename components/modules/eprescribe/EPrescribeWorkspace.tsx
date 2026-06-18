@@ -13,7 +13,7 @@ import { usePharmacies } from "@/lib/hooks/usePharmacies";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
-import { useDoctors } from "@/lib/hooks/useDoctors";
+import { useDoctors, licenseForState } from "@/lib/hooks/useDoctors";
 import { submitGreenstone } from "@/lib/pharmacy/client";
 import type { GsOrderInput } from "@/lib/pharmacy/greenstoneTypes";
 import { getPatientExtra } from "@/lib/data/patientExtras";
@@ -243,12 +243,14 @@ export function EPrescribeWorkspace(
     setSelectedPharmacyId(compounding?.id || pharmacies[0]?.id || "");
   }, [pharmacies, selectedPharmacyId]);
 
-  // Default prescriber = first active provider with a valid 10-digit NPI
+  // Default prescriber = the patient's assigned provider; else first active provider with a valid NPI
   useEffect(() => {
     if (selectedDoctorId) return;
+    const assigned = patient?.providerId ? doctors.find((d) => d.id === patient.providerId) : null;
+    if (assigned) { setSelectedDoctorId(assigned.id); return; }
     const withNpi = doctors.find((d) => d.active && /^\d{10}$/.test((d.npi || "").trim()));
     setSelectedDoctorId(withNpi?.id || doctors[0]?.id || "");
-  }, [doctors, selectedDoctorId]);
+  }, [doctors, selectedDoctorId, patient?.providerId]);
 
   // Step indicator state
   const total = orderCart.length;
@@ -479,6 +481,7 @@ export function EPrescribeWorkspace(
       prescriberName:  prescriber,
       prescriberNpi:   selectedDoctor?.npi || "",
       prescriberDea:   selectedDoctor?.dea || "",
+      prescriberLicense: licenseForState(selectedDoctor, patient.state)?.number || "",
       patient: {
         name:    patient.name,
         id:      patient.id,
@@ -994,6 +997,18 @@ export function EPrescribeWorkspace(
               <div className="text-[10.5px] text-ink-muted mt-1.5">
                 The selected provider will be the legal prescriber of record. State licensure is checked automatically against patient's state of residence.
               </div>
+              {patient && selectedDoctor && (() => {
+                const lic = licenseForState(selectedDoctor, patient.state);
+                const isAssigned = !!patient.providerId && selectedDoctor.id === patient.providerId;
+                return (
+                  <div className="mt-1.5 text-[11px] leading-snug">
+                    {isAssigned && <span className="text-green font-semibold">✓ Patient's assigned provider. </span>}
+                    {lic
+                      ? <span className="text-ink-muted">{patient.state} license {lic.number}</span>
+                      : <span className="text-red font-semibold">⚠ Not licensed in {patient.state} — assign a provider licensed there.</span>}
+                  </div>
+                );
+              })()}
             </Field>
           </Card>
 
@@ -1202,6 +1217,7 @@ export function EPrescribeWorkspace(
               prescriber,
               prescriberNpi: selectedDoctor?.npi || "",
               prescriberDea: selectedDoctor?.dea || "",
+              prescriberLicense: licenseForState(selectedDoctor, patient.state)?.number || "",
               refNum: finalRefNum || "DVRx-PENDING",
               dateWritten: previewToday(),
               signedAt: finalRefNum ? signedAtNow() : "",
@@ -1239,7 +1255,7 @@ function doctorLabel(d: Doctor): string {
 // Constructs the same rxPayload shape that submitOrder() writes to the
 // shared documents store, but from live form state — so the user sees the
 // exact prescription content before signing it.
-function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber, prescriberNpi, prescriberDea, refNum, dateWritten, signedAt, allergies }: {
+function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber, prescriberNpi, prescriberDea, prescriberLicense, refNum, dateWritten, signedAt, allergies }: {
   patient:     Patient;
   extra:       PatientExtra | null;
   meds:        MedicationLine[];
@@ -1248,6 +1264,7 @@ function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber,
   prescriber:  string;
   prescriberNpi: string;
   prescriberDea: string;
+  prescriberLicense?: string;
   refNum:      string;
   dateWritten: string;
   signedAt:    string;
@@ -1260,6 +1277,7 @@ function buildPreviewPayload({ patient, extra, meds, sups, pharmacy, prescriber,
     prescriberName:   prescriber,
     prescriberNpi:    prescriberNpi || "—",
     prescriberDea:    prescriberDea || "—",
+    prescriberLicense: prescriberLicense || "",
     patient: {
       name:      patient.name,
       id:        patient.id,
