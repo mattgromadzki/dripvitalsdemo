@@ -29,7 +29,7 @@ import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@
    so anything an admin publishes shows up here automatically.
    ───────────────────────────────────────────────────────────────────────── */
 
-type Page = "home" | "chat" | "treatments" | "shots" | "visits" | "shop" | "account";
+type Page = "home" | "chat" | "treatments" | "shots" | "reminders" | "shop" | "account";
 type TxTab = "current" | "dose" | "orders" | "subscription";
 type AcctTab = "profile" | "billing" | "phi";
 type ModalType =
@@ -38,7 +38,7 @@ type ModalType =
 
 const PAGE_TITLES: Record<Page, string> = {
   home: "Home", chat: "Chat", treatments: "Treatments",
-  shots: "Shots", visits: "Visits & Reminders", shop: "Shop", account: "Account",
+  shots: "Shots", reminders: "Reminders", shop: "Shop", account: "Account",
 };
 
 const GENERIC_BENEFITS = [
@@ -163,7 +163,6 @@ export default function PatientPortalPage() {
   const [modal, setModal] = useState<ModalType>(null);
   const [weightDraft, setWeightDraft] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [bookedVisit, setBookedVisit] = useState<string | null>(null);
   const [doseReminder, setDoseReminder] = useState(true);
   const [refillReminder, setRefillReminder] = useState(true);
 
@@ -389,7 +388,7 @@ export default function PatientPortalPage() {
           <NavBtn active={page === "chat"} onClick={() => nav("chat")} ico="💬" badge={3}>Chat</NavBtn>
           <NavBtn active={page === "treatments"} onClick={() => nav("treatments")} ico="💊">Treatments</NavBtn>
           <NavBtn active={page === "shots"} onClick={() => nav("shots")} ico="💉">Shots</NavBtn>
-          <NavBtn active={page === "visits"} onClick={() => nav("visits")} ico="📅">Visits</NavBtn>
+          <NavBtn active={page === "reminders"} onClick={() => nav("reminders")} ico="🔔">Reminders</NavBtn>
           <NavBtn active={page === "shop"} onClick={() => nav("shop")} ico="🛍️">Shop</NavBtn>
           <div className="sidebar-foot">
             <NavBtn active={page === "account"} onClick={() => nav("account")} ico="👤">Manage account</NavBtn>
@@ -426,7 +425,7 @@ export default function PatientPortalPage() {
             )}
             {page === "treatments" && <TreatmentsPage tab={txTab} setTab={setTxTab} openModal={setModal} toast={toast} />}
             {page === "shots" && <ShotsPage openModal={setModal} shots={record.shots} />}
-            {page === "visits" && <VisitsPage booked={bookedVisit} setBooked={setBookedVisit} doseReminder={doseReminder} setDoseReminder={setDoseReminder} refillReminder={refillReminder} setRefillReminder={setRefillReminder} toast={toast} />}
+            {page === "reminders" && <RemindersPage doseReminder={doseReminder} setDoseReminder={setDoseReminder} refillReminder={refillReminder} setRefillReminder={setRefillReminder} toast={toast} />}
             {page === "shop" && (
               pdpProduct
                 ? <ProductDetail product={pdpProduct} related={published.filter((r) => r.cat === pdpProduct.cat && r.id !== pdpProduct.id).slice(0, 3)} onBack={() => setPdpId(null)} onOpen={setPdpId} toast={toast} />
@@ -439,10 +438,10 @@ export default function PatientPortalPage() {
 
       {/* Mobile tabbar */}
       <div className="mob-tabbar">
-        {(["home", "chat", "treatments", "shots", "visits"] as Page[]).map((p) => (
+        {(["home", "chat", "treatments", "shots", "reminders"] as Page[]).map((p) => (
           <button key={p} className={`mob-tab ${page === p ? "active" : ""}`} onClick={() => nav(p)}>
-            <div className="mob-tab-ico">{p === "home" ? "🏠" : p === "chat" ? "💬" : p === "treatments" ? "💊" : p === "shots" ? "💉" : "📅"}</div>
-            {p === "treatments" ? "Plan" : p === "visits" ? "Visits" : p[0].toUpperCase() + p.slice(1)}
+            <div className="mob-tab-ico">{p === "home" ? "🏠" : p === "chat" ? "💬" : p === "treatments" ? "💊" : p === "shots" ? "💉" : "🔔"}</div>
+            {p === "treatments" ? "Plan" : p === "reminders" ? "Reminders" : p[0].toUpperCase() + p.slice(1)}
           </button>
         ))}
       </div>
@@ -943,36 +942,13 @@ function ShotsPage({ openModal, shots }: { openModal: (m: ModalType) => void; sh
   );
 }
 
-/* ── Visits & Reminders: self-scheduling + dose/refill reminders ── */
-function VisitsPage({ booked, setBooked, doseReminder, setDoseReminder, refillReminder, setRefillReminder, toast }: {
-  booked: string | null; setBooked: (s: string | null) => void;
+/* ── Reminders: dose/refill reminders + upcoming doses. No visit scheduling —
+   the intake form is the visit in this async-care model. ── */
+function RemindersPage({ doseReminder, setDoseReminder, refillReminder, setRefillReminder, toast }: {
   doseReminder: boolean; setDoseReminder: (b: boolean) => void;
   refillReminder: boolean; setRefillReminder: (b: boolean) => void;
   toast: (s: string) => void;
 }) {
-  const TIMES = ["9:00 AM", "11:30 AM", "2:00 PM", "4:30 PM"];
-  const [selDay, setSelDay] = useState<string | null>(null);
-  const [selTime, setSelTime] = useState<string | null>(null);
-
-  // Next 10 weekdays as bookable days
-  const days = useMemo(() => {
-    const out: { key: string; label: string; sub: string }[] = [];
-    const d = new Date(); d.setDate(d.getDate() + 1);
-    while (out.length < 10) {
-      const dow = d.getDay();
-      if (dow !== 0 && dow !== 6) {
-        out.push({
-          key: d.toISOString().slice(0, 10),
-          label: d.toLocaleDateString("en-US", { weekday: "short" }),
-          sub: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        });
-      }
-      d.setDate(d.getDate() + 1);
-    }
-    return out;
-  }, []);
-
-  // Upcoming weekly doses from next Sunday
   const doses = useMemo(() => {
     const out: { date: string; dose: string }[] = [];
     const d = new Date(); d.setDate(d.getDate() + ((7 - d.getDay()) % 7 || 7));
@@ -982,51 +958,15 @@ function VisitsPage({ booked, setBooked, doseReminder, setDoseReminder, refillRe
     }
     return out;
   }, []);
-
-  function confirmBooking() {
-    if (!selDay || !selTime) { toast("Pick a day and time first"); return; }
-    const d = new Date(selDay + "T00:00:00");
-    const label = `${d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} at ${selTime}`;
-    setBooked(label); setSelDay(null); setSelTime(null);
-    toast("✓ Check-in booked — confirmation sent");
-  }
+  const next = doses[0];
 
   return (
     <section className="page active">
-      {/* Upcoming appointment / next dose banner */}
+      {/* Next dose banner */}
       <div className="shot-next">
-        <div className="shot-next-lbl">{booked ? "Upcoming check-in" : "No check-in scheduled"}</div>
-        <div className="shot-next-day">{booked || "Book a virtual visit below"}</div>
-        <div className="shot-next-dose">{booked ? "Video visit with your provider · 15 min" : "Provider check-ins keep your plan on track"}</div>
-        {booked && <button className="shot-log-btn" onClick={() => { setBooked(null); toast("Check-in canceled"); }}>Cancel check-in</button>}
-      </div>
-
-      {/* Self-scheduling */}
-      <div className="card">
-        <div className="card-h">Schedule a provider check-in</div>
-        <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>Pick a day and time that works for you.</div>
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 14 }}>
-          {days.map((d) => (
-            <button key={d.key} onClick={() => setSelDay(d.key)}
-              style={{ flex: "0 0 auto", minWidth: 58, padding: "8px 6px", borderRadius: 12, textAlign: "center", cursor: "pointer",
-                border: selDay === d.key ? "1.5px solid var(--blue)" : "1px solid var(--border)",
-                background: selDay === d.key ? "var(--blue-soft)" : "var(--surface)", color: "var(--text)" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>{d.label}</div>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{d.sub}</div>
-            </button>
-          ))}
-        </div>
-        {selDay && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-            {TIMES.map((t) => (
-              <button key={t} onClick={() => setSelTime(t)}
-                style={{ padding: "7px 14px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
-                  border: selTime === t ? "1.5px solid var(--blue)" : "1px solid var(--border)",
-                  background: selTime === t ? "var(--blue)" : "var(--surface)", color: selTime === t ? "#fff" : "var(--text)" }}>{t}</button>
-            ))}
-          </div>
-        )}
-        <button className="shot-log-btn" onClick={confirmBooking} style={{ opacity: selDay && selTime ? 1 : 0.6 }}>📅 Confirm check-in</button>
+        <div className="shot-next-lbl">Next dose</div>
+        <div className="shot-next-day">{next ? next.date : "—"}</div>
+        <div className="shot-next-dose">{next ? `${next.dose} · subcutaneous` : "No upcoming doses"}</div>
       </div>
 
       {/* Reminders */}
