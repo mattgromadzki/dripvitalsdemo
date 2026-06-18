@@ -1,14 +1,17 @@
 import { Redis } from "@upstash/redis";
 import { hashPassword, verifyPassword } from "@/lib/auth/serverCrypto";
+import { listPatients, isPersistent } from "@/lib/crm/patients";
 
 /**
- * Server-side patient credentials. Patients are the EMR patient records
- * (in store:patients); their password is the shared demo password until they set
- * their own, which is stored hashed in `patient:auth:v1` (keyed by email).
+ * Server-side patient credentials. Patients are the EMR patient records,
+ * persisted via the CRM patient store (Postgres / `crm:patients:v1`) — the same
+ * roster the EMR syncs to. Passwords are stored hashed in `patient:auth:v1`
+ * (keyed by email); until a patient sets one, the shared demo password applies.
  *
- * When Upstash isn't configured, patient records can't be read server-side, so
- * the login route falls back to a client-supplied id hint + the demo password
- * (clearly a demo-only path). With Upstash present, lookups are authoritative.
+ * When nothing is persisted (no Postgres or Upstash), patient records can't be
+ * read server-side, so the login route falls back to a client-supplied id hint
+ * + the demo password (a demo-only path). When persistence is present, lookups
+ * are authoritative.
  */
 const PW_KEY = "patient:auth:v1";
 const DEMO_PW = "demo1234";
@@ -21,20 +24,17 @@ function redis(): Redis | null {
 }
 
 export function patientAuthPersistent(): boolean {
-  return !!redis();
+  return isPersistent();
 }
 
 export interface PatientRec { id: string; name: string; email: string; }
 
-/** Authoritative lookup from the persisted patient roster (Upstash only). */
+/** Authoritative lookup from the persisted patient roster (Postgres / Upstash). */
 export async function findPatientByEmail(email: string): Promise<PatientRec | null> {
-  const r = redis();
-  if (!r) return null;
-  const v = await r.get("store:patients");
-  const arr = typeof v === "string" ? JSON.parse(v) : v;
-  if (!Array.isArray(arr)) return null;
   const lc = email.trim().toLowerCase();
-  const p = arr.find((x: { email?: string }) => (x?.email || "").toLowerCase() === lc) as { id?: string; name?: string; email?: string } | undefined;
+  let all: { id?: string; name?: string; email?: string }[] = [];
+  try { all = await listPatients(); } catch { all = []; }
+  const p = all.find((x) => (x?.email || "").toLowerCase() === lc);
   return p?.id ? { id: p.id, name: p.name || "Patient", email: p.email || lc } : null;
 }
 

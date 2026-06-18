@@ -11,6 +11,7 @@ import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { sendChat, pullChat } from "@/lib/chat/client";
 import { seedRecordFromPatient, emptyRecord, formatShotDate } from "@/lib/data/portalRecords";
 import type { ShotEntry } from "@/lib/data/portalRecords";
+import { SEED_DEMO } from "@/lib/config/runtime";
 import { SHOP_CATEGORY_LABEL } from "@/lib/data/shopProducts";
 import type { ShopProduct, ShopCategory } from "@/lib/types";
 import { validateAddress } from "@/lib/usps/validateAddress";
@@ -303,9 +304,11 @@ export default function PatientPortalPage() {
                 <div className="login-helpers">
                   <a href="#" onClick={(e) => { e.preventDefault(); setAuthErr(null); setResetSent(false); setAuthView("forgot"); }}>Forgot password?</a>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--ink-muted, #6b7890)", marginTop: 10 }}>
-                  Demo account: <b>mattgromadzki@gmail.com</b> · password <b>demo1234</b>
-                </div>
+                {SEED_DEMO && (
+                  <div style={{ fontSize: 12, color: "var(--ink-muted, #6b7890)", marginTop: 10 }}>
+                    Demo account: <b>mattgromadzki@gmail.com</b> · password <b>demo1234</b>
+                  </div>
+                )}
               </>
             )}
 
