@@ -46,7 +46,10 @@ interface State {
 // v3 because the schema changed (new question types + rules on each form).
 // Old v2 data is no longer compatible — admins will re-hydrate from SEED.
 // v4: name/email/phone collapsed into a single "personal_info" question.
-const LS_KEY = "dripvitals_treatments_v4";
+// v5: added anti-aging intake forms (NAD+ expanded, Sermorelin, Glutathione)
+//     and treatments to SEED — bump forces a clean re-hydrate so they appear.
+//     Old v4 data remains in localStorage (under the old key) and is untouched.
+const LS_KEY = "dripvitals_treatments_v5";
 
 // Only data fields are persisted. Action functions are NOT serialized —
 // they're re-created at module load.
