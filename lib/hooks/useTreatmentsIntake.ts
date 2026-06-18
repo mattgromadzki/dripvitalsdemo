@@ -286,8 +286,30 @@ export async function resetTreatmentsStoreToDefaults() {
   nextFormId      = SEED_FORMS.length + 1;
   nextClientId    = SEED_CLIENTS.length + 1;
   nextQId         = 1000;
+
+  // Preserve uploaded treatment thumbnails. A "reset" restores the default
+  // catalog *content*, but must NOT wipe pictures an operator uploaded via the
+  // treatment editor. We read the current server copy, map id -> thumbnail, and
+  // re-apply those thumbnails onto matching seed treatments before pushing, so
+  // future content updates never delete existing pictures.
+  let treatments: typeof SEED_TREATMENTS = SEED_TREATMENTS;
+  if (typeof window !== "undefined") {
+    try {
+      const r = await fetch(`/api/store/treatments`, { cache: "no-store" });
+      const d = await r.json();
+      const current: Array<{ id: number; thumbnail?: string }> = Array.isArray(d?.data) ? d.data : [];
+      const thumbById = new Map<number, string>();
+      current.forEach((t) => { if (t && t.thumbnail) thumbById.set(t.id, t.thumbnail); });
+      if (thumbById.size > 0) {
+        treatments = SEED_TREATMENTS.map((t) =>
+          thumbById.has(t.id) ? { ...t, thumbnail: thumbById.get(t.id) } : t,
+        );
+      }
+    } catch { /* ignore — fall back to seed without thumbnails */ }
+  }
+
   useTreatmentsIntake.setState({
-    treatments: SEED_TREATMENTS,
+    treatments,
     forms:      SEED_FORMS,
     clients:    SEED_CLIENTS,
   });
@@ -297,7 +319,7 @@ export async function resetTreatmentsStoreToDefaults() {
     try {
       await Promise.all([
         put("intake-forms", SEED_FORMS),
-        put("treatments", SEED_TREATMENTS),
+        put("treatments", treatments),
       ]);
     } catch { /* ignore — local reset still applied */ }
   }
