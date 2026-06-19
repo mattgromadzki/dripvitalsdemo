@@ -245,10 +245,12 @@ export default function ShopPage() {
                     >
                       <Td>
                         <div
-                          className="w-11 h-11 rounded-sm flex items-center justify-center text-[22px] flex-shrink-0"
+                          className="w-11 h-11 rounded-sm flex items-center justify-center text-[22px] flex-shrink-0 overflow-hidden"
                           style={{ background: thumb.background, color: thumb.color }}
                         >
-                          {p.img}
+                          {p.imageUrl
+                            ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                            : p.img}
                         </div>
                       </Td>
                       <Td>

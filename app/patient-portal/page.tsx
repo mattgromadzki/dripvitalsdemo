@@ -78,6 +78,19 @@ interface ChatMsg { from: "mine" | "them"; text: string; time: string; attachmen
 export default function PatientPortalPage() {
   const allProducts = useShop((s) => s.products);
 
+  // Pull the persisted storefront (incl. admin-uploaded thumbnails) so customers
+  // see the same catalog the Shop admin manages. Falls back to the code seed on any error.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/store/shop")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive && j && Array.isArray(j.data) && j.data.length) useShop.setState({ products: j.data });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   // The logged-in patient (demo: the first EMR patient). Using a real EMR
   // patient is what lets staff open this same person in Patient View and see
   // exactly what they entered here.
@@ -1118,7 +1131,7 @@ function ShopPage({ list, count, filter, setFilter, search, setSearch, onOpen }:
 function ProductCard({ p, onOpen }: { p: ShopProduct; onOpen: (id: string) => void }) {
   return (
     <div className="product-card" onClick={() => onOpen(p.id)}>
-      <div className={`product-img ${p.cls}`}>{p.img}</div>
+      <div className={`product-img ${p.cls}`} style={p.imageUrl ? { overflow: "hidden" } : undefined}>{p.imageUrl ? <img src={p.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : p.img}</div>
       <div className="product-body">
         <div className="product-tag">{p.tag}</div>
         <div className="product-name">{p.name}</div>
@@ -1147,7 +1160,7 @@ function ProductDetail({ product: p, related, onBack, onOpen, toast }: {
     <section className="page active">
       <button className="pdp-back" onClick={onBack}>← Back to Shop</button>
       <div className="pdp-hero">
-        <div className={`pdp-hero-img product-img ${p.cls}`}>{p.img}</div>
+        <div className={`pdp-hero-img product-img ${p.cls}`} style={p.imageUrl ? { overflow: "hidden" } : undefined}>{p.imageUrl ? <img src={p.imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : p.img}</div>
         <div className="pdp-hero-info">
           <div className="pdp-tag">{p.tag}</div>
           <h1 className="pdp-name">{p.name}</h1>

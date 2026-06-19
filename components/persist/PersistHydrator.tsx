@@ -15,6 +15,7 @@ import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import { useMedications } from "@/lib/hooks/useMedications";
 import { usePharmacies } from "@/lib/hooks/usePharmacies";
 import { useDoctors } from "@/lib/hooks/useDoctors";
+import { useShop } from "@/lib/hooks/useShop";
 import { useProviders } from "@/lib/hooks/useProviders";
 import { useStaff } from "@/lib/hooks/useStaff";
 import { useIntegrations } from "@/lib/hooks/useIntegrations";
@@ -62,6 +63,7 @@ export function PersistHydrator() {
     serverPersist(usePharmacies, "pharmacies", "pharmacies", CATALOG_POLL);
     serverPersist(useDoctors, "doctors", "doctors", CATALOG_POLL);
     serverPersist(useProviders, "providers", "providers", CATALOG_POLL);
+    serverPersist(useShop, "shop", "products", CATALOG_POLL);
     serverPersist(useStaff, "staff", "staff", CATALOG_POLL);
     serverPersist(useIntegrations, "integrations", "integrations", CATALOG_POLL);
     serverPersist(useRbac, "rbac", "rolePerms", CATALOG_POLL);

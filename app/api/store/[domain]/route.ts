@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 const ALLOW = new Set([
   "treatment-requests", "soap-notes", "prescriptions", "labs",
   "orders", "shipments", "tasks", "subscriptions", "visit-queue",
-  "treatments", "intake-forms",
+  "treatments", "intake-forms", "shop",
   // communications
   "emails", "sms",
   // pharmacy push events (5Axis webhooks)
@@ -24,7 +24,7 @@ const ALLOW = new Set([
 
 // Readable without a staff session — the PUBLIC patient intake form needs these
 // to render the questionnaire. Everything else requires a signed-in staff session.
-const PUBLIC_READ = new Set(["intake-forms", "treatments"]);
+const PUBLIC_READ = new Set(["intake-forms", "treatments", "shop"]);
 
 // Permission required to WRITE each domain. Unmapped domains default to owner-only.
 const WRITE_PERM: Record<string, string> = {
@@ -39,6 +39,7 @@ const WRITE_PERM: Record<string, string> = {
   "visit-queue": "patients.edit",
   "treatments": "settings.manage",
   "intake-forms": "settings.manage",
+  "shop": "settings.manage",
   "emails": "email.send",
   "sms": "sms.send",
   "medications": "settings.manage",

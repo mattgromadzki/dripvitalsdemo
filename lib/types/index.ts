@@ -1069,6 +1069,7 @@ export interface ShopProduct {
   price: number;            // monthly price ($/mo) shown on the card
   firstMonth: number;       // promotional first-month price
   img: string;              // emoji/icon glyph shown in the thumbnail
+  imageUrl?: string;        // uploaded photo (data URL); overrides the emoji/gradient when set
   cls: ShopThumbColor;      // thumbnail background gradient
   url: string;              // intake deep-link for the Get Started button
   published: boolean;       // false === draft (hidden from portal)

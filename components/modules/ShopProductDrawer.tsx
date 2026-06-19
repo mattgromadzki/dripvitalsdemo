@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { fileToCompressedDataURL } from "@/lib/util/imageCompress";
+import { toast } from "@/lib/hooks/useToast";
 import type { ShopProduct, ShopProductInput, ShopFaq, ShopCategory, ShopThumbColor } from "@/lib/types";
 import {
   SHOP_CATEGORY_LABEL,
@@ -31,6 +33,7 @@ interface FormState {
   price: string;
   firstMonth: string;
   img: string;
+  imageUrl: string;
   cls: ShopThumbColor;
   url: string;
   safety: string;
@@ -52,6 +55,7 @@ function buildInitialState(product: ShopProduct | null, nextSort: number): FormS
       price: "99",
       firstMonth: "99",
       img: "💉",
+      imageUrl: "",
       cls: "green",
       url: "",
       safety: "",
@@ -71,6 +75,7 @@ function buildInitialState(product: ShopProduct | null, nextSort: number): FormS
     price: String(product.price),
     firstMonth: String(product.firstMonth),
     img: product.img,
+    imageUrl: product.imageUrl ?? "",
     cls: product.cls,
     url: product.url,
     safety: product.safety ?? "",
@@ -112,6 +117,25 @@ export function ShopProductDrawer({
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  async function onPickPhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast("Please choose an image file"); return; }
+    setUploading(true);
+    try {
+      const dataUrl = await fileToCompressedDataURL(file, 600, 0.8);
+      set("imageUrl", dataUrl);
+      toast("📷 Photo added");
+    } catch {
+      toast("Couldn't process that image");
+    } finally {
+      setUploading(false);
+    }
+  }
+
   function cycleImg() {
     setForm((f) => {
       const idx = SHOP_THUMB_OPTIONS.indexOf(f.img as (typeof SHOP_THUMB_OPTIONS)[number]);
@@ -150,6 +174,7 @@ export function ShopProductDrawer({
       price: Number(form.price) || 0,
       firstMonth: Number(form.firstMonth) || 0,
       img: form.img,
+      imageUrl: form.imageUrl || undefined,
       cls: form.cls,
       url: form.url.trim(),
       published: form.published,
@@ -247,21 +272,30 @@ export function ShopProductDrawer({
                 className="w-[110px] h-[110px] rounded-md flex items-center justify-center text-[52px] overflow-hidden"
                 style={{ background: thumb.background, color: thumb.color }}
               >
-                {form.img}
+                {form.imageUrl
+                  ? <img src={form.imageUrl} alt="" className="w-full h-full object-cover" />
+                  : form.img}
               </div>
               <div className="flex flex-col gap-2">
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickPhoto} />
                 <div className="flex gap-2">
                   <button className="btn btn-ghost btn-sm" onClick={cycleImg}>
                     Change icon
                   </button>
                   <button
                     className="btn btn-ghost btn-sm"
-                    onClick={() => alert("File picker would open in production.")}
+                    disabled={uploading}
+                    onClick={() => fileRef.current?.click()}
                   >
-                    Upload photo
+                    {uploading ? "Uploading…" : form.imageUrl ? "Replace photo" : "Upload photo"}
                   </button>
+                  {form.imageUrl && (
+                    <button className="btn btn-ghost btn-sm text-red" onClick={() => set("imageUrl", "")}>
+                      Remove photo
+                    </button>
+                  )}
                 </div>
-                <Helper>Recommended: 800×800px, transparent or white background. PNG/JPG up to 2MB.</Helper>
+                <Helper>Recommended: 800×800px, transparent or white background. PNG/JPG up to 2MB. A photo overrides the icon + gradient.</Helper>
               </div>
             </div>
             <Field label="Background gradient" className="mt-3.5">
