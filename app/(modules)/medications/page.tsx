@@ -16,6 +16,7 @@ export default function MedicationsPage() {
   const meds = useMedications((s) => s.meds);
   const add = useMedications((s) => s.add);
   const update = useMedications((s) => s.update);
+  const remove = useMedications((s) => s.remove);
   const pharmaciesAll = usePharmacies((s) => s.pharmacies);
   const realPharmacies = pharmaciesAll.map((p) => p.name);
   const pharmacyFilterOpts = Array.from(new Set([...realPharmacies, ...meds.map((m) => m.pharmacy)]));
@@ -138,7 +139,10 @@ export default function MedicationsPage() {
                   <td className="px-3 py-2.5 text-right whitespace-nowrap">{m.sent.toLocaleString("en-US")}</td>
                   <td className="px-3 py-2.5"><Pill intent={m.status === "active" ? "green" : "red"} dot>{m.status === "active" ? "Active" : "Discontinued"}</Pill></td>
                   <td className="px-3 py-2.5 text-right">
-                    <button className="text-[11.5px] font-semibold text-brand-dk border border-border rounded-[7px] px-2.5 py-1 hover:bg-brand-soft hover:border-brand" onClick={() => { setEditMed(m); setModalOpen(true); }}>Edit</button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button className="text-[11.5px] font-semibold text-brand-dk border border-border rounded-[7px] px-2.5 py-1 hover:bg-brand-soft hover:border-brand" onClick={() => { setEditMed(m); setModalOpen(true); }}>Edit</button>
+                      <button className="text-[11.5px] font-semibold text-red border border-border rounded-[7px] px-2.5 py-1 hover:bg-red-soft hover:border-red" onClick={() => { if (window.confirm(`Delete "${m.name}${m.strength ? " " + m.strength : ""}"? This removes it from the catalog and can't be undone.`)) { remove(m.id); toast("🗑 Medication deleted"); } }}>Delete</button>
+                    </div>
                   </td>
                 </tr>
               ))}
