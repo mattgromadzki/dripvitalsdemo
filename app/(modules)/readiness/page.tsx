@@ -10,7 +10,7 @@ interface Readiness {
   redis: boolean;
   brands: Brand[];
   payments: { provider: string | null; ready: boolean; detail: string; env: string[] };
-  pharmacy: { ready: boolean; which: string | null; env: string[] };
+  pharmacy: { ready: boolean; which: string | null; env: string[]; greenstone: { token: boolean; baseUrl: string; isProd: boolean; ncpdp: boolean; clinic: boolean; webhook: boolean } | null };
   address: { ready: boolean; env: string[] };
   shipping: { ready: boolean; env: string[] };
   sentry: boolean;
@@ -112,7 +112,9 @@ export default function ReadinessPage() {
 
           <Group title="Pharmacy & fulfillment">
             <Item name="Pharmacy e-prescribing" state={d.pharmacy.ready ? "ready" : "missing"}
-              label={d.pharmacy.ready ? "Live" : "Not set"} detail={d.pharmacy.which ? `${d.pharmacy.which} connected` : "LifeFile or eMed"} env={d.pharmacy.env} />
+              label={d.pharmacy.ready ? "Live" : "Not set"} detail={d.pharmacy.greenstone
+                ? `${d.pharmacy.which} · endpoint: ${d.pharmacy.greenstone.baseUrl}${d.pharmacy.greenstone.isProd ? "" : " ⚠"} · NCPDP ${d.pharmacy.greenstone.ncpdp ? "set" : "MISSING ⚠"} · clinic ${d.pharmacy.greenstone.clinic ? "set" : "MISSING ⚠"} · webhook ${d.pharmacy.greenstone.webhook ? "set" : "not set"} — note: token presence only, not validated by 5Axis`
+                : d.pharmacy.which ? `${d.pharmacy.which} connected` : "LifeFile or eMed"} env={d.pharmacy.env} />
             <Item name="Address verification (Smarty)" state={d.address.ready ? "ready" : "missing"} label={d.address.ready ? "Live" : "Not set"} env={d.address.env} />
             <Item name="Shipping (USPS)" state={d.shipping.ready ? "ready" : "missing"} label={d.shipping.ready ? "Live" : "Not set"} env={d.shipping.env} />
           </Group>

@@ -97,6 +97,17 @@ function medToDrugEntry(m: Medication): DrugCatalogEntry {
   };
 }
 
+// Normalize any DOB string to the YYYY-MM-DD format GreenstoneRX/5Axis expects.
+// Returns undefined for unparseable values (e.g. a placeholder "—") so we omit
+// the field rather than send a malformed date.
+function toISODate(s?: string): string | undefined {
+  if (!s) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return undefined;
+  return d.toISOString().slice(0, 10);
+}
+
 export function EPrescribeWorkspace(
   { embeddedPatientId, orderContext }: { embeddedPatientId?: string; orderContext?: EPrescribeOrderContext } = {}
 ) {
@@ -435,7 +446,7 @@ export function EPrescribeWorkspace(
       internalCustomerId: patient.id,
       firstName,
       lastName,
-      dob: extra?.dob,
+      dob: toISODate(extra?.dob),
       gender: extra?.gender,
       email: patient.email,
       phoneNumber: patient.phone,
@@ -443,14 +454,13 @@ export function EPrescribeWorkspace(
       scripts: meds.map((m) => ({
         name: `${m.drug.name} ${m.strength}`.trim(),
         dispense_quantity: String(m.qty),
-        dispense_unit: m.unit || "unit",
+        dispense_unit: (m.unit || "unit").replace(/^per\s+/i, "").trim() || "unit",
         sig: m.sig,
         doctor: selectedDoctor.id,
         doctor_name: doctorLabel(selectedDoctor),
         doctor_npi: npi,
         number_refills: m.refills,
         date_prescribed: today,
-        timeStamp: nowMs,
       })),
       deliveryType: "direct",
     };
