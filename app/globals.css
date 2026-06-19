@@ -2991,6 +2991,18 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .emr-content { zoom: var(--emr-scale, 1); overflow-x: auto; }
 .dv-sidebar  { zoom: var(--emr-scale, 1); }
 
+/* ── EMR type scale ──────────────────────────────────────────────
+   Normalizes typography across every module to match the orders-page
+   design. Scoped to .emr-content and using element+class specificity
+   (e.g. `.emr-content h1` = 0,1,1) so it cleanly overrides inline
+   Tailwind sizes like `text-[22px]` (0,1,0) without per-page edits.
+   Treatments module keeps its own scoped scale.                   */
+.emr-content { font-size: 14px; }
+.emr-content h1 { font-size: 23px; font-weight: 800; letter-spacing: -.5px; line-height: 1.18; }
+.emr-content h2 { font-size: 17px; font-weight: 700; letter-spacing: -.3px; line-height: 1.25; }
+.emr-content h3 { font-size: 14px; font-weight: 700; line-height: 1.3; }
+.treatments-intake-mod h1, .treatments-intake-mod h2, .treatments-intake-mod h3 { font-size: revert; font-weight: revert; letter-spacing: revert; }
+
 /* ── Patient portal: shipment tracking cards ── */
 .dv-portal .ship-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 16px; box-shadow: 0 6px 22px rgba(28,31,36,.05); }
 .dv-portal .ship-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
