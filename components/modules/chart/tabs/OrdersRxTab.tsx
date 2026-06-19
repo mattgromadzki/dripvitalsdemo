@@ -4,7 +4,12 @@ import { useState, type ReactNode } from "react";
 import type { Key } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { toast } from "@/lib/hooks/useToast";
-import type { Patient, PatientExtra } from "@/lib/types";
+import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
+import { usePermission } from "@/lib/rbac/usePermission";
+import { NewPrescriptionModal } from "@/components/modules/chart/NewPrescriptionModal";
+import type { Patient, PatientExtra, PaymentOverride } from "@/lib/types";
+
+type RxView = { id: string; med: string; dose: string; refills: number; prescribed: string; status: string; prescribedBy: string; paymentOverride?: PaymentOverride };
 
 type InnerTab = "current" | "past" | "rx";
 
@@ -25,10 +30,25 @@ const STEP_LABELS_MINI_UP = ["Placed", "Payment", "Approval", "Fill", "Shipped",
 
 export function OrdersRxTab({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
   const [innerTab, setInnerTab] = useState<InnerTab>("current");
+  const [rxOpen, setRxOpen] = useState(false);
+  const canRx = usePermission("rx.prescribe");
   const allOrders = extra.orders;
   // Heuristic — first order treated as "current", rest as past
   const currentList = allOrders.length > 0 ? [allOrders[0]] : [];
   const pastList    = allOrders.slice(1);
+
+  // Merge manually-created prescriptions (store, filtered to this patient) with the chart's seeded ones
+  const storeRx = usePrescriptions((s) => s.prescriptions);
+  const rxItems: RxView[] = [
+    ...storeRx.filter((r) => r.patientId === patient.id).map((r) => ({
+      id: r.id, med: r.medication, dose: r.dose, refills: r.refillsRemaining,
+      prescribed: r.prescribedDate, status: r.status, prescribedBy: r.prescriber, paymentOverride: r.paymentOverride,
+    })),
+    ...extra.prescriptions.map((rx) => ({
+      id: rx.id, med: rx.med, dose: rx.dose, refills: rx.refills,
+      prescribed: rx.prescribed, status: rx.status, prescribedBy: rx.prescribedBy,
+    })),
+  ];
 
   return (
     <div>
@@ -39,19 +59,21 @@ export function OrdersRxTab({ patient, extra }: { patient: Patient; extra: Patie
         <InnerTabBtn active={innerTab === "past"} count={pastList.length} onClick={() => setInnerTab("past")}>
           Past Orders
         </InnerTabBtn>
-        <InnerTabBtn active={innerTab === "rx"} count={extra.prescriptions.length} onClick={() => setInnerTab("rx")}>
+        <InnerTabBtn active={innerTab === "rx"} count={rxItems.length} onClick={() => setInnerTab("rx")}>
           Prescriptions
         </InnerTabBtn>
         <div className="flex-1" />
         <div className="flex gap-2 pb-2">
-          <button className="btn btn-ghost btn-sm" onClick={() => toast("💊 Prescribe flow opened")}>+ Prescribe</button>
+          {canRx && <button className="btn btn-ghost btn-sm" onClick={() => setRxOpen(true)}>+ Prescribe</button>}
           <button className="btn btn-primary btn-sm" onClick={() => toast("📦 New order flow opened")}>+ New Order</button>
         </div>
       </div>
 
       {innerTab === "current" && <CurrentOrders orders={currentList} patient={patient} />}
       {innerTab === "past"    && <PastOrders    orders={pastList}    />}
-      {innerTab === "rx"      && <Prescriptions extra={extra} patient={patient} />}
+      {innerTab === "rx"      && <Prescriptions items={rxItems} patient={patient} onPrescribe={() => setRxOpen(true)} />}
+
+      <NewPrescriptionModal patient={patient} open={rxOpen} onClose={() => setRxOpen(false)} />
     </div>
   );
 }
@@ -368,8 +390,8 @@ function PastOrders({ orders }: { orders: PatientExtra["orders"] }) {
   );
 }
 
-function Prescriptions({ extra, patient }: { extra: PatientExtra; patient: Patient }) {
-  if (extra.prescriptions.length === 0) {
+function Prescriptions({ items, patient, onPrescribe }: { items: RxView[]; patient: Patient; onPrescribe: () => void }) {
+  if (items.length === 0) {
     return (
       <div className="bg-surface border border-border rounded-lg p-10 text-center">
         <div className="text-[32px] opacity-40 mb-2">💊</div>
@@ -380,11 +402,16 @@ function Prescriptions({ extra, patient }: { extra: PatientExtra; patient: Patie
   }
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {extra.prescriptions.map((rx) => (
+      {items.map((rx) => (
         <div key={rx.id} className="bg-surface border border-border rounded-lg px-4 py-3.5">
           <div className="flex items-center gap-2 mb-2">
             <Pill intent={rx.status === "active" ? "green" : "muted"} dot>{rx.status[0].toUpperCase() + rx.status.slice(1)}</Pill>
-            <span className="font-mono text-[10.5px] text-ink-muted">{rx.id}</span>
+            {rx.paymentOverride && (
+              <Pill intent={rx.paymentOverride.mode === "waived" ? "amber" : "blue"} dot>
+                {rx.paymentOverride.mode === "waived" ? "Comped" : "Paid (override)"}
+              </Pill>
+            )}
+            <span className="font-mono text-[10.5px] text-ink-muted ml-auto">{rx.id}</span>
           </div>
           <div className="text-[15px] font-bold text-ink">{rx.med}</div>
           <div className="font-mono text-[12px] text-brand-dk font-semibold mt-1">{rx.dose}</div>
@@ -394,6 +421,11 @@ function Prescriptions({ extra, patient }: { extra: PatientExtra; patient: Patie
             <DetailField label="Date" value={rx.prescribed} mono />
             <DetailField label="Patient" value={patient.first} />
           </div>
+          {rx.paymentOverride && (
+            <div className="mt-2.5 text-[11px] text-ink-muted bg-surface-2 border border-border rounded-md px-2.5 py-1.5">
+              💳 Payment {rx.paymentOverride.mode === "waived" ? "waived" : "marked paid"} — {rx.paymentOverride.reason} · {rx.paymentOverride.by}
+            </div>
+          )}
           <div className="flex gap-2 mt-3 pt-3 border-t border-border">
             <button className="btn btn-ghost btn-xs" onClick={() => toast("📦 Refill sent")}>📦 Send Refill</button>
             <button className="btn btn-ghost btn-xs" onClick={() => toast("↻ Renewal flow opened")}>↻ Renew</button>

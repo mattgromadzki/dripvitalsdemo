@@ -175,6 +175,17 @@ export interface Prescription {
   sig: string;              // signa / instructions
   controlled?: boolean;     // for DEA-controlled meds (rare for GLP-1, common for ADHD)
   interactionFlag?: string; // if drug-drug check found something
+  paymentOverride?: PaymentOverride; // set when a provider bypasses the normal charge
+}
+
+/** Records a manual payment override on a prescription created from the chart.
+ *  mode "paid"   → payment collected outside the app (mark as settled, no charge).
+ *  mode "waived" → comped, no charge at all. */
+export interface PaymentOverride {
+  mode: "paid" | "waived";
+  reason: string;
+  by: string;   // staff member who applied the override
+  at: number;   // epoch ms
 }
 
 export type SoapNoteStatus = "draft" | "signed" | "amended";
