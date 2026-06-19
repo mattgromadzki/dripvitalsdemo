@@ -54,7 +54,7 @@ export function RxPreviewBask({ rx, status, refNum }: Props) {
       <RxField label="Shipping Address">
         {rx.patient.address ? (
           <span className="font-sans text-[12px] leading-snug">
-            {rx.patient.address.street}, {rx.patient.address.city}, {rx.patient.address.state} {rx.patient.address.zip}
+            {rx.patient.address.street}{rx.patient.address.line2 ? `, ${rx.patient.address.line2}` : ""}, {rx.patient.address.city}, {rx.patient.address.state} {rx.patient.address.zip}
           </span>
         ) : (
           <span className="font-sans italic text-ink-muted text-[12px]">No address on file</span>

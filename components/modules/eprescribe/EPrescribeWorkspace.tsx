@@ -1245,10 +1245,15 @@ export function EPrescribeWorkspace(
                           value={extra.address.street}
                           mono
                         />
-                        <SummaryRow
-                          label="City / State"
-                          value={`${extra.address.city}, ${extra.address.state}`}
-                        />
+                        {extra.address.line2 ? (
+                          <SummaryRow
+                            label="Address line 2"
+                            value={extra.address.line2}
+                            mono
+                          />
+                        ) : null}
+                        <SummaryRow label="City" value={extra.address.city} />
+                        <SummaryRow label="State" value={extra.address.state} />
                         <SummaryRow
                           label="ZIP"
                           value={extra.address.zip}

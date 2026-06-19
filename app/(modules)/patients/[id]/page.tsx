@@ -85,7 +85,6 @@ export default function PatientDetailPage() {
   const pid = patient.id;
   const logAudit = (action: string, area = "Chart") => setAudit((a) => [{ time: `Now`, user: "Admin", action, area, device: "Browser" }, ...a]);
   const addr = extra.address;
-  const fullAddress = addr ? `${addr.street}${addr.line2 ? ", " + addr.line2 : ""}, ${addr.city}, ${addr.state} ${addr.zip}` : "—";
   const buildProfile = () => ({
     name: patient.name, email: patient.email, phone: patient.phone,
     dob: extra.dob || "", allergies: patient.allergies || "",
@@ -200,7 +199,14 @@ export default function PatientDetailPage() {
                 <Info k="Rx Status" v={hasRx ? "Active" : "Signature needed"} /><Info k="Payment" v={patient.sub} />
               </div>
               <div className="mt-3 pt-3 border-t border-surface-3">
-                <Info k="Shipping address" v={fullAddress} />
+                <div className="text-[10px] uppercase tracking-wide text-ink-muted font-bold mb-2">Shipping address</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Info k="Address" v={addr?.street || "—"} />
+                  <Info k="Address line 2" v={addr?.line2 || "—"} />
+                  <Info k="City" v={addr?.city || "—"} />
+                  <Info k="Zip code" v={addr?.zip || "—"} />
+                  <Info k="State" v={addr?.state || patient.state || "—"} />
+                </div>
               </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-4">
