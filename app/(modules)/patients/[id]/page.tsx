@@ -13,6 +13,7 @@ import { NewOrderModal } from "@/components/modules/chart/NewOrderModal";
 import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
+import { PatientPharmacyTracking } from "@/components/modules/pharmacy/PatientPharmacyTracking";
 
 type TabKey = "summary" | "intake" | "treatment" | "orders" | "weight" | "messages" | "documents" | "billing" | "admin";
 const TABS: { key: TabKey; label: string }[] = [
@@ -293,7 +294,9 @@ export default function PatientDetailPage() {
           )}
 
           {tab === "orders" && (
-            <Card title="Patient Orders &amp; Prescriptions" sub="Prescriptions transmitted to the pharmacy via e-prescribe, with status and timestamps." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
+            <>
+              <PatientPharmacyTracking patientId={pid} />
+              <Card title="Patient Orders &amp; Prescriptions" sub="Prescriptions transmitted to the pharmacy via e-prescribe, with status and timestamps." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
               {patientRx.length === 0 && <div className="text-ink-muted text-[12.5px] py-6 text-center">No prescriptions yet. Use Create Rx to send one through e-prescribe.</div>}
               {patientRx.map((r) => {
                 const doc = patientDocs.find((d) => d.category === "rx" && Math.abs(d.createdAt - r.prescribedAt) < 5);
@@ -321,6 +324,7 @@ export default function PatientDetailPage() {
                 );
               })}
             </Card>
+            </>
           )}
 
           {tab === "weight" && (

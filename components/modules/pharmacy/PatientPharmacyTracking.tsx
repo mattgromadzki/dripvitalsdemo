@@ -44,15 +44,17 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
 
   const latest = events[0];
   const latestStage = stageOf(latest);
+  const gsOrderId = events.find((e) => e.orderId != null && String(e.orderId).length > 0)?.orderId;
   const tracking = events.find((e) => e.trackingNumber)?.trackingNumber;
   const trackingUrl = events.find((e) => e.trackingUrl)?.trackingUrl;
 
   return (
     <div className="bg-surface border border-border rounded-2xl p-5 mb-4">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[16px]">💊</span>
           <span className="font-semibold text-ink">Pharmacy fulfillment</span>
+          {gsOrderId ? <span className="text-[12px] text-ink-muted font-mono">GreenstoneRX #{gsOrderId}</span> : null}
           <Pill intent={latestStage.intent} dot>{latestStage.label}</Pill>
         </div>
         <button className="btn btn-ghost text-[12px]" onClick={load}>Refresh</button>
