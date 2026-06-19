@@ -34,7 +34,9 @@ import {
   type SupplyOption,
   type SavedDocument,
 } from "@/lib/data/eprescribeCatalog";
-import type { TreatmentRequest, Patient, PatientExtra, PatientDocument, Pharmacy, Prescription, Doctor } from "@/lib/types";
+import type { TreatmentRequest, Patient, PatientExtra, PatientDocument, Pharmacy, Prescription, Doctor, Medication } from "@/lib/types";
+import { useMedications } from "@/lib/hooks/useMedications";
+import { MED_PROGRAM_INTENT } from "@/lib/data/medications";
 
 const ROUTE_OPTIONS = ["Subcutaneous (SQ)", "Intramuscular (IM)", "Oral (PO)", "Topical", "Sublingual (SL)"];
 const FREQ_OPTIONS  = ["Once daily (QD)", "Twice daily (BID)", "Three times daily (TID)", "Once weekly", "Every 2 weeks", "Monthly", "As needed (PRN)"];
@@ -72,6 +74,28 @@ interface SupplyLine {
 type CartLine = MedicationLine | SupplyLine;
 
 export interface EPrescribeOrderContext { id: string; treatmentName: string; placedAt: string; price?: string; kind?: "paid" | "treatment" }
+
+// Map a Medication from the EMR Medications catalog into the e-prescribe drug
+// search shape, so the "Drug Name or NDC" dropdown reflects the real catalog
+// managed in the Medications section (not a separate hardcoded list).
+function medToDrugEntry(m: Medication): DrugCatalogEntry {
+  const injectable = /vial|syringe|inject|pen|mL/i.test(m.form);
+  const compounded = /compound/i.test(m.name) || /compound/i.test(m.pharmacy);
+  const progIntent = MED_PROGRAM_INTENT[m.program] ?? "muted";
+  const iconColor = progIntent === "muted" ? "var(--color-ink-muted-2)" : `var(--color-${progIntent})`;
+  const iconBg = progIntent === "muted" ? "var(--color-surface-3)" : `var(--color-${progIntent}-soft)`;
+  return {
+    id: m.id,
+    name: m.name,
+    detail: [m.strength, m.program, m.form, m.pharmacy].filter(Boolean).join(" · "),
+    icon: injectable ? "💉" : "💊",
+    drugClass: m.program,
+    badge: compounded ? "Compounded" : "Generic",
+    badgeIntent: compounded ? "purple" : "green",
+    iconColor,
+    iconBg,
+  };
+}
 
 export function EPrescribeWorkspace(
   { embeddedPatientId, orderContext }: { embeddedPatientId?: string; orderContext?: EPrescribeOrderContext } = {}
@@ -151,15 +175,24 @@ export function EPrescribeWorkspace(
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropOpen]);
 
+  // Drug search options come from the EMR Medications catalog (useMedications),
+  // so e-prescribe matches what's managed in the Medications section. Falls back
+  // to the standard catalog only if the catalog is empty (so prescribing still works).
+  const allMeds = useMedications((s) => s.meds);
+  const drugOptions = useMemo(() => {
+    const c = allMeds.filter((m) => m.status === "active").map(medToDrugEntry);
+    return c.length ? c : DRUG_CATALOG;
+  }, [allMeds]);
+
   const filteredDrugs = useMemo(() => {
     const q = drugSearch.trim().toLowerCase();
-    if (!q) return DRUG_CATALOG;
-    return DRUG_CATALOG.filter((d) =>
+    if (!q) return drugOptions;
+    return drugOptions.filter((d) =>
       d.name.toLowerCase().includes(q) ||
       d.detail.toLowerCase().includes(q) ||
       d.drugClass.toLowerCase().includes(q)
     );
-  }, [drugSearch]);
+  }, [drugSearch, drugOptions]);
 
   // ── Medication form ─────────────────────────────────────────────────
   const [activePresetIdx, setActivePresetIdx] = useState(1);
@@ -294,7 +327,7 @@ export function EPrescribeWorkspace(
     setDropOpen(true);
   }
   function selectDrugById(id: string) {
-    const d = DRUG_CATALOG.find((x) => x.id === id);
+    const d = drugOptions.find((x) => x.id === id);
     if (!d) return;
     setSelectedDrug(d);
     setDrugSearch(d.name);
