@@ -94,6 +94,8 @@ const headerCls = "text-[10px] uppercase tracking-[1.4px] text-ink-muted-2 font-
 export function Sidebar() {
   const open = useUI((s) => s.sidebarOpen);
   const close = useUI((s) => s.closeSidebar);
+  const collapsed = useUI((s) => s.collapsed);
+  const toggleCollapsed = useUI((s) => s.toggleCollapsed);
   const path = usePathname();
 
   // Close the drawer whenever the route changes (i.e. after tapping a nav item).
@@ -102,16 +104,26 @@ export function Sidebar() {
   return (
     <>
       {open && <div className="dv-backdrop" onClick={close} />}
-      <aside className={`dv-sidebar w-[236px] min-w-[236px] bg-surface border-r border-border flex flex-col overflow-y-auto py-3.5 px-3${open ? " open" : ""}`}>
-        <Suspense fallback={<SidebarSkeleton />}>
-          <SidebarInner />
+      <aside className={`dv-sidebar ${collapsed ? "w-[64px] min-w-[64px]" : "w-[208px] min-w-[208px]"} bg-surface border-r border-border flex flex-col overflow-y-auto overflow-x-hidden py-3 px-2.5 transition-[width,min-width] duration-200 ease-out${open ? " open" : ""}`}>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label="Toggle sidebar"
+          className={`dv-hide-mobile flex items-center ${collapsed ? "justify-center" : "justify-end"} text-ink-muted hover:text-ink hover:bg-surface-3 text-[13px] mb-1.5 px-2 py-1 rounded-md`}
+        >
+          {collapsed ? "»" : "«"}
+        </button>
+        <Suspense fallback={<SidebarSkeleton collapsed={collapsed} />}>
+          <SidebarInner rail={collapsed} />
         </Suspense>
       </aside>
     </>
   );
 }
 
-function SidebarSkeleton() {
+function SidebarSkeleton({ collapsed }: { collapsed?: boolean }) {
+  if (collapsed) return null;
   return (
     <>
       {NAV.map((section) => (
@@ -129,7 +141,7 @@ function SidebarSkeleton() {
   );
 }
 
-function SidebarInner() {
+function SidebarInner({ rail }: { rail?: boolean }) {
   const path = usePathname();
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
@@ -174,6 +186,33 @@ function SidebarInner() {
     if (item.href.includes("?")) return currentFullHref === item.href;
     const matchesPath = path === item.href || (item.href !== "/" && path.startsWith(item.href + "/"));
     return matchesPath && !fullHrefsInNav.has(currentFullHref);
+  }
+
+  // Collapsed: flat icon-only rail with tooltips + a dot for badges.
+  if (rail) {
+    const flat = NAV.flatMap((s) => s.items.filter((it) => !NAV_PERM[it.href] || perms.includes(NAV_PERM[it.href])));
+    return (
+      <>
+        {flat.map((item) => {
+          const active = itemActive(item);
+          const badge = item.href === "/patient-chat" ? (chatUnread > 0 ? chatUnread : undefined) : item.badge;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              className={[
+                "relative flex items-center justify-center w-[44px] h-[40px] mx-auto rounded-[9px] mb-px transition-colors text-[16px]",
+                active ? "bg-brand-soft" : "hover:bg-surface-3",
+              ].join(" ")}
+            >
+              <span>{item.icon}</span>
+              {badge != null && <span className={`absolute top-[6px] right-[6px] w-[7px] h-[7px] rounded-full ${item.href === "/patient-chat" ? "bg-red" : "bg-brand"}`} />}
+            </Link>
+          );
+        })}
+      </>
+    );
   }
 
   return (

@@ -125,7 +125,7 @@ export default function OrdersPage() {
   ];
 
   return (
-    <div className="px-7 py-6 text-[14px]">
+    <div className="px-5 py-5 text-[14px]">
       {/* Page head */}
       <div className="flex items-start gap-3.5 mb-4 flex-wrap">
         <div>
