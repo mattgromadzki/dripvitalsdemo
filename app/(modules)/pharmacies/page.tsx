@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Key, ReactNode } from "react";
 import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
-import { usePharmacies } from "@/lib/hooks/usePharmacies";
+import { usePharmacies, resetPharmaciesToDefaults } from "@/lib/hooks/usePharmacies";
 import type { Pharmacy } from "@/lib/types";
 
 const ALL_STATES = [
@@ -116,6 +116,7 @@ export default function PartnerPharmaciesPage() {
           <div className="flex gap-2">
             <button className="btn btn-ghost btn-sm" onClick={() => toast("📥 CSV import opened")}>📥 Import CSV</button>
             <button className="btn btn-ghost btn-sm" onClick={() => toast("📊 Pharmacy reports opened")}>📊 Reports</button>
+            <button className="btn btn-ghost btn-sm" style={{ color: "var(--color-amber)" }} onClick={async () => { await resetPharmaciesToDefaults(); toast("↺ Pharmacies reset to defaults"); }}>↺ Reset to defaults</button>
             <button className="btn btn-primary btn-sm" onClick={openAdd}>+ Add Pharmacy</button>
           </div>
         </div>

@@ -10,7 +10,6 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import { useEmails } from "@/lib/hooks/useEmails";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { NewOrderModal } from "@/components/modules/chart/NewOrderModal";
-import { NewPrescriptionModal } from "@/components/modules/chart/NewPrescriptionModal";
 import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
 
 type TabKey = "summary" | "intake" | "treatment" | "orders" | "weight" | "messages" | "documents" | "billing" | "admin";
@@ -39,7 +38,6 @@ export default function PatientDetailPage() {
   const [tab, setTab] = useState<TabKey>("summary");
   const [msgOpen, setMsgOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
-  const [rxOpen, setRxOpen] = useState(false);
   const [modal, setModal] = useState<null | "note" | "dose" | "profile" | "id">(null);
 
   const extra = useMemo(() => (patient ? getPatientExtra(patient) : null), [patient]);
@@ -158,7 +156,7 @@ export default function PatientDetailPage() {
         <div className="flex gap-2 flex-wrap ml-auto">
           <button className="btn btn-primary btn-sm" onClick={() => setTab("intake")}>Review Intake</button>
           <button className="btn btn-ghost btn-sm" onClick={() => setMsgOpen(true)}>Message</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setRxOpen(true)}>Create Rx</button>
+          <Link href={`/patients/${pid}/prescribe?tx=${encodeURIComponent(patient.plan)}`} className="btn btn-ghost btn-sm">Create Rx</Link>
           <button className="btn btn-ghost btn-sm" onClick={() => setModal("note")}>Add Note</button>
         </div>
       </section>
@@ -394,7 +392,7 @@ export default function PatientDetailPage() {
             <div className="grid grid-cols-2 gap-2">
               <button className="btn btn-ghost btn-sm" onClick={() => setTab("weight")}>Add Weight</button>
               <button className="btn btn-ghost btn-sm" onClick={() => setMsgOpen(true)}>Message</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setRxOpen(true)}>Create Rx</button>
+              <Link href={`/patients/${pid}/prescribe?tx=${encodeURIComponent(patient.plan)}`} className="btn btn-ghost btn-sm">Create Rx</Link>
               <button className="btn btn-ghost btn-sm" onClick={() => setModal("note")}>Add Note</button>
               <button className="btn btn-ghost btn-sm" onClick={() => setModal("id")}>View ID</button>
               <button className="btn btn-ghost btn-sm" onClick={() => setOrderOpen(true)}>Order</button>
@@ -404,7 +402,6 @@ export default function PatientDetailPage() {
       </div>
 
       <NewOrderModal patient={patient} open={orderOpen} onClose={() => setOrderOpen(false)} />
-      <NewPrescriptionModal patient={patient} open={rxOpen} onClose={() => setRxOpen(false)} />
       <PatientMessageCenter patient={patient} open={msgOpen} onClose={() => setMsgOpen(false)} />
 
       {modal === "note" && (
