@@ -35,7 +35,7 @@ function buildDocument(input: GsOrderInput) {
   return {
     internal_order_id: input.internalOrderId,
     internal_customer_id: input.internalCustomerId,
-    clinic: CLINIC,
+    clinic: CLINIC.toUpperCase(),
     status: "TO_BE_FILLED",
     pharmacy_ncpdpid: NCPDP,
     firstName: input.firstName,
@@ -48,8 +48,8 @@ function buildDocument(input: GsOrderInput) {
       address: input.address.address,
       line2: input.address.line2,
       city: input.address.city,
-      state: input.address.state,
-      zipCode: input.address.zipCode,
+      state: String(input.address.state || "").trim().toUpperCase().slice(0, 2),
+      zipCode: String(input.address.zipCode || "").trim(),
     },
     scripts: input.scripts.map((s) => ({
       name: s.name,
@@ -116,5 +116,35 @@ export async function greenstoneStatus(filter: { order_id?: number | string; int
     };
   } catch {
     return { ok: false, error: "Could not reach the pharmacy API.", source: "greenstone" };
+  }
+}
+
+/**
+ * Cancel an order at GreenstoneRX via the 5Axis update_one operation, setting
+ * the order status to CANCELLED. Per the API spec:
+ *   { query_type: "update_one",
+ *     query_params: { filters: { order_id | internal_order_id }, values: { "$set": { status: "CANCELLED" } } } }
+ * Returns ok only when the API responds success:1. Direct status cancellation is
+ * honored for early-stage orders; once a label exists the pharmacy may reject it
+ * (route through their pull-live flow), and that rejection is surfaced as `error`.
+ */
+export async function greenstoneCancel(filter: { order_id?: number | string; internal_order_id?: string }): Promise<GsSubmitResult> {
+  if (!live()) {
+    return { ok: true, orderId: filter.order_id ?? filter.internal_order_id, message: "Mock cancel (no token set).", source: "mock" };
+  }
+  try {
+    const filters: Record<string, unknown> = {};
+    if (filter.order_id != null) filters.order_id = filter.order_id;
+    else if (filter.internal_order_id) filters.internal_order_id = filter.internal_order_id;
+    const body = { query_type: "update_one", query_params: { filters, values: { $set: { status: "CANCELLED" } } } };
+    const r = await fetch(`${BASE}${ORDERS_PATH}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j?.success !== 1) {
+      const host = BASE.replace(/^https?:\/\//, "");
+      return { ok: false, error: `${j?.message || `Pharmacy rejected the cancellation (HTTP ${r.status}).`} [endpoint: ${host}]`, source: "greenstone" };
+    }
+    return { ok: true, orderId: filter.order_id ?? filter.internal_order_id, message: j?.message, source: "greenstone" };
+  } catch (e) {
+    return { ok: false, error: `Cancellation request failed: ${(e as Error).message}`, source: "greenstone" };
   }
 }

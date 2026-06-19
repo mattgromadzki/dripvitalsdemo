@@ -11,6 +11,7 @@ const STAGE: Record<string, { label: string; intent: "muted" | "amber" | "green"
   shipped:   { label: "In transit",        intent: "amber" },
   delivered: { label: "Delivered",         intent: "green" },
   issue:     { label: "Shipping issue",    intent: "red"   },
+  held:      { label: "On hold",           intent: "amber" },
   cancelled: { label: "Cancelled",         intent: "red"   },
   voided:    { label: "Voided (EMR)",      intent: "red"   },
 };
@@ -40,9 +41,9 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
   useEffect(() => { load(); }, [load]);
 
   const voidOrder = useCallback(async () => {
-    if (!window.confirm("Void this order in the EMR?\n\nThis marks it voided in the chart and patient portal. It does NOT cancel the fill at the pharmacy — you must confirm cancellation with GreenstoneRX directly.")) return;
+    if (!window.confirm("Cancel this order at GreenstoneRX?\n\nThis sends a cancellation to the pharmacy. If they accept it, the order is marked Cancelled in the chart and patient portal. Orders already being filled or shipped may be rejected by the pharmacy.")) return;
     try {
-      await fetch("/api/pharmacy/greenstone/void", {
+      const r = await fetch("/api/pharmacy/greenstone/void", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -52,7 +53,9 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
           patientName: events.find((e) => e.patientName)?.patientName,
         }),
       });
-    } catch { /* ignore */ }
+      const j = await r.json().catch(() => ({}));
+      if (!j?.ok) window.alert("Cancellation not completed: " + (j?.error || "the pharmacy did not accept it. Contact GreenstoneRX directly."));
+    } catch { window.alert("Cancellation request failed. Check your connection and try again."); }
     load();
   }, [patientId, events, load]);
 
@@ -78,7 +81,7 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
         </div>
         <div className="flex gap-1.5">
           <button className="btn btn-ghost text-[12px]" onClick={load}>Refresh</button>
-          <button className="btn btn-ghost btn-danger text-[12px]" onClick={voidOrder}>Cancel / void</button>
+          <button className="btn btn-ghost btn-danger text-[12px]" onClick={voidOrder}>Cancel order</button>
         </div>
       </div>
 

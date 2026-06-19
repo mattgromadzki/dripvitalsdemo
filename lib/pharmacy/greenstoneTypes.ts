@@ -40,7 +40,7 @@ export interface GsSubmitResult { ok: boolean; orderId?: number | string; messag
 export interface GsStatusResult { ok: boolean; orderId?: number | string; status?: string; trackingNumber?: string; trackingUrl?: string; document?: unknown; error?: string; source: "greenstone" | "mock" }
 
 // Map a 5Axis status to the patient-facing tracker stage.
-export function gsTrackerStage(status?: string): "requested" | "filling" | "ready" | "shipped" | "delivered" | "issue" | "cancelled" {
+export function gsTrackerStage(status?: string): "requested" | "filling" | "ready" | "shipped" | "delivered" | "issue" | "cancelled" | "held" {
   switch ((status || "").toUpperCase()) {
     case "TO_BE_FILLED": return "requested";
     case "PARTIAL_FILL":
@@ -49,7 +49,9 @@ export function gsTrackerStage(status?: string): "requested" | "filling" | "read
     case "SHIPPED_TO_CLINIC": return "ready";
     case "IN_SHIPPING": return "shipped";
     case "ISSUE_IN_SHIPPING": return "issue";
-    case "COMPLETED": return "delivered";
+    case "COMPLETED":
+    case "PARTIAL_COMPLETED": return "delivered";
+    case "ON_HOLD": return "held";
     case "CANCELLED":
     case "CANCELED":
     case "VOIDED": return "cancelled";
