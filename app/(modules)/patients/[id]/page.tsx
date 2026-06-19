@@ -11,6 +11,8 @@ import { useEmails } from "@/lib/hooks/useEmails";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { NewOrderModal } from "@/components/modules/chart/NewOrderModal";
 import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
+import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
+import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 
 type TabKey = "summary" | "intake" | "treatment" | "orders" | "weight" | "messages" | "documents" | "billing" | "admin";
 const TABS: { key: TabKey; label: string }[] = [
@@ -35,6 +37,8 @@ export default function PatientDetailPage() {
   const patient = usePatients((s) => s.patients.find((p) => p.id === params.id));
   const updatePatient = usePatients((s) => s.update);
   const addEmail = useEmails((s) => s.add);
+  const allRx = usePrescriptions((s) => s.prescriptions);
+  const allDocs = usePatientDocuments((s) => s.documents);
 
   const [tab, setTab] = useState<TabKey>("summary");
   const [msgOpen, setMsgOpen] = useState(false);
@@ -83,6 +87,8 @@ export default function PatientDetailPage() {
   }
 
   const pid = patient.id;
+  const patientRx = allRx.filter((r) => r.patientId === pid).sort((a, b) => b.prescribedAt - a.prescribedAt);
+  const patientDocs = allDocs.filter((d) => d.patientId === pid).sort((a, b) => b.createdAt - a.createdAt);
   const logAudit = (action: string, area = "Chart") => setAudit((a) => [{ time: `Now`, user: "Admin", action, area, device: "Browser" }, ...a]);
   const addr = extra.address;
   const buildProfile = () => ({
@@ -287,17 +293,33 @@ export default function PatientDetailPage() {
           )}
 
           {tab === "orders" && (
-            <Card title="Patient Orders" sub="Current order plus history for this patient." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
-              {extra.orders.length === 0 && <div className="text-ink-muted text-[12.5px] py-6 text-center">No orders yet.</div>}
-              {extra.orders.map((o) => (
-                <div key={o.id} className="grid items-center gap-3 py-3 border-b border-surface-3 last:border-none" style={{ gridTemplateColumns: "1.1fr 1.4fr auto 1.2fr auto" }}>
-                  <div><strong className="font-mono text-[12.5px]">{o.id}</strong><div className="text-[11px] text-ink-muted">{o.placedAt}</div></div>
-                  <div><strong className="text-[12.5px]">{o.treatmentName}</strong><div className="text-[11px] text-ink-muted">{o.medSub}</div></div>
-                  <Pill intent={o.shipmentStatus === "delivered" ? "green" : o.paid ? "blue" : "amber"}>{o.shipmentStatus}</Pill>
-                  <div><strong className="text-[12px]">{o.price}</strong><div className="text-[11px] text-ink-muted">{o.pharmacy}</div></div>
-                  <button className="btn btn-ghost btn-xs" onClick={() => toast(`Order ${o.id}`)}>Open</button>
-                </div>
-              ))}
+            <Card title="Patient Orders &amp; Prescriptions" sub="Prescriptions transmitted to the pharmacy via e-prescribe, with status and timestamps." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
+              {patientRx.length === 0 && <div className="text-ink-muted text-[12.5px] py-6 text-center">No prescriptions yet. Use Create Rx to send one through e-prescribe.</div>}
+              {patientRx.map((r) => {
+                const doc = patientDocs.find((d) => d.category === "rx" && Math.abs(d.createdAt - r.prescribedAt) < 5);
+                const intent = r.status === "active" || r.status === "filled" ? "green" : r.status === "pending" || r.status === "refill" ? "amber" : r.status === "denied" || r.status === "expired" ? "red" : "blue";
+                return (
+                  <div key={r.id} className="border-b border-surface-3 last:border-none py-3">
+                    <div className="flex items-start gap-3 flex-wrap">
+                      <div className="flex-1 min-w-[200px]">
+                        <strong className="text-[13px]">{r.medication} {r.strength}</strong>
+                        <div className="text-[11.5px] text-ink-muted">{r.dose} · Qty {r.qty} · {r.refillsRemaining} refills · {r.daySupply}-day supply</div>
+                        <div className="text-[11.5px] text-ink-muted mt-0.5">℞ {r.pharmacy} · {r.prescriber}</div>
+                        {r.sig && <div className="text-[11px] text-ink-muted-2 mt-0.5 italic">Sig: {r.sig}</div>}
+                      </div>
+                      <div className="text-right">
+                        <Pill intent={intent}>{r.status}</Pill>
+                        <div className="text-[11px] text-ink-muted mt-1">{r.prescribedDate}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      {doc
+                        ? <Link href={`/documents/${doc.id}`} className="btn btn-ghost btn-xs">View Rx confirmation (PDF)</Link>
+                        : <span className="text-[11px] text-ink-muted-2 self-center">Confirmation in Documents tab</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </Card>
           )}
 
@@ -357,10 +379,17 @@ export default function PatientDetailPage() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  {extra.documents.map((d, i) => (
-                    <div key={i} className="flex items-center gap-3 border border-border rounded-[10px] px-3 py-2.5"><div className="min-w-0 flex-1"><strong className="text-[12px] truncate block">{d.name}</strong><div className="text-[11px] text-ink-muted">{d.type} · {d.date} · {d.size}</div></div><button className="btn btn-ghost btn-xs" onClick={() => toast(`Open ${d.name}`)}>Open</button></div>
+                  {patientDocs.map((d) => (
+                    <div key={d.id} className="flex items-center gap-3 border border-border rounded-[10px] px-3 py-2.5">
+                      <div className="w-8 h-8 rounded-md bg-surface-3 flex items-center justify-center text-[16px] shrink-0">{d.icon}</div>
+                      <div className="min-w-0 flex-1">
+                        <strong className="text-[12px] truncate block">{d.title}</strong>
+                        <div className="text-[11px] text-ink-muted">{d.category.toUpperCase()} · {d.createdDate}{d.signedBy ? ` · Signed by ${d.signedBy}` : ""}</div>
+                      </div>
+                      <Link href={`/documents/${d.id}`} className="btn btn-ghost btn-xs">View / PDF</Link>
+                    </div>
                   ))}
-                  {extra.documents.length === 0 && <div className="text-ink-muted text-[12px] py-4 text-center">No documents yet.</div>}
+                  {patientDocs.length === 0 && <div className="text-ink-muted text-[12px] py-4 text-center">No documents yet. Prescription confirmations appear here after an e-prescribe order is sent.</div>}
                 </div>
               </div>
             </Card>
