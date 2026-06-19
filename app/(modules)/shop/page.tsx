@@ -8,7 +8,7 @@ import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ShopProductDrawer } from "@/components/modules/ShopProductDrawer";
 import { toast } from "@/lib/hooks/useToast";
-import { useShop } from "@/lib/hooks/useShop";
+import { useShop, resetShopToDefaults } from "@/lib/hooks/useShop";
 import { SHOP_CATEGORY_LABEL, SHOP_THUMB_STYLE } from "@/lib/data/shopProducts";
 import type { ShopProduct, ShopProductInput, ShopCategory } from "@/lib/types";
 
@@ -129,9 +129,34 @@ export default function ShopPage() {
             Each product&rsquo;s Get Started button redirects to the intake URL you assign.
           </div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={openNew}>
-          + Add Product
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={async () => {
+              if (!confirm("Reset the Shop catalog to the latest code defaults? This replaces the saved copy on all devices (and the patient portal) and reloads the page. Uploaded product photos are kept.")) return;
+              await resetShopToDefaults();
+              window.location.reload();
+            }}
+            title="Re-sync the catalog from code (keeps uploaded photos)"
+            style={{
+              background: "#fff7ed",
+              border: "2px solid #fb923c",
+              color: "#c2410c",
+              fontWeight: 600,
+              padding: "7px 13px",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 13,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            ↺ Reset to defaults
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={openNew}>
+            + Add Product
+          </button>
+        </div>
       </div>
 
       {/* KPI strip */}

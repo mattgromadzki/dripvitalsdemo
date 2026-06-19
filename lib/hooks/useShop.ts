@@ -66,3 +66,42 @@ export const useShop = create<ShopState>((set, get) => ({
     }));
   },
 }));
+
+/**
+ * Re-sync the Shop catalog from code (lib/data/shopProducts.ts) and overwrite the
+ * saved server copy. Mirrors the Treatments "Reset to defaults" flow.
+ *
+ * Uploaded product photos are PRESERVED: a reset restores default catalog *content*
+ * (names, prices, copy, ordering) but must not wipe images an operator uploaded via
+ * the product drawer. We read the current server copy, map id -> imageUrl, and
+ * re-apply those photos onto matching seed products before pushing.
+ */
+export async function resetShopToDefaults(): Promise<void> {
+  seq = SEED.length;
+
+  let products: ShopProduct[] = SEED;
+  if (typeof window !== "undefined") {
+    try {
+      const r = await fetch(`/api/store/shop`, { cache: "no-store" });
+      const d = await r.json();
+      const current: Array<{ id: string; imageUrl?: string }> = Array.isArray(d?.data) ? d.data : [];
+      const imgById = new Map<string, string>();
+      current.forEach((p) => { if (p && p.imageUrl) imgById.set(p.id, p.imageUrl); });
+      if (imgById.size > 0) {
+        products = SEED.map((p) => (imgById.has(p.id) ? { ...p, imageUrl: imgById.get(p.id) } : p));
+      }
+    } catch { /* ignore — fall back to seed without preserved photos */ }
+  }
+
+  useShop.setState({ products });
+
+  if (typeof window !== "undefined") {
+    try {
+      await fetch(`/api/store/shop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: products }),
+      });
+    } catch { /* ignore — local reset still applied */ }
+  }
+}
