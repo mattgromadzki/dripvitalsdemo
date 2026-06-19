@@ -233,7 +233,7 @@ export function ShopProductDrawer({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-[26px] py-[22px]">
+        <div className="flex-1 min-h-0 overflow-y-auto px-[26px] py-[22px]">
           {/* Basic info */}
           <Section title="Basic info">
             <Field label="Product name">
