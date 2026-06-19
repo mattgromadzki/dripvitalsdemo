@@ -148,3 +148,50 @@ export async function greenstoneCancel(filter: { order_id?: number | string; int
     return { ok: false, error: `Cancellation request failed: ${(e as Error).message}`, source: "greenstone" };
   }
 }
+
+// ── Order messaging (5Axis order message thread) ───────────────────────────
+// POST/GET /api/v1/orders/{order_id}/messages — two-way notes between the
+// clinic and the pharmacist on a specific order.
+export interface GsMessage { id: string; orderId: string | number; clinic?: string; senderType: "clinic" | "pharmacy"; senderName?: string; message: string; createdAt: string; read?: boolean }
+export interface GsMessagesResult { ok: boolean; messages?: GsMessage[]; totalCount?: number; error?: string; source: "greenstone" | "mock" }
+export interface GsSendMessageResult { ok: boolean; messageId?: string; createdAt?: string; error?: string; source: "greenstone" | "mock" }
+
+const messagesPath = (orderId: string | number) => `/api/v1/orders/${encodeURIComponent(String(orderId))}/messages`;
+
+export async function greenstoneListMessages(orderId: string | number): Promise<GsMessagesResult> {
+  if (!live()) return { ok: true, messages: [], totalCount: 0, source: "mock" };
+  try {
+    const r = await fetch(`${BASE}${messagesPath(orderId)}`, { method: "GET", headers: headers() });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j?.success !== 1) return { ok: false, error: j?.message || `Message lookup failed (HTTP ${r.status}).`, source: "greenstone" };
+    const list = (j?.data?.messages || []) as Array<Record<string, unknown>>;
+    return {
+      ok: true,
+      totalCount: (j?.data?.total_count as number) ?? list.length,
+      messages: list.map((m) => ({
+        id: String(m._id ?? m.message_id ?? ""),
+        orderId: (m.order_id as string | number) ?? orderId,
+        clinic: m.clinic as string | undefined,
+        senderType: (m.sender_type as "clinic" | "pharmacy") ?? "pharmacy",
+        senderName: m.sender_name as string | undefined,
+        message: String(m.message ?? ""),
+        createdAt: String(m.created_at ?? ""),
+        read: m.read as boolean | undefined,
+      })),
+      source: "greenstone",
+    };
+  } catch (e) { return { ok: false, error: `Message lookup failed: ${(e as Error).message}`, source: "greenstone" }; }
+}
+
+export async function greenstoneSendMessage(orderId: string | number, message: string): Promise<GsSendMessageResult> {
+  const msg = (message || "").trim();
+  if (!msg) return { ok: false, error: "Message is empty.", source: "greenstone" };
+  if (msg.length > 2000) return { ok: false, error: "Message exceeds the 2000-character limit.", source: "greenstone" };
+  if (!live()) return { ok: true, messageId: "mock-" + Date.now(), createdAt: new Date().toISOString(), source: "mock" };
+  try {
+    const r = await fetch(`${BASE}${messagesPath(orderId)}`, { method: "POST", headers: headers(), body: JSON.stringify({ message: msg }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j?.success !== 1) return { ok: false, error: j?.message || `Send failed (HTTP ${r.status}).`, source: "greenstone" };
+    return { ok: true, messageId: j?.data?.message_id, createdAt: j?.data?.created_at, source: "greenstone" };
+  } catch (e) { return { ok: false, error: `Send failed: ${(e as Error).message}`, source: "greenstone" }; }
+}
