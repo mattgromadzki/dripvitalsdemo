@@ -11,6 +11,7 @@ const STAGE: Record<string, { label: string; intent: "muted" | "amber" | "green"
   shipped:   { label: "In transit",        intent: "amber" },
   delivered: { label: "Delivered",         intent: "green" },
   issue:     { label: "Shipping issue",    intent: "red"   },
+  cancelled: { label: "Cancelled",         intent: "red"   },
   voided:    { label: "Voided (EMR)",      intent: "red"   },
 };
 

@@ -696,6 +696,8 @@ function stageMeta(stage?: string): { label: string; pill: "pending" | "active" 
     case "shipped":   return { label: "In transit", pill: "pending" };
     case "delivered": return { label: "Delivered", pill: "active" };
     case "issue":     return { label: "Shipping issue", pill: "danger" };
+    case "cancelled": return { label: "Cancelled", pill: "danger" };
+    case "voided":    return { label: "Cancelled", pill: "danger" };
     default:          return { label: "Update", pill: "pending" };
   }
 }
