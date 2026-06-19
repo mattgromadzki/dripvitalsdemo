@@ -5,9 +5,11 @@ import type { Key } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { toast } from "@/lib/hooks/useToast";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
+import { useOrders } from "@/lib/hooks/useOrders";
 import { usePermission } from "@/lib/rbac/usePermission";
 import { NewPrescriptionModal } from "@/components/modules/chart/NewPrescriptionModal";
-import type { Patient, PatientExtra, PaymentOverride } from "@/lib/types";
+import { NewOrderModal } from "@/components/modules/chart/NewOrderModal";
+import type { Patient, PatientExtra, PaymentOverride, OrderRow } from "@/lib/types";
 
 type RxView = { id: string; med: string; dose: string; refills: number; prescribed: string; status: string; prescribedBy: string; paymentOverride?: PaymentOverride };
 
@@ -31,7 +33,9 @@ const STEP_LABELS_MINI_UP = ["Placed", "Payment", "Approval", "Fill", "Shipped",
 export function OrdersRxTab({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
   const [innerTab, setInnerTab] = useState<InnerTab>("current");
   const [rxOpen, setRxOpen] = useState(false);
+  const [ordOpen, setOrdOpen] = useState(false);
   const canRx = usePermission("rx.prescribe");
+  const createdOrders = useOrders((s) => s.orders).filter((o) => o.patientId === patient.id);
   const allOrders = extra.orders;
   // Heuristic — first order treated as "current", rest as past
   const currentList = allOrders.length > 0 ? [allOrders[0]] : [];
@@ -65,15 +69,21 @@ export function OrdersRxTab({ patient, extra }: { patient: Patient; extra: Patie
         <div className="flex-1" />
         <div className="flex gap-2 pb-2">
           {canRx && <button className="btn btn-ghost btn-sm" onClick={() => setRxOpen(true)}>+ Prescribe</button>}
-          <button className="btn btn-primary btn-sm" onClick={() => toast("📦 New order flow opened")}>+ New Order</button>
+          <button className="btn btn-primary btn-sm" onClick={() => setOrdOpen(true)}>+ New Order</button>
         </div>
       </div>
 
-      {innerTab === "current" && <CurrentOrders orders={currentList} patient={patient} />}
+      {innerTab === "current" && (
+        <div className="flex flex-col gap-4">
+          {createdOrders.length > 0 && <CreatedOrders orders={createdOrders} />}
+          <CurrentOrders orders={currentList} patient={patient} />
+        </div>
+      )}
       {innerTab === "past"    && <PastOrders    orders={pastList}    />}
       {innerTab === "rx"      && <Prescriptions items={rxItems} patient={patient} onPrescribe={() => setRxOpen(true)} />}
 
       <NewPrescriptionModal patient={patient} open={rxOpen} onClose={() => setRxOpen(false)} />
+      <NewOrderModal patient={patient} open={ordOpen} onClose={() => setOrdOpen(false)} />
     </div>
   );
 }
@@ -432,6 +442,34 @@ function Prescriptions({ items, patient, onPrescribe }: { items: RxView[]; patie
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const ORDER_STATUS_INTENT: Record<string, "green" | "amber" | "blue" | "red" | "muted"> = {
+  active: "green", filled: "green", resulted: "green",
+  pending: "amber", in_lab: "amber",
+  refill: "blue", ordered: "blue",
+  denied: "red", critical: "red",
+};
+
+function CreatedOrders({ orders }: { orders: OrderRow[] }) {
+  return (
+    <div className="bg-surface border border-border rounded-lg overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-border bg-surface-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Created orders</div>
+      <div className="divide-y divide-border">
+        {orders.map((o) => (
+          <div key={o.id} className="flex items-center gap-3 px-4 py-3">
+            <span className="text-[18px]">{o.kind === "lab" ? "🧪" : "💊"}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-semibold text-ink truncate">{o.item}</div>
+              <div className="text-[11px] text-ink-muted mt-0.5">{o.destination} · {o.orderedBy} · {o.orderedDate}{o.kind === "rx" && o.refills != null ? ` · ${o.refills} refills` : ""}</div>
+            </div>
+            <span className="font-mono text-[10.5px] text-ink-muted">{o.id}</span>
+            <Pill intent={ORDER_STATUS_INTENT[o.status] || "muted"} dot>{o.status.replace("_", " ")}</Pill>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { toast } from "@/lib/hooks/useToast";
 import { SectionCard } from "@/components/modules/chart/SectionCard";
+import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import type { Patient, PatientExtra } from "@/lib/types";
 
 const STATUS_INTENT: Record<string, "green" | "amber" | "red" | "muted"> = {
@@ -16,6 +17,8 @@ const STATUS_INTENT: Record<string, "green" | "amber" | "red" | "muted"> = {
 
 export function BillingTab({ patient, extra }: { patient: Patient; extra: PatientExtra }) {
   const noSub = patient.sub === "—" || patient.status !== "active";
+  const overrides = usePrescriptions((s) => s.prescriptions)
+    .filter((r) => r.patientId === patient.id && r.paymentOverride);
 
   return (
     <div className="grid grid-cols-[1fr_1fr] gap-4 max-[1100px]:grid-cols-1">
@@ -83,6 +86,39 @@ export function BillingTab({ patient, extra }: { patient: Patient; extra: Patien
             </div>
             <Pill intent="green">Default</Pill>
           </div>
+        </SectionCard>
+
+        <SectionCard
+          title="Prescription charges & overrides"
+          icon="💳"
+          iconBg="var(--color-amber-soft)"
+          iconColor="var(--color-amber)"
+        >
+          {overrides.length === 0 ? (
+            <div className="py-6 text-center text-ink-muted">
+              <div className="text-[28px] opacity-40 mb-2">🧾</div>
+              <div className="text-[12.5px] font-bold text-ink mb-1">No payment overrides</div>
+              <div className="text-[11px]">Manual “mark as paid” or “waive” actions on prescriptions show here</div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {overrides.map((r) => {
+                const o = r.paymentOverride!;
+                return (
+                  <div key={r.id} className="flex items-start gap-3 py-2.5 px-3 bg-surface-2 border border-border rounded-md">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12.5px] font-semibold text-ink truncate">{r.medication}</div>
+                      <div className="text-[11px] text-ink-muted mt-0.5">{o.reason} · {o.by}</div>
+                      <div className="text-[10.5px] text-ink-muted-2 mt-0.5">{new Date(o.at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {r.id}</div>
+                    </div>
+                    <Pill intent={o.mode === "waived" ? "amber" : "blue"} dot>
+                      {o.mode === "waived" ? "Waived" : "Paid"}
+                    </Pill>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </SectionCard>
       </div>
 
