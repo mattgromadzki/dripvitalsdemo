@@ -16,6 +16,8 @@ export function NewOrderModal({ patient, open, onClose }: { patient: Patient; op
 
   const [kind, setKind]               = useState<"rx" | "lab">("rx");
   const [treatmentId, setTreatmentId] = useState<number | "">("");
+  const [query, setQuery]             = useState("");
+  const [comboOpen, setComboOpen]     = useState(false);
   const [labItem, setLabItem]         = useState("");
   const [destination, setDest]        = useState("GreenstoneRX");
   const [refills, setRefills]         = useState(0);
@@ -30,15 +32,19 @@ export function NewOrderModal({ patient, open, onClose }: { patient: Patient; op
     setDest(k === "lab" ? "Quest Diagnostics" : (selectedTreatment?.pharmacy || "GreenstoneRX"));
   }
 
-  function pickTreatment(idStr: string) {
-    const id = idStr ? Number(idStr) : "";
-    setTreatmentId(id);
-    const t = activeTreatments.find((x) => x.id === id);
-    if (t) setDest(t.pharmacy || "GreenstoneRX");
+  const filteredTreatments = query.trim()
+    ? activeTreatments.filter((t) => `${t.name} ${t.med} ${t.strength}`.toLowerCase().includes(query.trim().toLowerCase()))
+    : activeTreatments;
+
+  function selectTreatment(t: (typeof activeTreatments)[number]) {
+    setTreatmentId(t.id);
+    setQuery(t.name);
+    setDest(t.pharmacy || "GreenstoneRX");
+    setComboOpen(false);
   }
 
   function resetAll() {
-    setKind("rx"); setTreatmentId(""); setLabItem(""); setDest("GreenstoneRX"); setRefills(0);
+    setKind("rx"); setTreatmentId(""); setQuery(""); setComboOpen(false); setLabItem(""); setDest("GreenstoneRX"); setRefills(0);
     setStatus("pending"); setOrderedBy(patient.provider || "Dr. Tancinco");
   }
 
@@ -94,10 +100,33 @@ export function NewOrderModal({ patient, open, onClose }: { patient: Patient; op
       {kind === "rx" ? (
         <>
           <label className="fl">Treatment</label>
-          <select className="fi mb-1" value={treatmentId === "" ? "" : String(treatmentId)} onChange={(e) => pickTreatment(e.target.value)}>
-            <option value="">Select a treatment…</option>
-            {activeTreatments.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.med} {t.strength}</option>)}
-          </select>
+          <div className="relative mb-1">
+            <input
+              className="fi"
+              placeholder="Search or select a treatment…"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setComboOpen(true); if (treatmentId !== "") setTreatmentId(""); }}
+              onFocus={() => setComboOpen(true)}
+              onBlur={() => setTimeout(() => setComboOpen(false), 120)}
+            />
+            {comboOpen && (
+              <div className="absolute z-[60] left-0 right-0 mt-1 max-h-[220px] overflow-y-auto bg-surface border border-border rounded-md shadow-lg">
+                {filteredTreatments.length === 0 ? (
+                  <div className="px-3 py-2.5 text-[12px] text-ink-muted">No treatments match &ldquo;{query}&rdquo;.</div>
+                ) : filteredTreatments.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); selectTreatment(t); }}
+                    className={`w-full text-left px-3 py-2 hover:bg-brand-soft transition-colors ${t.id === treatmentId ? "bg-brand-soft" : ""}`}
+                  >
+                    <div className="text-[12.5px] font-semibold text-ink">{t.name}</div>
+                    <div className="text-[11px] text-ink-muted">{t.med} · {t.strength} · {t.price}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {selectedTreatment && (
             <div className="text-[11px] text-ink-muted mb-2">{selectedTreatment.med} · {selectedTreatment.strength} · {selectedTreatment.price} · {selectedTreatment.pharmacy}</div>
           )}
