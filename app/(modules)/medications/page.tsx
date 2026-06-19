@@ -5,7 +5,8 @@ import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
 import { useMedications } from "@/lib/hooks/useMedications";
-import { MED_PROGRAM_INTENT, MED_PROGRAMS, MED_PHARMACIES } from "@/lib/data/medications";
+import { MED_PROGRAM_INTENT, MED_PROGRAMS } from "@/lib/data/medications";
+import { usePharmacies } from "@/lib/hooks/usePharmacies";
 import { MedicationModal, type MedDraft } from "@/components/modules/medications/MedicationModal";
 import type { Medication } from "@/lib/types";
 
@@ -15,6 +16,8 @@ export default function MedicationsPage() {
   const meds = useMedications((s) => s.meds);
   const add = useMedications((s) => s.add);
   const update = useMedications((s) => s.update);
+  const realPharmacies = usePharmacies((s) => s.pharmacies.map((p) => p.name));
+  const pharmacyFilterOpts = Array.from(new Set([...realPharmacies, ...meds.map((m) => m.pharmacy)]));
 
   const [search, setSearch] = useState("");
   const [programF, setProgramF] = useState("");
@@ -103,7 +106,7 @@ export default function MedicationsPage() {
           <option value="">Program</option>{MED_PROGRAMS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <select className={sel} value={pharmacyF} onChange={(e) => setPharmacyF(e.target.value)}>
-          <option value="">Pharmacy</option>{MED_PHARMACIES.map((p) => <option key={p} value={p}>{p}</option>)}
+          <option value="">Pharmacy</option>{pharmacyFilterOpts.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <select className={sel} value={statusF} onChange={(e) => setStatusF(e.target.value as "" | "active" | "discontinued")}>
           <option value="">Status</option><option value="active">Active</option><option value="discontinued">Discontinued</option>

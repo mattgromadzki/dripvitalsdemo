@@ -3,7 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Modal } from "@/components/ui/Modal";
 import type { Medication } from "@/lib/types";
-import { MED_PROGRAMS, MED_PHARMACIES, MED_FORMS } from "@/lib/data/medications";
+import { MED_PROGRAMS, MED_FORMS } from "@/lib/data/medications";
+import { usePharmacies } from "@/lib/hooks/usePharmacies";
 
 export type MedDraft = Omit<Medication, "id" | "sent">;
 
@@ -16,18 +17,20 @@ interface Props {
 
 const BLANK: MedDraft = {
   name: "", strength: "", program: "Weight Loss", form: "Vial",
-  pharmacy: MED_PHARMACIES[0], unit: "per vial", cost: 0, ship: 0, status: "active",
+  pharmacy: "", unit: "per vial", cost: 0, ship: 0, status: "active",
 };
 
 export function MedicationModal({ open, onClose, med, onSave }: Props) {
   const [f, setF] = useState<MedDraft>(BLANK);
   const [err, setErr] = useState("");
   const isEdit = !!med;
+  const pharmacyNames = usePharmacies((s) => s.pharmacies.map((p) => p.name));
+  const pharmacyOptions = Array.from(new Set([...pharmacyNames, ...(f.pharmacy ? [f.pharmacy] : [])]));
 
   useEffect(() => {
     if (!open) return;
     setErr("");
-    setF(med ? { name: med.name, strength: med.strength, program: med.program, form: med.form, pharmacy: med.pharmacy, unit: med.unit, cost: med.cost, ship: med.ship, status: med.status } : BLANK);
+    setF(med ? { name: med.name, strength: med.strength, program: med.program, form: med.form, pharmacy: med.pharmacy, unit: med.unit, cost: med.cost, ship: med.ship, status: med.status } : { ...BLANK, pharmacy: pharmacyNames[0] || "" });
   }, [open, med]);
 
   const set = <K extends keyof MedDraft>(k: K, v: MedDraft[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -47,7 +50,7 @@ export function MedicationModal({ open, onClose, med, onSave }: Props) {
         <Field label="Program"><select className="fsel" value={f.program} onChange={(e) => set("program", e.target.value)}>{MED_PROGRAMS.map((p) => <option key={p}>{p}</option>)}</select></Field>
         <Field label="Strength / Dose"><input className="fi" value={f.strength} placeholder="0.5 mg" onChange={(e) => set("strength", e.target.value)} /></Field>
         <Field label="Form"><select className="fsel" value={f.form} onChange={(e) => set("form", e.target.value)}>{MED_FORMS.map((x) => <option key={x}>{x}</option>)}</select></Field>
-        <Field label="Pharmacy"><select className="fsel" value={f.pharmacy} onChange={(e) => set("pharmacy", e.target.value)}>{MED_PHARMACIES.map((x) => <option key={x}>{x}</option>)}</select></Field>
+        <Field label="Pharmacy"><select className="fsel" value={f.pharmacy} onChange={(e) => set("pharmacy", e.target.value)}>{pharmacyOptions.length === 0 && <option value="">No pharmacies — add one in Pharmacies</option>}{pharmacyOptions.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Unit (priced per)"><input className="fi" value={f.unit} placeholder="per vial" onChange={(e) => set("unit", e.target.value)} /></Field>
         <Field label="Status"><select className="fsel" value={f.status} onChange={(e) => set("status", e.target.value as Medication["status"])}><option value="active">Active</option><option value="discontinued">Discontinued</option></select></Field>
         <Field label="Cost ($ / unit)"><input className="fi" type="number" step="0.01" value={f.cost || ""} placeholder="95" onChange={(e) => set("cost", parseFloat(e.target.value) || 0)} /></Field>
