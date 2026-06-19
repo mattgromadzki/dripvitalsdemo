@@ -407,7 +407,7 @@ export function EPrescribeWorkspace(
       gender: extra?.gender,
       email: patient.email,
       phoneNumber: patient.phone,
-      address: { address: addr.street, city: addr.city, state: addr.state, zipCode: addr.zip },
+      address: { address: addr.street, line2: addr.line2, city: addr.city, state: addr.state, zipCode: addr.zip },
       scripts: meds.map((m) => ({
         name: `${m.drug.name} ${m.strength}`.trim(),
         dispense_quantity: String(m.qty),
@@ -469,6 +469,7 @@ export function EPrescribeWorkspace(
           recipientPhone: patient.phone,
           recipientEmail: patient.email,
           addressLine1: addr.street,
+          addressLine2: addr.line2 || undefined,
           city: addr.city,
           state: addr.state,
           zipCode: addr.zip,

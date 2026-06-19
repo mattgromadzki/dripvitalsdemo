@@ -23,6 +23,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const todayStr = () => { const d = new Date(); return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; };
 const nowTime = () => { const d = new Date(); return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); };
 const initialsOf = (s: string) => s.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+const INP = "border border-border rounded-[9px] px-3 py-2 text-[12.5px] bg-surface w-full";
 
 interface WeightEntry { date: string; weight: number; source: string; note: string }
 interface DoseEntry { date: string; dose: string; status: string; provider: string; note: string }
@@ -65,7 +66,7 @@ export default function PatientDetailPage() {
     { kind: "Email", intent: "blue", title: "Intake received", sub: "Sent · Opened" },
     { kind: "SMS", intent: "purple", title: "Portal login link", sub: "Delivered" },
   ]);
-  const [profile, setProfile] = useState(() => ({ name: patient?.name || "", email: patient?.email || "", phone: patient?.phone || "" }));
+  const [profile, setProfile] = useState({ name: "", email: "", phone: "", dob: "", allergies: "", street: "", line2: "", city: "", state: "", zip: "" });
 
   if (!patient || !extra) {
     return (
@@ -83,6 +84,17 @@ export default function PatientDetailPage() {
 
   const pid = patient.id;
   const logAudit = (action: string, area = "Chart") => setAudit((a) => [{ time: `Now`, user: "Admin", action, area, device: "Browser" }, ...a]);
+  const addr = extra.address;
+  const fullAddress = addr ? `${addr.street}${addr.line2 ? ", " + addr.line2 : ""}, ${addr.city}, ${addr.state} ${addr.zip}` : "—";
+  const buildProfile = () => ({
+    name: patient.name, email: patient.email, phone: patient.phone,
+    dob: extra.dob || "", allergies: patient.allergies || "",
+    street: addr?.street || patient.address || "",
+    line2: addr?.line2 || patient.apt || "",
+    city: addr?.city || patient.city || "",
+    state: addr?.state || patient.state || "",
+    zip: addr?.zip || patient.zip || "",
+  });
 
   const intakeIncomplete = !!patient.intakeProgress && patient.intakeProgress !== "Completed";
   const hasRx = doseHistory.length > 0;
@@ -128,7 +140,7 @@ export default function PatientDetailPage() {
     logAudit(`Changed dose to ${doseField}`, "Treatment"); toast("Dose updated"); setDoseNote(""); setModal(null);
   };
   const saveProfile = () => {
-    updatePatient(pid, { name: profile.name, email: profile.email, phone: profile.phone });
+    updatePatient(pid, { name: profile.name, email: profile.email, phone: profile.phone, dob: profile.dob, allergies: profile.allergies, address: profile.street, apt: profile.line2, city: profile.city, state: profile.state, zip: profile.zip });
     logAudit("Edited patient profile", "Profile"); toast("Profile saved"); setModal(null);
   };
   const decideIntake = (decision: "Approved" | "Info requested" | "Denied") => {
@@ -181,10 +193,14 @@ export default function PatientDetailPage() {
         <div className="flex flex-col gap-4 min-w-0">
 
           {tab === "summary" && (<>
-            <Card title="Patient Summary" sub="Demographics, clinical flags, treatment, ID, and order state." action={<button className="btn btn-ghost btn-sm" onClick={() => { setProfile({ name: patient.name, email: patient.email, phone: patient.phone }); setModal("profile"); }}>Edit Profile</button>}>
+            <Card title="Patient Summary" sub="Demographics, address, clinical flags, treatment, ID, and order state." action={<button className="btn btn-ghost btn-sm" onClick={() => { setProfile(buildProfile()); setModal("profile"); }}>Edit Profile</button>}>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Info k="Phone" v={patient.phone} /><Info k="State" v={patient.state} /><Info k="Program" v={patient.plan} /><Info k="Provider" v={patient.provider} />
-                <Info k="Allergies" v={patient.allergies || "None reported"} /><Info k="Risk" v={extra.riskLabel} /><Info k="Rx Status" v={hasRx ? "Active" : "Signature needed"} /><Info k="Payment" v={patient.sub} />
+                <Info k="Phone" v={patient.phone} /><Info k="DOB" v={extra.dob || "—"} /><Info k="State" v={patient.state} /><Info k="Program" v={patient.plan} />
+                <Info k="Provider" v={patient.provider} /><Info k="Allergies" v={patient.allergies || "None reported"} /><Info k="Current Meds" v={(patient as { currentMeds?: string }).currentMeds || "None reported"} /><Info k="Risk" v={extra.riskLabel} />
+                <Info k="Rx Status" v={hasRx ? "Active" : "Signature needed"} /><Info k="Payment" v={patient.sub} />
+              </div>
+              <div className="mt-3 pt-3 border-t border-surface-3">
+                <Info k="Shipping address" v={fullAddress} />
               </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-4">
@@ -422,10 +438,17 @@ export default function PatientDetailPage() {
       )}
       {modal === "profile" && (
         <Modal title="Edit Patient Profile" onClose={() => setModal(null)} onSave={saveProfile} saveLabel="Save Profile">
-          <div className="grid gap-2">
-            <input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="Name" className="border border-border rounded-[9px] px-3 py-2 text-[12.5px] bg-surface" />
-            <input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} placeholder="Email" className="border border-border rounded-[9px] px-3 py-2 text-[12.5px] bg-surface" />
-            <input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="Phone" className="border border-border rounded-[9px] px-3 py-2 text-[12.5px] bg-surface" />
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+            <PField label="Full name" full><input className={INP} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /></PField>
+            <PField label="Email"><input className={INP} value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} /></PField>
+            <PField label="Phone"><input className={INP} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></PField>
+            <PField label="Date of birth"><input className={INP} value={profile.dob} placeholder="1988-04-12" onChange={(e) => setProfile({ ...profile, dob: e.target.value })} /></PField>
+            <PField label="Allergies"><input className={INP} value={profile.allergies} placeholder="None reported" onChange={(e) => setProfile({ ...profile, allergies: e.target.value })} /></PField>
+            <PField label="Street address" full><input className={INP} value={profile.street} placeholder="123 Main St" onChange={(e) => setProfile({ ...profile, street: e.target.value })} /></PField>
+            <PField label="Apt / Suite / Unit (line 2)" full><input className={INP} value={profile.line2} placeholder="Apt 4B" onChange={(e) => setProfile({ ...profile, line2: e.target.value })} /></PField>
+            <PField label="City"><input className={INP} value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></PField>
+            <PField label="State"><input className={INP} value={profile.state} onChange={(e) => setProfile({ ...profile, state: e.target.value })} /></PField>
+            <PField label="ZIP"><input className={INP} value={profile.zip} onChange={(e) => setProfile({ ...profile, zip: e.target.value })} /></PField>
           </div>
         </Modal>
       )}
@@ -470,6 +493,9 @@ function Card({ title, sub, action, children }: { title: string; sub?: string; a
 }
 function Info({ k, v }: { k: string; v: string }) {
   return <div><div className="text-[10px] uppercase tracking-wide text-ink-muted font-bold">{k}</div><strong className="text-[12.5px] font-semibold">{v}</strong></div>;
+}
+function PField({ label, full, children }: { label: string; full?: boolean; children: React.ReactNode }) {
+  return <div className={full ? "col-span-2" : ""}><label className="text-[10px] font-bold uppercase tracking-wide text-ink-muted block mb-1">{label}</label>{children}</div>;
 }
 function Qr({ k, v }: { k: string; v: string }) {
   return <tr className="border-b border-surface-3 last:border-none"><td className="py-1.5 pr-3 font-semibold align-top w-[42%]">{k}</td><td className="py-1.5 text-ink-2">{v}</td></tr>;

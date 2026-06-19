@@ -95,7 +95,7 @@ export interface PatientExtra {
   riskScore: number;
   riskLabel: string;
   sideEffects: { sx: string; severity: "mild" | "moderate" | "severe"; resolved: boolean; date: string }[];
-  address?: { street: string; city: string; state: string; zip: string };
+  address?: { street: string; line2?: string; city: string; state: string; zip: string };
   insurance?: { carrier: string; memberId: string; group: string };
   emergencyContact?: { name: string; relationship: string; phone: string };
   visits: { date: string; type: string; provider: string; notes: string; duration: number }[];
@@ -941,7 +941,7 @@ export interface PatientDocument {
       dob: string;
       phone: string;
       email: string;
-      address?: { street: string; city: string; state: string; zip: string };
+      address?: { street: string; line2?: string; city: string; state: string; zip: string };
       allergies: string;
       insurance?: { carrier: string; memberId: string; group: string };
     };

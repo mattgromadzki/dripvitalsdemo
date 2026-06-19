@@ -234,7 +234,7 @@ export function getPatientExtra(p: Patient): PatientExtra {
     riskScore,
     riskLabel,
     sideEffects,
-    address: { street, city, state: p.state, zip },
+    address: { street, line2: p.apt || "", city, state: p.state, zip },
     insurance: p.status === "active" ? {
       carrier: ["BlueCross BlueShield", "Aetna", "United Healthcare", "Cigna"][seed % 4],
       memberId: `MEM${String(seed * 1337).slice(0, 9)}`,
