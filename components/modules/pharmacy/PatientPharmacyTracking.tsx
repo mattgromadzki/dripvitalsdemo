@@ -11,6 +11,7 @@ const STAGE: Record<string, { label: string; intent: "muted" | "amber" | "green"
   shipped:   { label: "In transit",        intent: "amber" },
   delivered: { label: "Delivered",         intent: "green" },
   issue:     { label: "Shipping issue",    intent: "red"   },
+  voided:    { label: "Voided (EMR)",      intent: "red"   },
 };
 
 function stageOf(e: PharmacyEvent): { label: string; intent: "muted" | "amber" | "green" | "red" } {
@@ -37,6 +38,23 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const voidOrder = useCallback(async () => {
+    if (!window.confirm("Void this order in the EMR?\n\nThis marks it voided in the chart and patient portal. It does NOT cancel the fill at the pharmacy — you must confirm cancellation with GreenstoneRX directly.")) return;
+    try {
+      await fetch("/api/pharmacy/greenstone/void", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId,
+          orderId: events.find((e) => e.orderId != null)?.orderId,
+          internalOrderId: events.find((e) => e.internalOrderId)?.internalOrderId,
+          patientName: events.find((e) => e.patientName)?.patientName,
+        }),
+      });
+    } catch { /* ignore */ }
+    load();
+  }, [patientId, events, load]);
+
   if (loading) {
     return <div className="bg-surface border border-border rounded-2xl p-4 mb-4 text-[12.5px] text-ink-muted">Loading pharmacy status…</div>;
   }
@@ -57,7 +75,10 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
           {gsOrderId ? <span className="text-[12px] text-ink-muted font-mono">GreenstoneRX #{gsOrderId}</span> : null}
           <Pill intent={latestStage.intent} dot>{latestStage.label}</Pill>
         </div>
-        <button className="btn btn-ghost text-[12px]" onClick={load}>Refresh</button>
+        <div className="flex gap-1.5">
+          <button className="btn btn-ghost text-[12px]" onClick={load}>Refresh</button>
+          <button className="btn btn-ghost btn-danger text-[12px]" onClick={voidOrder}>Cancel / void</button>
+        </div>
       </div>
 
       {tracking && (
