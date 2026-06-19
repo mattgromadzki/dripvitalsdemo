@@ -16,7 +16,8 @@ export default function MedicationsPage() {
   const meds = useMedications((s) => s.meds);
   const add = useMedications((s) => s.add);
   const update = useMedications((s) => s.update);
-  const realPharmacies = usePharmacies((s) => s.pharmacies.map((p) => p.name));
+  const pharmaciesAll = usePharmacies((s) => s.pharmacies);
+  const realPharmacies = pharmaciesAll.map((p) => p.name);
   const pharmacyFilterOpts = Array.from(new Set([...realPharmacies, ...meds.map((m) => m.pharmacy)]));
 
   const [search, setSearch] = useState("");

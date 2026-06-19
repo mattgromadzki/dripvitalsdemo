@@ -24,7 +24,8 @@ export function MedicationModal({ open, onClose, med, onSave }: Props) {
   const [f, setF] = useState<MedDraft>(BLANK);
   const [err, setErr] = useState("");
   const isEdit = !!med;
-  const pharmacyNames = usePharmacies((s) => s.pharmacies.map((p) => p.name));
+  const pharmacies = usePharmacies((s) => s.pharmacies);
+  const pharmacyNames = pharmacies.map((p) => p.name);
   const pharmacyOptions = Array.from(new Set([...pharmacyNames, ...(f.pharmacy ? [f.pharmacy] : [])]));
 
   useEffect(() => {
