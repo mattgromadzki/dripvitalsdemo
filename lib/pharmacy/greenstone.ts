@@ -80,7 +80,8 @@ export async function greenstoneSubmit(input: GsOrderInput): Promise<GsSubmitRes
     const r = await fetch(`${BASE}${ORDERS_PATH}`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || j?.success !== 1) {
-      return { ok: false, error: j?.message || `Pharmacy rejected the order (HTTP ${r.status}).`, warnings: j?.warnings, source: "greenstone" };
+      const host = BASE.replace(/^https?:\/\//, "");
+      return { ok: false, error: `${j?.message || `Pharmacy rejected the order (HTTP ${r.status}).`} [endpoint: ${host}]`, warnings: j?.warnings, source: "greenstone" };
     }
     const d = (j && typeof j.data === "object" && j.data) ? j.data : {};
     const orderId =
