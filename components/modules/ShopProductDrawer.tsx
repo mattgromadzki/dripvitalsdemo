@@ -205,7 +205,7 @@ export function ShopProductDrawer({
       {/* Drawer panel */}
       <aside
         className={[
-          "fixed top-0 right-0 z-[1001] h-screen w-[640px] max-w-full bg-surface flex flex-col",
+          "fixed top-0 right-0 z-[1001] h-[100dvh] w-[640px] max-w-full bg-surface flex flex-col",
           "shadow-xl transition-transform duration-200 ease-out",
           open ? "translate-x-0" : "translate-x-full",
         ].join(" ")}
@@ -492,7 +492,7 @@ export function ShopProductDrawer({
               Cancel
             </button>
             <button className="btn btn-primary btn-sm" onClick={handleSave}>
-              Save Product
+              {isEditing ? "Save changes" : "Add product"}
             </button>
           </div>
         </div>
