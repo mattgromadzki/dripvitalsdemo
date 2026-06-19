@@ -14,8 +14,9 @@ import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { useTreatmentRequests } from "@/lib/hooks/useTreatmentRequests";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 import { useDoctors, licenseForState, getLicenseStatus } from "@/lib/hooks/useDoctors";
-import { submitGreenstone } from "@/lib/pharmacy/client";
+import { submitGreenstone, submitLifeFile } from "@/lib/pharmacy/client";
 import type { GsOrderInput } from "@/lib/pharmacy/greenstoneTypes";
+import type { LFOrderBody } from "@/lib/pharmacy/lifefileTypes";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { ClinicalSafetyStrip } from "@/components/clinical/ClinicalSafetyStrip";
 import { useClinical } from "@/lib/hooks/useClinical";
@@ -423,6 +424,71 @@ export function EPrescribeWorkspace(
     };
   }
 
+  // Map the live form state to a LifeFile order document for Hallandale.
+  function buildLifeFileInput(): LFOrderBody | { error: string } {
+    if (!patient) return { error: "No patient selected." };
+    if (!selectedDoctor) return { error: "Select a signing provider." };
+    const npi = (selectedDoctor.npi || "").trim();
+    if (!/^\d{10}$/.test(npi)) return { error: `${doctorLabel(selectedDoctor)} has no valid 10-digit NPI — add it on the Doctor record before sending to Hallandale.` };
+    const stateLic = licenseForState(selectedDoctor, patient.state);
+    if (!stateLic || getLicenseStatus(stateLic).key === "expired") return { error: `${doctorLabel(selectedDoctor)} isn't licensed in ${patient.state}. Assign a provider with a current ${patient.state} license before sending.` };
+    const addr = extra?.address;
+    if (!addr?.street || !addr?.city || !addr?.state || !addr?.zip) return { error: "Patient address is incomplete — LifeFile needs street, city, state, and ZIP." };
+    if (meds.length === 0) return { error: "LifeFile orders need at least one medication." };
+    const gender: "m" | "f" | "u" = patient.gender === "M" ? "m" : patient.gender === "F" ? "f" : "u";
+    const today = new Date().toISOString().slice(0, 10);
+    const nowMs = Date.now();
+    return {
+      message: { id: nowMs, sentTime: new Date().toISOString() },
+      order: {
+        general: { referenceId: `DV-${patient.id}-${nowMs}` },
+        prescriber: {
+          npi,
+          licenseState: patient.state,
+          licenseNumber: stateLic.number,
+          dea: selectedDoctor.dea || undefined,
+          lastName: selectedDoctor.last,
+          firstName: selectedDoctor.first,
+        },
+        patient: {
+          lastName: patient.last,
+          firstName: patient.first,
+          gender,
+          dateOfBirth: extra?.dob || "",
+          address1: addr.street,
+          city: addr.city,
+          state: addr.state,
+          zip: addr.zip,
+          phoneMobile: patient.phone,
+          email: patient.email,
+        },
+        shipping: {
+          recipientType: "patient",
+          recipientLastName: patient.last,
+          recipientFirstName: patient.first,
+          recipientPhone: patient.phone,
+          recipientEmail: patient.email,
+          addressLine1: addr.street,
+          city: addr.city,
+          state: addr.state,
+          zipCode: addr.zip,
+        },
+        billing: { payorType: "pat" },
+        rxs: meds.map((m) => ({
+          rxType: "new" as const,
+          drugName: m.drug.name,
+          drugStrength: m.strength,
+          quantity: String(m.qty),
+          quantityUnits: m.unit || "unit",
+          directions: m.sig,
+          refills: m.refills,
+          dateWritten: today,
+          daysSupply: m.daySupply,
+        })),
+      },
+    };
+  }
+
   async function submitOrder() {
     if (!patient || !selectedPharmacyId) return;
     if (screening.danger && !alertsAck) { toast("⛔ Acknowledge the contraindication alert before signing"); return; }
@@ -442,6 +508,21 @@ export function EPrescribeWorkspace(
       setSending(false);
       if (!res.ok) { toast(`⚠ GreenstoneRX rejected the order: ${res.error || "unknown error"}`); return; }
       gsOrderId = res.orderId;
+    }
+
+    // If this pharmacy transmits via the LifeFile API (Hallandale), send the
+    // order for real before persisting — only continue on success.
+    const isLifeFile = selectedPharmacy.connector === "lifefile";
+    let lfOrderId: string | number | undefined;
+    if (isLifeFile) {
+      if (meds.length === 0) { toast("⚠ Hallandale orders need at least one medication"); return; }
+      const built = buildLifeFileInput();
+      if ("error" in built) { toast(`⚠ ${built.error}`); return; }
+      setSending(true);
+      const res = await submitLifeFile(built);
+      setSending(false);
+      if (!res.ok) { toast(`⚠ Hallandale (LifeFile) rejected the order: ${res.error || res.message || "unknown error"}`); return; }
+      lfOrderId = res.orderId;
     }
 
     const today = new Date();
@@ -547,7 +628,7 @@ export function EPrescribeWorkspace(
       category: "rx",
       title: savedDoc.title,
       date: savedDoc.createdDate,
-      meta: `${meds.length} medication${meds.length === 1 ? "" : "s"}, ${sups.length} suppl${sups.length === 1 ? "y" : "ies"} · ${selectedPharmacy.name} · Ref ${refNum}${gsOrderId ? ` · GS ${gsOrderId}` : ""}`,
+      meta: `${meds.length} medication${meds.length === 1 ? "" : "s"}, ${sups.length} suppl${sups.length === 1 ? "y" : "ies"} · ${selectedPharmacy.name} · Ref ${refNum}${gsOrderId ? ` · GS ${gsOrderId}` : lfOrderId ? ` · LF ${lfOrderId}` : ""}`,
       icon: "℞",
       rxId: refNum,
       pharmacy: selectedPharmacy.name,
