@@ -426,9 +426,8 @@ export function EPrescribeWorkspace(
     if (!stateLic || getLicenseStatus(stateLic).key === "expired") return { error: `${doctorLabel(selectedDoctor)} isn't licensed in ${patient.state}. Assign a provider with a current ${patient.state} license before sending.` };
     const addr = extra?.address;
     if (!addr?.street || !addr?.city || !addr?.state || !addr?.zip) return { error: "Patient address is incomplete — GreenstoneRX needs street, city, state, and ZIP." };
-    const parts = patient.name.trim().split(/\s+/);
-    const firstName = parts[0] || patient.name;
-    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : (parts[0] || patient.name);
+    const firstName = (patient.first || "").trim() || patient.name.trim().split(/\s+/)[0] || patient.name;
+    const lastName = (patient.last || "").trim() || patient.name.trim().split(/\s+/).slice(1).join(" ") || firstName;
     const today = new Date().toISOString().slice(0, 10);
     const nowMs = Date.now();
     return {
