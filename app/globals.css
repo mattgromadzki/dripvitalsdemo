@@ -3042,3 +3042,190 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .tx-list-dim { color: var(--color-ink-muted); }
 .tx-list-form { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tx-list-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Drip Vitals EMR soft redesign system
+   Applies across every module/page by restyling the shared shell, cards, pills,
+   tables, forms, buttons, modals, and chart containers.
+───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --color-canvas: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #fbfbfc;
+  --color-surface-3: #f4f6f8;
+  --color-surface-4: #eaedf2;
+  --color-border: #e9ebef;
+  --color-border-2: #d8dee7;
+  --color-ink: #202124;
+  --color-ink-2: #3f4652;
+  --color-ink-muted: #777f8c;
+  --color-ink-muted-2: #aab2bd;
+  --color-brand: #2f6f9f;
+  --color-brand-dk: #285f89;
+  --color-brand-md: #4d86b1;
+  --color-brand-soft: #eef6fb;
+  --color-brand-softer: #f7fbfd;
+  --color-brand-glow: rgba(47,111,159,.14);
+  --color-green: #6f8d6a; --color-green-soft: #f1f7ef;
+  --color-amber: #b78b58; --color-amber-soft: #fbf5ec;
+  --color-red:   #b56b6b; --color-red-soft:   #fbf0f0;
+  --color-blue:  #2f6f9f; --color-blue-soft:  #eef6fb;
+  --color-purple:#8a7bbd; --color-purple-soft:#f4f1fb;
+  --color-teal:  #5d8f8a; --color-teal-soft:  #eef7f5;
+  --color-coral: #b56b6b; --color-coral-soft: #fbf0f0;
+  --color-pink:  #8a7bbd; --color-pink-soft:  #f4f1fb;
+  --color-violet:#8a7bbd; --color-violet-soft:#f4f1fb;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(47,111,159,.045), transparent 380px),
+    linear-gradient(180deg, #fafbfc 0%, var(--color-canvas) 100%);
+  color: var(--color-ink);
+}
+
+.emr-content {
+  background: transparent;
+}
+
+/* Shared shell */
+.dv-sidebar {
+  background: rgba(255,255,255,.96) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: 1px 0 0 rgba(35,42,52,.02);
+}
+.dv-sidebar a,
+.dv-sidebar button {
+  border-radius: 13px !important;
+}
+.dv-sidebar a:hover {
+  background: var(--color-surface-3) !important;
+}
+.dv-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  background: rgba(32,33,36,.24);
+  backdrop-filter: blur(3px);
+}
+
+/* Page density + readability */
+.emr-content > div,
+.emr-content .px-7 {
+  max-width: 1540px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Cards */
+.card,
+.bg-surface.border.border-border,
+.bg-surface.border,
+[class*="bg-surface"][class*="border-border"] {
+  border-color: var(--color-border) !important;
+  box-shadow: 0 10px 28px rgba(35,42,52,.045) !important;
+}
+.card,
+.rounded-xl,
+.rounded-2xl,
+.rounded-lg {
+  border-radius: 18px;
+}
+.card-head {
+  background: linear-gradient(180deg, #fff 0%, #fcfcfd 100%);
+  border-color: var(--color-border) !important;
+}
+.ct,
+h1,
+h2,
+h3 {
+  letter-spacing: -0.025em;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 12px;
+  font-weight: 750;
+  box-shadow: none !important;
+}
+.btn-primary {
+  background: var(--color-brand) !important;
+  color: white !important;
+}
+.btn-primary:hover { background: var(--color-brand-dk) !important; }
+.btn-ghost {
+  background: #fff !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-ink-2) !important;
+}
+.btn-ghost:hover {
+  background: var(--color-surface-3) !important;
+}
+.btn-danger {
+  background: var(--color-red-soft) !important;
+  color: var(--color-red) !important;
+}
+
+/* Pills/badges */
+.pill {
+  border-radius: 999px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+.pill-brand { background: var(--color-brand-soft) !important; color: var(--color-brand) !important; }
+.pill-green { background: var(--color-green-soft) !important; color: var(--color-green) !important; }
+.pill-blue { background: var(--color-blue-soft) !important; color: var(--color-blue) !important; }
+.pill-amber { background: var(--color-amber-soft) !important; color: var(--color-amber) !important; }
+.pill-red { background: var(--color-red-soft) !important; color: var(--color-red) !important; }
+.pill-purple { background: var(--color-purple-soft) !important; color: var(--color-purple) !important; }
+.pill-teal { background: var(--color-teal-soft) !important; color: var(--color-teal) !important; }
+.pill-coral { background: var(--color-coral-soft) !important; color: var(--color-coral) !important; }
+.pill-pink { background: var(--color-pink-soft) !important; color: var(--color-pink) !important; }
+
+/* Forms */
+.fi, .fsel, .fta, input, select, textarea {
+  border-color: var(--color-border) !important;
+}
+.fi:focus, .fsel:focus, .fta:focus, input:focus, select:focus, textarea:focus {
+  outline: none !important;
+  border-color: var(--color-brand) !important;
+  box-shadow: 0 0 0 3px rgba(47,111,159,.12) !important;
+}
+
+/* Tables */
+table thead,
+thead.bg-surface-2,
+tr.bg-surface-2 {
+  background: #fafbfc !important;
+}
+th {
+  color: var(--color-ink-muted) !important;
+  font-weight: 800 !important;
+}
+td, th {
+  border-color: var(--color-border) !important;
+}
+tr:hover td {
+  background: #fcfcfd;
+}
+
+/* Modals/drawers */
+.modal,
+.shadow-xl,
+.shadow-lg {
+  box-shadow: 0 24px 64px rgba(35,42,52,.12) !important;
+}
+.modal-overlay {
+  background: rgba(32,33,36,.24);
+  backdrop-filter: blur(7px);
+}
+
+/* Subtle mobile handling */
+@media (max-width: 900px) {
+  .emr-content > div,
+  .emr-content .px-7 {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+}
