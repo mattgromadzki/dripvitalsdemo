@@ -302,7 +302,7 @@ export default function OrdersPage() {
             <button className="btn btn-ghost btn-sm" onClick={() => toast("⚙ Customize columns")}>⚙ Customize columns</button>
           </div>
           <div className="overflow-x-auto">
-            <table className="border-collapse w-full min-w-[1100px]">
+            <table className="border-collapse w-full min-w-[1100px] text-[12px]">
               <thead>
                 <tr className="bg-surface-2">
                   {["Order #", "Date", "Patient", "State", "Treatment", "Rx", "Order Status", "Pharmacy", "Shipment", "Tracking", "Payment", "Total", "Action"].map((h) => (
@@ -318,7 +318,7 @@ export default function OrdersPage() {
                   const ship = d.isDelivered ? "Complete" : d.isShipping ? "Shipped" : d.atPharmacy ? "Processing" : d.isException ? "Held" : "Pending";
                   return (
                     <tr key={o.id} onClick={() => setSelected(o)} className="border-b border-border last:border-none hover:bg-surface-2 cursor-pointer">
-                      <td className="px-3 py-2.5 font-mono text-[11.5px] font-bold text-ink-2 whitespace-nowrap">{o.id}</td>
+                      <td className="px-3 py-2.5 font-mono font-bold text-ink-2 whitespace-nowrap">{o.id}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-ink-2">{o.created}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <Link href={`/patients/${o.patientId}`} className="text-brand-dk font-semibold hover:underline">{o.patientName}</Link>
@@ -329,7 +329,7 @@ export default function OrdersPage() {
                       <td className="px-3 py-2.5"><StatusBadge status={o.status} /></td>
                       <td className="px-3 py-2.5 whitespace-nowrap">{o.pharmacy}</td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-ink-2">{ship}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted text-[11px]">{o.tracking || "—"}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{o.tracking || "—"}</td>
                       <td className="px-3 py-2.5">{pay ? <Pill intent={pay[0] as "green" | "amber"}>{pay[1]}</Pill> : <span className="text-ink-muted">—</span>}</td>
                       <td className="px-3 py-2.5 font-bold whitespace-nowrap text-right">{o.total}</td>
                       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><button className="btn btn-ghost btn-xs" onClick={() => setSelected(o)}>Open</button></td>
