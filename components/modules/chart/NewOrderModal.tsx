@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { toast } from "@/lib/hooks/useToast";
 import { useOrders } from "@/lib/hooks/useOrders";
+import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
 import type { Patient, OrderRow, RxStatus, LabStatus } from "@/lib/types";
 
 const RX_STATUSES: RxStatus[]   = ["pending", "active", "refill"];
@@ -11,34 +12,46 @@ const LAB_STATUSES: LabStatus[] = ["ordered", "pending", "in_lab"];
 
 export function NewOrderModal({ patient, open, onClose }: { patient: Patient; open: boolean; onClose: () => void }) {
   const add = useOrders((s) => s.add);
+  const activeTreatments = useTreatmentsIntake((s) => s.treatments).filter((t) => t.active);
 
-  const [kind, setKind]         = useState<"rx" | "lab">("rx");
-  const [item, setItem]         = useState("");
-  const [destination, setDest]  = useState("GreenstoneRX");
-  const [refills, setRefills]   = useState(0);
-  const [status, setStatus]     = useState<RxStatus | LabStatus>("pending");
-  const [orderedBy, setOrderedBy] = useState(patient.provider || "Dr. Tancinco");
+  const [kind, setKind]               = useState<"rx" | "lab">("rx");
+  const [treatmentId, setTreatmentId] = useState<number | "">("");
+  const [labItem, setLabItem]         = useState("");
+  const [destination, setDest]        = useState("GreenstoneRX");
+  const [refills, setRefills]         = useState(0);
+  const [status, setStatus]           = useState<RxStatus | LabStatus>("pending");
+  const [orderedBy, setOrderedBy]     = useState(patient.provider || "Dr. Tancinco");
+
+  const selectedTreatment = activeTreatments.find((t) => t.id === treatmentId) || null;
 
   function switchKind(k: "rx" | "lab") {
     setKind(k);
     setStatus(k === "lab" ? "ordered" : "pending");
-    setDest(k === "lab" ? "Quest Diagnostics" : "GreenstoneRX");
+    setDest(k === "lab" ? "Quest Diagnostics" : (selectedTreatment?.pharmacy || "GreenstoneRX"));
+  }
+
+  function pickTreatment(idStr: string) {
+    const id = idStr ? Number(idStr) : "";
+    setTreatmentId(id);
+    const t = activeTreatments.find((x) => x.id === id);
+    if (t) setDest(t.pharmacy || "GreenstoneRX");
   }
 
   function resetAll() {
-    setKind("rx"); setItem(""); setDest("GreenstoneRX"); setRefills(0);
+    setKind("rx"); setTreatmentId(""); setLabItem(""); setDest("GreenstoneRX"); setRefills(0);
     setStatus("pending"); setOrderedBy(patient.provider || "Dr. Tancinco");
   }
 
   function submit() {
-    if (!item.trim()) { toast(kind === "lab" ? "Enter the lab panels" : "Enter the medication / item"); return; }
+    const item = kind === "lab" ? labItem.trim() : (selectedTreatment?.name || "");
+    if (!item) { toast(kind === "lab" ? "Enter the lab panels" : "Choose a treatment"); return; }
     if (!destination.trim()) { toast(kind === "lab" ? "Enter a lab" : "Enter a pharmacy"); return; }
     const now = Date.now();
     const order: Omit<OrderRow, "id"> = {
       kind,
       patientName: patient.name,
       patientId: patient.id,
-      item: item.trim(),
+      item,
       destination: destination.trim(),
       orderedDate: new Date(now).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       orderedAt: now,
@@ -47,7 +60,7 @@ export function NewOrderModal({ patient, open, onClose }: { patient: Patient; op
       ...(kind === "rx" ? { refills: Number(refills) || 0 } : {}),
     };
     add(order);
-    toast(kind === "lab" ? "🧪 Lab order created" : "📦 Order created");
+    toast(kind === "lab" ? "🧪 Lab order created" : "📦 Treatment order created — open e-Prescribe to pick the medication");
     resetAll();
     onClose();
   }
@@ -62,8 +75,8 @@ export function NewOrderModal({ patient, open, onClose }: { patient: Patient; op
       </>}
     >
       <div className="text-[12px] text-ink-muted mb-3">
-        Creating an order for <b className="text-ink-2">{patient.name}</b> ({patient.id}). This records the order — it does not
-        transmit to the pharmacy or lab.
+        Creating an order for <b className="text-ink-2">{patient.name}</b> ({patient.id}). Pick the treatment here, then open
+        {" "}<b className="text-ink-2">e-Prescribe</b> from the order to choose the exact medication and send it to the pharmacy.
       </div>
 
       <label className="fl">Order type</label>
@@ -71,15 +84,33 @@ export function NewOrderModal({ patient, open, onClose }: { patient: Patient; op
         <button
           className={`flex-1 py-2 px-3 rounded-md border text-[12.5px] font-semibold transition-colors ${kind === "rx" ? "border-brand bg-brand-soft text-brand-dk" : "border-border bg-surface text-ink-2"}`}
           onClick={() => switchKind("rx")}
-        >💊 Prescription / med</button>
+        >💊 Treatment</button>
         <button
           className={`flex-1 py-2 px-3 rounded-md border text-[12.5px] font-semibold transition-colors ${kind === "lab" ? "border-brand bg-brand-soft text-brand-dk" : "border-border bg-surface text-ink-2"}`}
           onClick={() => switchKind("lab")}
         >🧪 Lab</button>
       </div>
 
-      <label className="fl">{kind === "lab" ? "Panels" : "Item"}</label>
-      <input className="fi mb-2" placeholder={kind === "lab" ? "CMP + Lipid + HbA1c" : "Semaglutide 0.5mg · 4 units"} value={item} onChange={(e) => setItem(e.target.value)} />
+      {kind === "rx" ? (
+        <>
+          <label className="fl">Treatment</label>
+          <select className="fi mb-1" value={treatmentId === "" ? "" : String(treatmentId)} onChange={(e) => pickTreatment(e.target.value)}>
+            <option value="">Select a treatment…</option>
+            {activeTreatments.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.med} {t.strength}</option>)}
+          </select>
+          {selectedTreatment && (
+            <div className="text-[11px] text-ink-muted mb-2">{selectedTreatment.med} · {selectedTreatment.strength} · {selectedTreatment.price} · {selectedTreatment.pharmacy}</div>
+          )}
+          {activeTreatments.length === 0 && (
+            <div className="text-[11px] text-amber mb-2">No active treatments — add one in the Treatments section first.</div>
+          )}
+        </>
+      ) : (
+        <>
+          <label className="fl">Panels</label>
+          <input className="fi mb-2" placeholder="CMP + Lipid + HbA1c" value={labItem} onChange={(e) => setLabItem(e.target.value)} />
+        </>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <div><label className="fl">{kind === "lab" ? "Lab" : "Pharmacy"}</label><input className="fi" value={destination} onChange={(e) => setDest(e.target.value)} /></div>

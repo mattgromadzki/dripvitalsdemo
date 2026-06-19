@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { Key } from "react";
+import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
 import { toast } from "@/lib/hooks/useToast";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
@@ -466,6 +467,14 @@ function CreatedOrders({ orders }: { orders: OrderRow[] }) {
               <div className="text-[11px] text-ink-muted mt-0.5">{o.destination} · {o.orderedBy} · {o.orderedDate}{o.kind === "rx" && o.refills != null ? ` · ${o.refills} refills` : ""}</div>
             </div>
             <span className="font-mono text-[10.5px] text-ink-muted">{o.id}</span>
+            {o.kind === "rx" && o.patientId && (
+              <Link
+                href={`/patients/${o.patientId}/prescribe?tx=${encodeURIComponent(o.item)}`}
+                className="text-[11px] font-semibold py-1.5 px-3 rounded-md bg-brand-soft text-brand-dk hover:bg-brand hover:text-white transition-colors whitespace-nowrap"
+              >
+                ⚡ e-Prescribe
+              </Link>
+            )}
             <Pill intent={ORDER_STATUS_INTENT[o.status] || "muted"} dot>{o.status.replace("_", " ")}</Pill>
           </div>
         ))}

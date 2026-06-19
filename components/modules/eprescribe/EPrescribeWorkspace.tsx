@@ -70,7 +70,7 @@ interface SupplyLine {
 }
 type CartLine = MedicationLine | SupplyLine;
 
-export interface EPrescribeOrderContext { id: string; treatmentName: string; placedAt: string; price?: string }
+export interface EPrescribeOrderContext { id: string; treatmentName: string; placedAt: string; price?: string; kind?: "paid" | "treatment" }
 
 export function EPrescribeWorkspace(
   { embeddedPatientId, orderContext }: { embeddedPatientId?: string; orderContext?: EPrescribeOrderContext } = {}
@@ -678,15 +678,24 @@ export function EPrescribeWorkspace(
       {patient && <ClinicalSafetyStrip patient={patient} className="mb-4" />}
       {patient && <RxAlertsPanel result={screening} className="mb-4" />}
 
-      {/* Order context (when launched from a paid order on the chart) */}
+      {/* Order context (launched from a created order or paid order on the chart) */}
       {orderContext && (
         <div className="bg-green-soft border border-green-soft rounded-lg p-3 mb-4 flex items-center gap-3" style={{ borderLeft: "3px solid var(--color-green)" }}>
-          <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center text-[15px]">🧾</div>
+          <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center text-[15px]">{orderContext.kind === "treatment" ? "💊" : "🧾"}</div>
           <div className="flex-1 min-w-0">
-            <div className="text-[12.5px] font-semibold text-ink">Prescribing for paid order {orderContext.id}</div>
-            <div className="text-[11.5px] text-ink-muted">{orderContext.treatmentName} · Paid {orderContext.placedAt}{orderContext.price ? ` · ${orderContext.price}` : ""}</div>
+            {orderContext.kind === "treatment" ? (
+              <>
+                <div className="text-[12.5px] font-semibold text-ink">Prescribing for treatment: {orderContext.treatmentName}</div>
+                <div className="text-[11.5px] text-ink-muted">Select the medication, dose, and pharmacy below to send to GreenstoneRX.</div>
+              </>
+            ) : (
+              <>
+                <div className="text-[12.5px] font-semibold text-ink">Prescribing for paid order {orderContext.id}</div>
+                <div className="text-[11.5px] text-ink-muted">{orderContext.treatmentName} · Paid {orderContext.placedAt}{orderContext.price ? ` · ${orderContext.price}` : ""}</div>
+              </>
+            )}
           </div>
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-surface border border-border text-green">Paid</span>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-pill bg-surface border border-border text-green">{orderContext.kind === "treatment" ? "Treatment" : "Paid"}</span>
         </div>
       )}
 
