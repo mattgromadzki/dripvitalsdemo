@@ -190,50 +190,17 @@ export function ShopProductDrawer({
   const thumb = SHOP_THUMB_STYLE[form.cls];
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={[
-          "fixed inset-0 z-[1000] transition-opacity duration-150",
-          open ? "opacity-100" : "opacity-0 pointer-events-none",
-        ].join(" ")}
-        style={{ background: "rgba(20,40,30,.42)" }}
-        onClick={onClose}
-        aria-hidden
-      />
-
-      {/* Drawer panel */}
-      <aside
-        className={[
-          "fixed top-0 right-0 z-[1001] h-[100dvh] w-[640px] max-w-full bg-surface flex flex-col",
-          "shadow-xl transition-transform duration-200 ease-out",
-          open ? "translate-x-0" : "translate-x-full",
-        ].join(" ")}
-        role="dialog"
-        aria-modal="true"
-        aria-label={isEditing ? "Edit product" : "New product"}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-[26px] py-5 border-b border-border flex-shrink-0">
-          <div>
-            <div className="text-[17px] font-bold tracking-tight text-ink">
-              {isEditing ? "Edit Product" : "New Product"}
-            </div>
-            <div className="text-[12px] text-ink-muted mt-0.5">
-              {isEditing ? product?.name : "Add a new product to the patient portal Shop"}
-            </div>
+    <div className="treatments-intake-mod">
+      <div className={`modal-ov ${open ? "show" : ""}`} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+        <div className="modal lg">
+          <div className="modal-head">
+            <div className="modal-head-ic">🛍</div>
+            <div className="modal-title">{isEditing ? "Edit Product" : "New Product"}</div>
+            <button type="button" className="modal-close" onClick={onClose}>✕</button>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-md text-ink-muted hover:bg-surface-3 hover:text-ink flex items-center justify-center text-[20px] leading-none border-none transition-colors"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
 
-        {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-[26px] py-[22px]">
+          {/* Body */}
+          <div className="modal-body">
           {/* Basic info */}
           <Section title="Basic info">
             <Field label="Product name">
@@ -478,26 +445,20 @@ export function ShopProductDrawer({
           </Section>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2.5 px-[26px] py-3.5 border-t border-border bg-surface-2 flex-shrink-0">
-          <div>
+          <div className="modal-footer">
             {isEditing && (
-              <button className="btn btn-danger btn-sm" onClick={() => onDelete(product!.id)}>
+              <button className="btn btn-danger btn-sm" style={{ marginRight: "auto" }} onClick={() => onDelete(product!.id)}>
                 Delete
               </button>
             )}
-          </div>
-          <div className="flex gap-2">
-            <button className="btn btn-ghost btn-sm" onClick={onClose}>
-              Cancel
-            </button>
+            <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary btn-sm" onClick={handleSave}>
               {isEditing ? "Save changes" : "Add product"}
             </button>
           </div>
         </div>
-      </aside>
-    </>
+      </div>
+    </div>
   );
 }
 
