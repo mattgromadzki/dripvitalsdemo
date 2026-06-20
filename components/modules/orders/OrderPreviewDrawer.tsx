@@ -92,7 +92,7 @@ export function OrderPreviewDrawer({ order, onClose }: { order: FulfillmentOrder
         </Section>
 
         <div className="px-[18px] pt-[14px]">
-          <PatientPharmacyTracking patientId={order.patientId} />
+          <PatientPharmacyTracking patientId={order.patientId} defaultAddress={extra.address} />
         </div>
 
         <div className="mt-auto px-[18px] py-[14px] border-t border-border flex gap-2">

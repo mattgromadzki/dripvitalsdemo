@@ -195,3 +195,27 @@ export async function greenstoneSendMessage(orderId: string | number, message: s
     return { ok: true, messageId: j?.data?.message_id, createdAt: j?.data?.created_at, source: "greenstone" };
   } catch (e) { return { ok: false, error: `Send failed: ${(e as Error).message}`, source: "greenstone" }; }
 }
+
+// ── Shipping address update (5Axis PUT /orders/{order_id}/update-address) ────
+// For early orders the change applies directly (HTTP 200). Once a label exists
+// (LABEL_CREATED / ISSUE_IN_SHIPPING) the API requires force:true and routes the
+// change through a pharmacist-reviewed pull-live request (HTTP 202).
+export interface GsAddressBody { address: string; city: string; state: string; zipCode: string; line2?: string; force?: boolean; note?: string; skip_validation?: boolean }
+export interface GsAddressResult { ok: boolean; pullLive?: boolean; message?: string; error?: string; source: "greenstone" | "mock" }
+
+export async function greenstoneUpdateAddress(orderId: string | number, body: GsAddressBody): Promise<GsAddressResult> {
+  if (!live()) return { ok: true, message: "Mock address update (no token set).", source: "mock" };
+  try {
+    const r = await fetch(`${BASE}/api/v1/orders/${encodeURIComponent(String(orderId))}/update-address`, {
+      method: "PUT", headers: headers(), body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 202) return { ok: true, pullLive: true, message: j?.message || "Queued for pharmacist review (order already has a label).", source: "greenstone" };
+    if (!r.ok || j?.success !== 1) {
+      const host = BASE.replace(/^https?:\/\//, "");
+      const hint = r.status === 409 ? " The order already has a shipping label — resend with force to route it through pharmacist review." : "";
+      return { ok: false, error: `${j?.message || `Address update failed (HTTP ${r.status}).`}${hint} [endpoint: ${host}]`, source: "greenstone" };
+    }
+    return { ok: true, message: j?.message || "Shipping address updated.", source: "greenstone" };
+  } catch (e) { return { ok: false, error: `Address update failed: ${(e as Error).message}`, source: "greenstone" }; }
+}

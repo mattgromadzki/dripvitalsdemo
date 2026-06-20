@@ -28,9 +28,13 @@ function fmtMsgTime(s: string): string {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
+export function PatientPharmacyTracking({ patientId, defaultAddress }: { patientId: string; defaultAddress?: { street?: string; line2?: string; city?: string; state?: string; zip?: string } }) {
   const [events, setEvents] = useState<PharmacyEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addrOpen, setAddrOpen] = useState(false);
+  const [addr, setAddr] = useState({ street: "", line2: "", city: "", state: "", zip: "" });
+  const [addrNote, setAddrNote] = useState("");
+  const [addrSaving, setAddrSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,6 +142,39 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
     load();
   }, [events, gsOrderId, patientId, load, loadMessages]);
 
+  const openAddr = useCallback(() => {
+    setAddr({
+      street: defaultAddress?.street || "",
+      line2: defaultAddress?.line2 || "",
+      city: defaultAddress?.city || "",
+      state: defaultAddress?.state || "",
+      zip: defaultAddress?.zip || "",
+    });
+    setAddrNote("");
+    setAddrOpen(true);
+  }, [defaultAddress]);
+
+  const saveAddress = useCallback(async () => {
+    if (gsOrderId == null) return;
+    if (!addr.street.trim() || !addr.city.trim() || !addr.state.trim() || !addr.zip.trim()) { window.alert("Street, city, state, and ZIP are all required."); return; }
+    const labeled = ["ready", "shipped", "issue", "held"].includes((events[0]?.stage || "").toLowerCase());
+    if (labeled && !addrNote.trim()) { window.alert("This order already has a shipping label — add a note for the pharmacist who will review the address change."); return; }
+    setAddrSaving(true);
+    try {
+      const r = await fetch("/api/pharmacy/greenstone/address", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: gsOrderId, address: addr.street, line2: addr.line2, city: addr.city, state: addr.state, zipCode: addr.zip, force: labeled, note: addrNote }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j?.ok) {
+        window.alert(j.pullLive ? "Address change sent to the pharmacist for review (the order already has a label)." : "Shipping address updated at the pharmacy.");
+        setAddrOpen(false); setAddrNote(""); load();
+      } else window.alert("Address not updated: " + (j?.error || "the pharmacy rejected it."));
+    } catch { window.alert("Address update failed. Check your connection and try again."); }
+    setAddrSaving(false);
+  }, [gsOrderId, addr, addrNote, events, load]);
+
   if (loading) {
     return <div className="bg-surface border border-border rounded-2xl p-4 mb-4 text-[12.5px] text-ink-muted">Loading pharmacy status…</div>;
   }
@@ -159,9 +196,32 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
         </div>
         <div className="flex gap-1.5">
           <button className="btn btn-ghost text-[12px]" onClick={load}>Refresh</button>
+          {gsOrderId != null && <button className="btn btn-ghost text-[12px]" onClick={openAddr}>Edit address</button>}
           <button className="btn btn-ghost btn-danger text-[12px]" onClick={voidOrder}>Cancel order</button>
         </div>
       </div>
+
+      {addrOpen && (
+        <div className="bg-surface-2 border border-border rounded-xl p-3 mb-3">
+          <div className="text-[11px] uppercase tracking-wide text-ink-muted mb-2">Update shipping address</div>
+          <div className="grid gap-2">
+            <input className="border border-border rounded-[8px] px-2.5 py-1.5 text-[12.5px] bg-surface" placeholder="Street address" value={addr.street} onChange={(e) => setAddr({ ...addr, street: e.target.value })} />
+            <input className="border border-border rounded-[8px] px-2.5 py-1.5 text-[12.5px] bg-surface" placeholder="Apt / suite / floor (optional)" value={addr.line2} onChange={(e) => setAddr({ ...addr, line2: e.target.value })} />
+            <div className="grid grid-cols-[1fr_70px_90px] gap-2">
+              <input className="border border-border rounded-[8px] px-2.5 py-1.5 text-[12.5px] bg-surface" placeholder="City" value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} />
+              <input className="border border-border rounded-[8px] px-2.5 py-1.5 text-[12.5px] bg-surface uppercase" placeholder="ST" maxLength={2} value={addr.state} onChange={(e) => setAddr({ ...addr, state: e.target.value })} />
+              <input className="border border-border rounded-[8px] px-2.5 py-1.5 text-[12.5px] bg-surface" placeholder="ZIP" value={addr.zip} onChange={(e) => setAddr({ ...addr, zip: e.target.value })} />
+            </div>
+            {["ready", "shipped", "issue", "held"].includes((events[0]?.stage || "").toLowerCase()) && (
+              <textarea className="border border-border rounded-[8px] px-2.5 py-1.5 text-[12.5px] bg-surface resize-none" rows={2} placeholder="Note for the pharmacist (required — order has a label)…" value={addrNote} onChange={(e) => setAddrNote(e.target.value.slice(0, 2000))} />
+            )}
+          </div>
+          <div className="flex gap-2 mt-2 justify-end">
+            <button className="btn btn-ghost text-[12px]" onClick={() => setAddrOpen(false)}>Cancel</button>
+            <button className="btn btn-primary text-[12px]" disabled={addrSaving} onClick={saveAddress}>{addrSaving ? "Saving…" : "Update address"}</button>
+          </div>
+        </div>
+      )}
 
       {tracking && (
         <div className="text-[12.5px] mb-3">

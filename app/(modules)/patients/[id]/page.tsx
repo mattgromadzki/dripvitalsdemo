@@ -304,7 +304,7 @@ export default function PatientDetailPage() {
                   ? patientOrders.map((o) => <OrderCard key={o.id} order={o} patient={patient} />)
                   : <div className="bg-surface border border-border rounded-2xl px-4 py-6 text-center text-ink-muted text-[12.5px]">No fulfillment order on file for this patient yet.</div>}
               </div>
-              <PatientPharmacyTracking patientId={pid} />
+              <PatientPharmacyTracking patientId={pid} defaultAddress={addr} />
               <Card title="Patient Orders &amp; Prescriptions" sub="Prescriptions transmitted to the pharmacy via e-prescribe, with status and timestamps." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
               {patientRx.length === 0 && <div className="text-ink-muted text-[12.5px] py-6 text-center">No prescriptions yet. Use Create Rx to send one through e-prescribe.</div>}
               {patientRx.map((r) => {

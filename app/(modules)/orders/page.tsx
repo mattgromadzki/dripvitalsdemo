@@ -7,10 +7,11 @@ import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { getFulfillmentOrders, type FulfillmentOrder } from "@/lib/data/fulfillmentOrders";
-import { WORKFLOW_META, type WorkflowStatus, type WorkflowStage } from "@/lib/data/orderWorkflow";
+import type { WorkflowStatus } from "@/lib/data/orderWorkflow";
 import { StatusBadge } from "@/components/modules/orders/StatusBadge";
 import { OrderPreviewDrawer } from "@/components/modules/orders/OrderPreviewDrawer";
 import { OrderCard } from "@/components/modules/orders/OrderCard";
+import { derive } from "@/lib/data/orderDerive";
 
 const parse$ = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
 const MONTHS: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
@@ -27,8 +28,6 @@ function withinDays(s: string, days: number): boolean {
   return diff >= 0 && (days === 0 ? diff < 1 : diff <= days);
 }
 
-const STAGE_ORDER: WorkflowStage[] = ["Intake", "Medical Review", "Clinical Decision", "Payment", "Pharmacy", "Shipping"];
-const TL_LABELS = ["Order", "Paid", "Review", "Rx", "Pharm", "Ship"];
 
 // Pipeline tabs (exact design labels) -> workflow status groups
 const TABS: { key: string; label: string; statuses: WorkflowStatus[] | null }[] = [
@@ -42,46 +41,6 @@ const TABS: { key: string; label: string; statuses: WorkflowStatus[] | null }[] 
   { key: "issues", label: "Issues", statuses: ["hold", "refund_requested", "chargeback", "compliance_review", "payment_failed", "denied", "pharmacy_delayed"] },
 ];
 
-interface Derived {
-  isException: boolean; isDelivered: boolean; isShipping: boolean; atPharmacy: boolean; leftPharmacy: boolean;
-  inReview: boolean; reviewed: boolean; isApproved: boolean; awaitingPay: boolean; payFailed: boolean;
-  isPaid: boolean; rxSent: boolean; rxNeeded: boolean; preRx: boolean;
-}
-function derive(o: FulfillmentOrder): Derived {
-  const stage = WORKFLOW_META[o.status].stage;
-  const inP = (s: WorkflowStage[]) => s.includes(stage);
-  const isException = stage === "Exceptions";
-  const isDelivered = o.status === "delivered";
-  const isShipping = ["label_created", "shipped", "in_transit"].includes(o.status);
-  const atPharmacy = stage === "Pharmacy";
-  const leftPharmacy = stage === "Shipping";
-  const inReview = stage === "Medical Review";
-  const reviewed = inP(["Clinical Decision", "Payment", "Pharmacy", "Shipping"]);
-  const isApproved = o.status === "approved" || inP(["Payment", "Pharmacy", "Shipping"]);
-  const awaitingPay = o.status === "awaiting_payment";
-  const payFailed = o.status === "payment_failed";
-  const isPaid = o.status === "paid" || inP(["Pharmacy", "Shipping"]);
-  const rxSent = inP(["Pharmacy", "Shipping"]);
-  const preRx = !rxSent && !isException && !isDelivered;
-  const rxNeeded = preRx;
-  return { isException, isDelivered, isShipping, atPharmacy, leftPharmacy, inReview, reviewed, isApproved, awaitingPay, payFailed, isPaid, rxSent, rxNeeded, preRx };
-}
-function timelineStates(d: Derived): ("done" | "current" | "need" | "")[] {
-  return [
-    "done",
-    d.isPaid ? "done" : (d.awaitingPay || d.payFailed) ? "need" : "",
-    d.reviewed ? "done" : d.inReview ? "current" : "",
-    d.rxSent ? "done" : d.isApproved ? "need" : "",
-    d.leftPharmacy ? "done" : d.atPharmacy ? "current" : "",
-    d.isDelivered ? "done" : d.isShipping ? "current" : "",
-  ];
-}
-
-const initials = (s: string) => s.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-const medAbbr = (s: string) => s.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-const typeIntent = (t: string): "blue" | "teal" | "purple" => (t === "New" ? "blue" : t === "Refill" ? "teal" : "purple");
-const carrierFor = (o: FulfillmentOrder) => (o.tracking && o.tracking !== "—" ? "UPS" : "—");
-const methodFor = (o: FulfillmentOrder) => (/semaglutide|tirzepatide|glp|nad|sermorelin|testosterone/i.test(o.medication) ? "Cold-chain" : "Standard");
 
 type ViewMode = "cards" | "table";
 
@@ -96,8 +55,6 @@ export default function OrdersPage() {
   const [programFilter, setProgramFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [selected, setSelected] = useState<FulfillmentOrder | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpand = (id: string) => setExpanded((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const tabStatuses = (key: string) => TABS.find((t) => t.key === key)?.statuses ?? null;
   const tabCount = (key: string) => { const s = tabStatuses(key); return s ? orders.filter((o) => s.includes(o.status)).length : orders.length; };
@@ -266,19 +223,3 @@ export default function OrdersPage() {
   );
 }
 
-function DetailBox({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h4 className="text-[10px] uppercase tracking-wider text-ink-muted-2 font-bold mb-2.5">{title}</h4>
-      {children}
-    </div>
-  );
-}
-function DRow({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex justify-between gap-3 py-[5px] text-[12px] border-b border-surface-3 last:border-none">
-      <span className="text-ink-muted">{k}</span>
-      <span className="font-semibold text-ink text-right truncate">{v}</span>
-    </div>
-  );
-}
