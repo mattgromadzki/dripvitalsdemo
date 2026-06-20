@@ -300,7 +300,9 @@ export default function PatientDetailPage() {
           {tab === "orders" && (
             <>
               <div className="flex flex-col gap-2.5 mb-4">
-                {patientOrders.map((o) => <OrderCard key={o.id} order={o} patient={patient} />)}
+                {patientOrders.length > 0
+                  ? patientOrders.map((o) => <OrderCard key={o.id} order={o} patient={patient} />)
+                  : <div className="bg-surface border border-border rounded-2xl px-4 py-6 text-center text-ink-muted text-[12.5px]">No fulfillment order on file for this patient yet.</div>}
               </div>
               <PatientPharmacyTracking patientId={pid} />
               <Card title="Patient Orders &amp; Prescriptions" sub="Prescriptions transmitted to the pharmacy via e-prescribe, with status and timestamps." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
