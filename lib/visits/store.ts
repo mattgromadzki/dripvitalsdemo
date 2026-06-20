@@ -64,21 +64,21 @@ export async function listVisits(): Promise<Visit[]> {
   return all.slice().sort((a, b) => (b.paidAt || b.startedAt) - (a.paidAt || a.startedAt));
 }
 
-/** Create the visit at form open (idempotent on id — re-opens won't duplicate). */
+/** Create the visit at the first real step (idempotent on id — re-renders won't
+ * duplicate; a re-call merges any newly-captured contact/form info). */
 export async function startVisit(input: { id: string } & Partial<Visit>): Promise<Visit> {
   const all = await readAll();
   const existing = all.find((v) => v.id === input.id);
-  if (existing) return existing; // already started this session
-  const { ms, display } = estParts();
-  const visit: Visit = {
-    id: input.id,
-    status: "started",
-    startedAt: ms,
-    startedDisplay: display,
-    intakeFormId: input.intakeFormId,
-    intakeFormName: input.intakeFormName,
-    updatedAt: ms,
+  const known: Partial<Visit> = {
+    patientId: input.patientId, patientName: input.patientName, email: input.email, phone: input.phone,
+    treatmentId: input.treatmentId, treatmentName: input.treatmentName, price: input.price,
+    intakeFormId: input.intakeFormId, intakeFormName: input.intakeFormName, shippingAddress: input.shippingAddress,
   };
+  if (existing) {
+    return (await updateVisit(input.id, known)) || existing;
+  }
+  const { ms, display } = estParts();
+  const visit: Visit = { id: input.id, status: "started", startedAt: ms, startedDisplay: display, updatedAt: ms, ...known };
   await writeAll([visit, ...all].slice(0, 5000));
   return visit;
 }
@@ -94,12 +94,17 @@ export async function updateVisit(id: string, patch: Partial<Visit>): Promise<Vi
   return merged;
 }
 
-/** Mark paid: overwrite the displayed timestamp with the payment time. */
+/** Mark paid: overwrite the displayed timestamp with the payment time. Upserts
+ * if the visit was never recorded at start (e.g. completion without a start hook). */
 export async function markVisitPaid(id: string, patch: Partial<Visit> = {}): Promise<Visit | null> {
   const all = await readAll();
-  const i = all.findIndex((v) => v.id === id);
-  if (i < 0) return null;
   const { ms, display } = estParts();
+  const i = all.findIndex((v) => v.id === id);
+  if (i < 0) {
+    const visit: Visit = { startedAt: ms, startedDisplay: display, ...patch, id, status: "paid", paidAt: ms, paidDisplay: display, updatedAt: ms } as Visit;
+    await writeAll([visit, ...all].slice(0, 5000));
+    return visit;
+  }
   all[i] = { ...all[i], ...patch, id, status: "paid", paidAt: ms, paidDisplay: display, updatedAt: ms };
   await writeAll(all);
   return all[i];

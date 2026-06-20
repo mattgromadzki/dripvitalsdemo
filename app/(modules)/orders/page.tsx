@@ -1,225 +1,146 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
-import { Toast } from "@/components/ui/Toast";
-import { toast } from "@/lib/hooks/useToast";
-import { usePatients } from "@/lib/hooks/usePatients";
-import { getFulfillmentOrders, type FulfillmentOrder } from "@/lib/data/fulfillmentOrders";
-import type { WorkflowStatus } from "@/lib/data/orderWorkflow";
-import { StatusBadge } from "@/components/modules/orders/StatusBadge";
-import { OrderPreviewDrawer } from "@/components/modules/orders/OrderPreviewDrawer";
-import { OrderCard } from "@/components/modules/orders/OrderCard";
-import { derive } from "@/lib/data/orderDerive";
 
-const parse$ = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
-const MONTHS: Record<string, number> = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
-const NOW = new Date(2026, 4, 31);
-function parseCreated(s: string): Date | null {
-  const m = (s || "").match(/^([A-Za-z]{3})\s+(\d{1,2})(?:,\s*(\d{4}))?$/);
-  if (!m) return null;
-  const mon = MONTHS[m[1]]; if (mon == null) return null;
-  return new Date(m[3] ? Number(m[3]) : 2026, mon, Number(m[2]));
-}
-function withinDays(s: string, days: number): boolean {
-  const d = parseCreated(s); if (!d) return false;
-  const diff = (NOW.getTime() - d.getTime()) / 86400000;
-  return diff >= 0 && (days === 0 ? diff < 1 : diff <= days);
+interface Visit {
+  id: string; status: "started" | "unpaid" | "paid";
+  startedAt: number; startedDisplay: string; paidAt?: number; paidDisplay?: string;
+  patientId?: string; patientName?: string; email?: string; phone?: string;
+  treatmentId?: string; treatmentName?: string; price?: number;
+  intakeFormId?: string; intakeFormName?: string;
+  shippingAddress?: { street?: string; line2?: string; city?: string; state?: string; zip?: string };
+  updatedAt: number;
 }
 
-
-// Pipeline tabs (exact design labels) -> workflow status groups
-const TABS: { key: string; label: string; statuses: WorkflowStatus[] | null }[] = [
-  { key: "all", label: "All", statuses: null },
-  { key: "new", label: "New", statuses: ["new_order", "intake_incomplete", "awaiting_questionnaire"] },
-  { key: "review", label: "Provider Review", statuses: ["awaiting_provider_review", "provider_reviewing", "additional_info_requested", "labs_required", "approved", "modification_requested"] },
-  { key: "payment", label: "Payment", statuses: ["awaiting_payment", "payment_failed", "paid"] },
-  { key: "pharmacy", label: "At Pharmacy", statuses: ["ready_for_pharmacy", "sent_to_pharmacy", "pharmacy_processing"] },
-  { key: "shipped", label: "Shipped", statuses: ["label_created", "shipped", "in_transit"] },
-  { key: "delivered", label: "Delivered", statuses: ["delivered"] },
-  { key: "issues", label: "Issues", statuses: ["hold", "refund_requested", "chargeback", "compliance_review", "payment_failed", "denied", "pharmacy_delayed"] },
+const TABS = [
+  { key: "all", label: "All" },
+  { key: "started", label: "Started / Unpaid" },
+  { key: "paid", label: "Paid" },
 ];
 
-
-type ViewMode = "cards" | "table";
-
-export default function OrdersPage() {
-  const patients = usePatients((s) => s.patients);
-  const orders = useMemo(() => getFulfillmentOrders(patients), [patients]);
-  const pMap = useMemo(() => new Map(patients.map((p) => [p.id, p])), [patients]);
-
-  const [view, setView] = useState<ViewMode>("cards");
+export default function VisitsPage() {
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [programFilter, setProgramFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
-  const [selected, setSelected] = useState<FulfillmentOrder | null>(null);
 
-  const tabStatuses = (key: string) => TABS.find((t) => t.key === key)?.statuses ?? null;
-  const tabCount = (key: string) => { const s = tabStatuses(key); return s ? orders.filter((o) => s.includes(o.status)).length : orders.length; };
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/visits", { cache: "no-store" });
+      const j = await r.json();
+      if (j?.ok && Array.isArray(j.visits)) setVisits(j.visits);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, [load]);
 
-  const programs = useMemo(() => Array.from(new Set(orders.map((o) => o.program))), [orders]);
+  const counts = useMemo(() => ({
+    all: visits.length,
+    started: visits.filter((v) => v.status !== "paid").length,
+    paid: visits.filter((v) => v.status === "paid").length,
+  }), [visits]);
 
-  const filtered = useMemo(() => orders.filter((o) => {
-    const ts = tabStatuses(activeTab);
-    if (ts && !ts.includes(o.status)) return false;
-    if (programFilter && o.program !== programFilter) return false;
-    if (dateFilter && !withinDays(o.created, dateFilter === "today" ? 0 : Number(dateFilter))) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!(o.id.toLowerCase().includes(q) || o.patientName.toLowerCase().includes(q) || o.medication.toLowerCase().includes(q))) return false;
-    }
-    return true;
-  }), [orders, activeTab, programFilter, dateFilter, search]);
+  const filtered = useMemo(() => {
+    let list = visits;
+    if (tab === "started") list = list.filter((v) => v.status !== "paid");
+    else if (tab === "paid") list = list.filter((v) => v.status === "paid");
+    const q = search.trim().toLowerCase();
+    if (q) list = list.filter((v) =>
+      (v.patientName || "").toLowerCase().includes(q) ||
+      (v.treatmentName || "").toLowerCase().includes(q) ||
+      (v.email || "").toLowerCase().includes(q) ||
+      v.id.toLowerCase().includes(q));
+    return list;
+  }, [visits, tab, search]);
 
-  const KPIS = [
-    { label: "New Today", sub: "Awaiting first review", value: tabCount("new"), color: "text-ink", tab: "new" },
-    { label: "Needs Review", sub: "Provider action required", value: tabCount("review"), color: "text-amber", tab: "review" },
-    { label: "At Pharmacy", sub: "Processing or queued", value: tabCount("pharmacy"), color: "text-ink", tab: "pharmacy" },
-    { label: "Shipped", sub: "Tracking active", value: tabCount("shipped"), color: "text-brand", tab: "shipped" },
-    { label: "Delivered", sub: "Recently completed", value: tabCount("delivered"), color: "text-green", tab: "delivered" },
-    { label: "Issues", sub: "Needs attention", value: tabCount("issues"), color: "text-red", tab: "issues" },
-  ];
+  const del = useCallback(async (id: string) => {
+    if (!window.confirm("Delete this visit from the EMR?\n\nThis permanently removes the intake record.")) return;
+    try { await fetch(`/api/visits?id=${encodeURIComponent(id)}`, { method: "DELETE" }); } catch { /* ignore */ }
+    load();
+  }, [load]);
 
   return (
     <div className="px-5 py-5 text-[14px]">
-      {/* Page head */}
       <div className="flex items-start gap-3.5 mb-4 flex-wrap">
         <div>
           <h1 className="text-[23px] font-extrabold tracking-tight">Visits</h1>
-          <div className="text-[12.5px] text-ink-muted mt-1 max-w-[680px]">Each visit begins when a patient starts their intake form — treatment selection, payment, prescription, pharmacy progress, and shipment tracking across the full fulfillment workflow.</div>
+          <div className="text-[12.5px] text-ink-muted mt-1 max-w-[700px]">A visit begins the moment a patient starts an intake form — timestamped in Eastern Time. One intake = one visit (two treatments = two visits). The visit records the treatment selected and flips to Paid when the patient pays. Unpaid visits can be deleted.</div>
         </div>
         <div className="flex-1" />
-        <button className="btn btn-ghost btn-sm" onClick={() => toast("⬇ Exporting CSV…")}>Export CSV</button>
-        <button className="btn btn-ghost btn-sm" onClick={() => toast("⚙ Bulk actions")}>Bulk actions</button>
-        <button className="btn btn-primary btn-sm" onClick={() => toast("➕ Create manual order")}>+ Create manual order</button>
+        <button className="btn btn-ghost btn-sm" onClick={load}>Refresh</button>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-4">
-        {KPIS.map((k) => (
-          <button key={k.label} onClick={() => setActiveTab(k.tab)}
-            className="bg-surface border border-border rounded-2xl px-4 py-3 text-left hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-3 gap-2.5 mb-4">
+        {[
+          { label: "Total visits", value: counts.all, color: "text-ink" },
+          { label: "Started / Unpaid", value: counts.started, color: "text-amber" },
+          { label: "Paid", value: counts.paid, color: "text-green" },
+        ].map((k) => (
+          <div key={k.label} className="bg-surface border border-border rounded-2xl px-4 py-3">
             <div className="text-[10px] font-bold uppercase tracking-wide text-ink-muted">{k.label}</div>
             <div className={`text-[26px] font-extrabold tracking-tight leading-none mt-1 ${k.color}`}>{k.value}</div>
-            <div className="text-[11px] text-ink-muted mt-0.5">{k.sub}</div>
-          </button>
+          </div>
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap mb-3.5">
-        <div className="flex-1 min-w-[240px] flex items-center gap-2 bg-surface border border-border rounded-[9px] px-3 py-2">
-          <span className="text-ink-muted">🔍</span>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by order #, patient, medication, tracking…" className="bg-transparent outline-none text-[12.5px] w-full" />
-        </div>
-        <select value={activeTab} onChange={(e) => setActiveTab(e.target.value)}
-          className="text-[12.5px] font-semibold text-ink-2 bg-surface border border-border rounded-[9px] px-3 py-2 cursor-pointer">
-          {TABS.map((t) => <option key={t.key} value={t.key}>{t.key === "all" ? "All statuses" : t.label}</option>)}
-        </select>
-        <select value={programFilter} onChange={(e) => setProgramFilter(e.target.value)}
-          className="text-[12.5px] font-semibold text-ink-2 bg-surface border border-border rounded-[9px] px-3 py-2 cursor-pointer">
-          <option value="">All treatments</option>
-          {programs.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
-          className="text-[12.5px] font-semibold text-ink-2 bg-surface border border-border rounded-[9px] px-3 py-2 cursor-pointer">
-          <option value="">All dates</option>
-          <option value="today">Today</option>
-          <option value="7">Last 7 days</option>
-          <option value="30">Last 30 days</option>
-        </select>
-        <div className="ml-auto flex bg-surface border border-border rounded-[9px] p-0.5">
-          {(["cards", "table"] as ViewMode[]).map((v) => (
-            <button key={v} onClick={() => setView(v)}
-              className={`text-[12.5px] font-semibold px-3.5 py-1.5 rounded-[7px] capitalize ${view === v ? "bg-brand-soft text-brand-dk" : "text-ink-muted hover:text-ink-2"}`}>{v}</button>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by patient, treatment, email, visit #…" className="bg-surface border border-border rounded-pill px-4 py-2 text-[12.5px] outline-none min-w-[280px] flex-1 max-w-[420px]" />
+        <div className="flex gap-1.5">
+          {TABS.map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)} className={`btn btn-sm ${tab === t.key ? "btn-primary" : "btn-ghost"}`}>
+              {t.label} {t.key === "all" ? counts.all : t.key === "started" ? counts.started : counts.paid}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Pipeline tabs */}
-      <nav className="flex gap-0.5 border-b border-border mb-3.5 overflow-x-auto">
-        {TABS.map((t) => {
-          const active = activeTab === t.key;
-          return (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`text-[12.5px] font-semibold px-3 py-2.5 whitespace-nowrap border-b-2 -mb-px flex items-center gap-1.5 ${active ? "text-brand-dk border-brand" : "text-ink-muted border-transparent hover:text-ink-2"}`}>
-              {t.label}
-              <span className={`text-[10.5px] rounded-pill px-1.5 font-bold ${active ? "bg-brand-soft text-brand-dk" : "bg-surface-3 text-ink-2"}`}>{tabCount(t.key)}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* CARDS VIEW */}
-      {view === "cards" && (
-        <div className="flex flex-col gap-2.5">
-          {filtered.map((o) => (
-            <OrderCard key={o.id} order={o} patient={pMap.get(o.patientId)} onOpen={() => setSelected(o)} />
-          ))}
-          {filtered.length === 0 && <div className="bg-surface border border-border rounded-2xl px-4 py-12 text-center text-ink-muted text-[12.5px]">No orders match these filters.</div>}
+      <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="border-collapse w-full min-w-[940px] text-[12.5px]">
+            <thead>
+              <tr className="bg-surface-2">
+                {["Visit", "Time (ET)", "Patient", "Treatment", "Intake form", "Status", "Total", "Actions"].map((h) => (
+                  <th key={h} className={`text-[10px] uppercase tracking-wide text-ink-muted font-bold text-left px-3 py-2.5 border-b border-border whitespace-nowrap ${h === "Total" ? "text-right" : ""}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((v) => {
+                const paid = v.status === "paid";
+                const when = paid ? (v.paidDisplay || v.startedDisplay) : v.startedDisplay;
+                return (
+                  <tr key={v.id} className="border-b border-border last:border-none hover:bg-surface-2">
+                    <td className="px-3 py-2.5 font-mono text-[11.5px] text-ink-muted whitespace-nowrap">{v.id}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {when}
+                      <span className="text-[10px] text-ink-muted ml-1">({paid ? "paid" : "started"})</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold">{v.patientName || "—"}</div>
+                      {v.email ? <div className="text-[11px] text-ink-muted">{v.email}</div> : null}
+                    </td>
+                    <td className="px-3 py-2.5">{v.treatmentName || <span className="text-ink-muted-2">Not selected</span>}</td>
+                    <td className="px-3 py-2.5">{v.intakeFormName || "—"}</td>
+                    <td className="px-3 py-2.5"><Pill intent={paid ? "green" : "amber"} dot>{paid ? "Paid · intake complete" : "Started · unpaid"}</Pill></td>
+                    <td className="px-3 py-2.5 text-right font-semibold">{v.price != null ? `$${v.price}` : "—"}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      <div className="flex gap-1.5 justify-end">
+                        {v.patientId ? <Link href={`/patients/${v.patientId}`} className="btn btn-ghost btn-xs">Chart →</Link> : null}
+                        <button className="btn btn-ghost btn-xs btn-danger" onClick={() => del(v.id)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={8} className="px-3 py-12 text-center text-ink-muted">{loading ? "Loading visits…" : "No visits yet. A visit appears as soon as a patient starts an intake form."}</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {/* TABLE VIEW */}
-      {view === "table" && (
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-4 py-3.5 border-b border-border">
-            <div>
-              <h3 className="text-[14px] font-extrabold">Compact table view</h3>
-              <div className="text-[12px] text-ink-muted mt-0.5">Spreadsheet-style order management for high-volume triage.</div>
-            </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => toast("⚙ Customize columns")}>⚙ Customize columns</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="border-collapse w-full min-w-[1100px] text-[12px]">
-              <thead>
-                <tr className="bg-surface-2">
-                  {["Order #", "Date", "Patient", "State", "Treatment", "Rx", "Order Status", "Pharmacy", "Shipment", "Tracking", "Payment", "Total", "Action"].map((h) => (
-                    <th key={h} className={`text-[10px] uppercase tracking-wide text-ink-muted font-bold text-left px-3 py-2.5 border-b border-border whitespace-nowrap ${h === "Total" ? "text-right" : ""}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((o) => {
-                  const d = derive(o);
-                  const rx = d.rxSent ? ["green", "Signed"] : d.rxNeeded ? ["amber", "Needs Rx"] : ["muted", "Pending"];
-                  const pay = d.isPaid ? ["green", "Paid"] : d.awaitingPay || d.payFailed ? ["amber", "Unpaid"] : null;
-                  const ship = d.isDelivered ? "Complete" : d.isShipping ? "Shipped" : d.atPharmacy ? "Processing" : d.isException ? "Held" : "Pending";
-                  return (
-                    <tr key={o.id} onClick={() => setSelected(o)} className="border-b border-border last:border-none hover:bg-surface-2 cursor-pointer">
-                      <td className="px-3 py-2.5 font-mono font-bold text-ink-2 whitespace-nowrap">{o.id}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-ink-2">{o.created}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <Link href={`/patients/${o.patientId}`} className="text-brand-dk font-semibold hover:underline">{o.patientName}</Link>
-                      </td>
-                      <td className="px-3 py-2.5">{o.state}</td>
-                      <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{o.medication}</td>
-                      <td className="px-3 py-2.5"><Pill intent={rx[0] as "green" | "amber" | "muted"}>{rx[1]}</Pill></td>
-                      <td className="px-3 py-2.5"><StatusBadge status={o.status} /></td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">{o.pharmacy}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-ink-2">{ship}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{o.tracking || "—"}</td>
-                      <td className="px-3 py-2.5">{pay ? <Pill intent={pay[0] as "green" | "amber"}>{pay[1]}</Pill> : <span className="text-ink-muted">—</span>}</td>
-                      <td className="px-3 py-2.5 font-bold whitespace-nowrap text-right">{o.total}</td>
-                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><button className="btn btn-ghost btn-xs" onClick={() => setSelected(o)}>Open</button></td>
-                    </tr>
-                  );
-                })}
-                {filtered.length === 0 && <tr><td colSpan={13} className="px-3 py-10 text-center text-ink-muted text-[12px]">No orders match these filters.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border text-[12px] text-ink-muted">
-            Showing <b className="text-ink-2">{filtered.length}</b> of <b className="text-ink-2">{orders.length}</b> orders
-          </div>
-        </div>
-      )}
-
-      {selected && <OrderPreviewDrawer order={selected} onClose={() => setSelected(null)} />}
-      <Toast />
+      </div>
     </div>
   );
 }
-

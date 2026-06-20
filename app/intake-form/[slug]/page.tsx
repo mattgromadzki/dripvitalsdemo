@@ -13,6 +13,7 @@ import { INTAKE_CONSENTS } from "@/lib/legal/documents";
 import { screenAnswers } from "@/lib/clinical/glp1Screening";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
+const newVisitId = () => "V-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const parsePrice = (s: string) => Number((s || "").replace(/[^0-9.]/g, "")) || 0;
 const ageFrom = (dob: string) => { if (!dob) return 35; const d = new Date(dob); return Math.floor((Date.now() - d.getTime()) / 3.15576e10); };
 function nowParts() {
@@ -30,6 +31,7 @@ export default function IntakeFormPage() {
   const addRequest = useTreatmentRequests((s) => s.add);
   const createdPatientId = useRef<string | null>(null);
   const linkedPidRef = useRef<string | null>(null);
+  const visitIdRef = useRef<string | null>(null);
 
   const form = useMemo(() => forms.find((f) => f.slug === slug), [forms, slug]);
 
@@ -137,6 +139,16 @@ export default function IntakeFormPage() {
     else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
     syncCrm(pid);
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", id: pid }) }).catch(() => {});
+    // Flip the Visit to Paid — overwrites the displayed EST timestamp with the
+    // payment time, and records the treatment + shipping for the visit record.
+    if (!visitIdRef.current) visitIdRef.current = newVisitId();
+    fetch("/api/visits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      action: "pay", id: visitIdRef.current,
+      patientId: pid, patientName: name, email: client.email, phone: client.phone,
+      treatmentId: `BX-${tx.id}`, treatmentName: tx.name, price,
+      intakeFormId: `FORM-${form.id}`, intakeFormName: form.name,
+      shippingAddress: { street: client.address?.line1, line2: client.address?.apt, city: client.address?.city, state: client.address?.state, zip: client.address?.zip },
+    }) }).catch(() => {});
     if (client.email) alertWelcome({ email: client.email, name, first, brandId });
 
     const np = nowParts();
@@ -177,6 +189,10 @@ export default function IntakeFormPage() {
         first: info.first || undefined, last: info.last || undefined, name,
         email: info.email || undefined, phone: info.phone || undefined,
       });
+      if (!visitIdRef.current) {
+        visitIdRef.current = newVisitId();
+        fetch("/api/visits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: visitIdRef.current, patientId: createdPatientId.current, patientName: name, email: info.email, phone: info.phone, intakeFormId: form ? `FORM-${form.id}` : undefined, intakeFormName: form?.name }) }).catch(() => {});
+      }
       syncCrm(createdPatientId.current);
       return;
     }
@@ -194,6 +210,9 @@ export default function IntakeFormPage() {
     createdPatientId.current = created.id;
     // Register the started intake server-side so the 24h reminder can fire if abandoned.
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: created.id, name, email: info.email, phone: info.phone }) }).catch(() => {});
+    // Open a Visit (EST-stamped) at this first real step. Idempotent per session.
+    if (!visitIdRef.current) visitIdRef.current = newVisitId();
+    fetch("/api/visits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: visitIdRef.current, patientId: created.id, patientName: name, email: info.email, phone: info.phone, intakeFormId: form ? `FORM-${form.id}` : undefined, intakeFormName: form?.name }) }).catch(() => {});
     syncCrm(created.id);
   }
 

@@ -13,7 +13,8 @@ export async function POST(req: Request) {
   if (!b?.id || !b?.action) return Response.json({ ok: false, error: "id and action are required." }, { status: 400 });
   try {
     if (b.action === "start") {
-      const v = await startVisit({ id: b.id, intakeFormId: b.intakeFormId as string, intakeFormName: b.intakeFormName as string });
+      const { action, id, ...rest } = b;
+      const v = await startVisit({ id: b.id, ...(rest as Partial<Parameters<typeof startVisit>[0]>) });
       return Response.json({ ok: true, visit: v });
     }
     if (b.action === "update") {
