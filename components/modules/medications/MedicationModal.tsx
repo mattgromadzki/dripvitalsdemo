@@ -49,7 +49,7 @@ export function MedicationModal({ open, onClose, med, onSave }: Props) {
       <Field label="Medication Name"><input className="fi" value={f.name} placeholder="Compounded Semaglutide" onChange={(e) => set("name", e.target.value)} /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Program"><select className="fsel" value={f.program} onChange={(e) => set("program", e.target.value)}>{MED_PROGRAMS.map((p) => <option key={p}>{p}</option>)}</select></Field>
-        <Field label="Strength / Dose"><input className="fi" value={f.strength} placeholder="0.5 mg" onChange={(e) => set("strength", e.target.value)} /></Field>
+        <Field label="Total mg"><input className="fi" value={f.strength} placeholder="e.g. 10 mg" onChange={(e) => set("strength", e.target.value)} /></Field>
         <Field label="Form"><select className="fsel" value={f.form} onChange={(e) => set("form", e.target.value)}>{MED_FORMS.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Pharmacy"><select className="fsel" value={f.pharmacy} onChange={(e) => set("pharmacy", e.target.value)}>{pharmacyOptions.length === 0 && <option value="">No pharmacies — add one in Pharmacies</option>}{pharmacyOptions.map((x) => <option key={x}>{x}</option>)}</select></Field>
         <Field label="Unit (priced per)"><input className="fi" value={f.unit} placeholder="per vial" onChange={(e) => set("unit", e.target.value)} /></Field>

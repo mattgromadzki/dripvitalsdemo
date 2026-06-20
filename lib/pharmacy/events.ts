@@ -12,7 +12,7 @@ import { bumpVersion } from "@/lib/realtime/signal";
  */
 export interface PharmacyEvent {
   id: string;
-  connector: "greenstone";
+  connector: "greenstone" | "lifefile";
   event: string;
   orderId?: string | number;
   internalOrderId?: string;

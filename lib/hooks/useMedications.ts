@@ -31,8 +31,14 @@ export const useMedications = create<MedicationsState>((set) => ({
   add: (input) => {
     let created: Medication = { id: "MED-999", ...input };
     set((s) => {
-      created = { id: makeId(s.nextId), ...input };
-      return { meds: [created, ...s.meds], nextId: s.nextId + 1 };
+      // Derive the id from the highest id currently in the store (which includes
+      // the real catalog hydrated from the server), not just the seed-derived
+      // nextId. This guarantees every new id is unique and can never collide
+      // with an existing medication — preventing a delete from removing rows
+      // that happened to share an id.
+      const n = Math.max(s.nextId, highest(s.meds) + 1);
+      created = { id: makeId(n), ...input };
+      return { meds: [created, ...s.meds], nextId: n + 1 };
     });
     return created;
   },
