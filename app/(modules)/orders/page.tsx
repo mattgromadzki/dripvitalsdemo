@@ -19,6 +19,26 @@ const STAGE: Record<string, { label: string; intent: "muted" | "amber" | "green"
 };
 const stageMeta = (s?: string) => STAGE[(s || "").toLowerCase()] || { label: s || "Submitted", intent: "muted" as const };
 
+// Shipping-status wording mirrors what Greenstone actually reports via webhook,
+// so the Shipping status column reads "Shipping label created", "In transit", etc.
+const SHIP_LABELS: Record<string, string> = {
+  TO_BE_FILLED: "Order received",
+  PARTIAL_FILL: "Being filled",
+  COMPLETE_FILLED: "Filled",
+  LABEL_CREATED: "Shipping label created",
+  SHIPPED_TO_CLINIC: "Shipped to clinic",
+  IN_SHIPPING: "In transit",
+  ISSUE_IN_SHIPPING: "Shipping issue",
+  COMPLETED: "Delivered",
+  PARTIAL_COMPLETED: "Partially delivered",
+  ON_HOLD: "On hold",
+  CANCELLED: "Cancelled",
+  CANCELED: "Cancelled",
+  VOIDED: "Voided",
+};
+const shipLabel = (status?: string, stage?: string) =>
+  SHIP_LABELS[(status || "").toUpperCase()] || stageMeta(stage).label;
+
 interface OrderRow {
   key: string; orderId: string | number; patientId?: string; patientName: string;
   medication: string; stage?: string; status?: string; tracking?: string; trackingUrl?: string; dateMs: number;
@@ -115,7 +135,7 @@ export default function OrdersPage() {
           <table className="border-collapse w-full min-w-[900px] text-[12.5px]">
             <thead>
               <tr className="bg-surface-2">
-                {["Order ID", "Patient", "Medication prescribed", "Shipping & tracking", "Date completed"].map((h) => (
+                {["Order ID", "Patient", "Medication prescribed", "Shipping status", "Tracking", "Date completed"].map((h) => (
                   <th key={h} className="text-[10px] uppercase tracking-wide text-ink-muted font-bold text-left px-3 py-2.5 border-b border-border whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -133,21 +153,21 @@ export default function OrdersPage() {
                     </td>
                     <td className="px-3 py-2.5">{o.medication}</td>
                     <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Pill intent={st.intent} dot>{st.label}</Pill>
-                        {o.tracking ? (
-                          o.trackingUrl
-                            ? <a href={o.trackingUrl} target="_blank" rel="noreferrer" className="text-brand underline font-mono text-[11.5px]">{o.tracking}</a>
-                            : <span className="font-mono text-[11.5px] text-ink-muted">{o.tracking}</span>
-                        ) : null}
-                      </div>
+                      <Pill intent={st.intent} dot>{shipLabel(o.status, o.stage)}</Pill>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {o.tracking ? (
+                        o.trackingUrl
+                          ? <a href={o.trackingUrl} target="_blank" rel="noreferrer" className="text-brand underline font-mono text-[11.5px] hover:text-brand-dk">{o.tracking}</a>
+                          : <span className="font-mono text-[11.5px]">{o.tracking}</span>
+                      ) : <span className="text-ink-muted">Pending</span>}
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{estDisplay(o.dateMs)}</td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-12 text-center text-ink-muted">{loading ? "Loading orders…" : "No orders yet. An order appears here when a provider submits a prescription to the pharmacy from e-Prescribe."}</td></tr>
+                <tr><td colSpan={6} className="px-3 py-12 text-center text-ink-muted">{loading ? "Loading orders…" : "No orders yet. An order appears here when a provider submits a prescription to the pharmacy from e-Prescribe."}</td></tr>
               )}
             </tbody>
           </table>
