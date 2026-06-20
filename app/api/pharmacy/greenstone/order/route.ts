@@ -30,6 +30,7 @@ export async function POST(req: Request) {
         internalOrderId: input.internalOrderId,
         patientId: input.internalCustomerId,
         patientName: [input.firstName, input.lastName].filter(Boolean).join(" ").trim() || undefined,
+        medication: input.scripts.map((s) => s.name).filter(Boolean).join(", ") || undefined,
         status: "TO_BE_FILLED",
         stage: "requested",
         at: new Date().toISOString(),

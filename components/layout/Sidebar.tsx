@@ -17,7 +17,8 @@ const NAV: NavSection[] = [
     label: "Clinical",
     items: [
       { href: "/dashboard",        icon: "📊", label: "Dashboard" },
-      { href: "/orders",           icon: "📦", label: "Visits" },
+      { href: "/visits",           icon: "📋", label: "Visits" },
+      { href: "/orders",           icon: "📦", label: "Orders" },
       { href: "/shipments",        icon: "🚚", label: "Shipments" },
       { href: "/patients",         icon: "👥", label: "Patients",         badge: 8 },
       { href: "/intake-review",    icon: "🧾", label: "Intake Review",    badge: 4 },

@@ -5,6 +5,7 @@
 export const NAV_PERM: Record<string, string> = {
   // Clinical
   "/orders": "patients.edit",
+  "/visits": "patients.edit",
   "/shipments": "patients.edit",
   "/intake-review": "intake.review",
   "/titration": "titration.manage",

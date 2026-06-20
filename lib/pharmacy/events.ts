@@ -18,6 +18,7 @@ export interface PharmacyEvent {
   internalOrderId?: string;
   patientId?: string;
   patientName?: string;
+  medication?: string;
   status?: string;
   stage?: string;
   trackingNumber?: string;
