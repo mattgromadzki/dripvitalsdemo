@@ -135,7 +135,7 @@ export default function OrdersPage() {
           <table className="border-collapse w-full min-w-[900px] text-[12.5px]">
             <thead>
               <tr className="bg-surface-2">
-                {["Order ID", "Patient", "Medication prescribed", "Shipping status", "Tracking", "Date completed"].map((h) => (
+                {["Order ID", "Patient", "Medication prescribed", "Status", "Tracking", "Date completed"].map((h) => (
                   <th key={h} className="text-[10px] uppercase tracking-wide text-ink-muted font-bold text-left px-3 py-2.5 border-b border-border whitespace-nowrap">{h}</th>
                 ))}
               </tr>
