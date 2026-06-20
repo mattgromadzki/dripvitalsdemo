@@ -199,7 +199,7 @@ export default function PatientDetailPage() {
         ))}
       </nav>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}>
+      <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-4 min-w-0">
 
           {tab === "summary" && (<>
@@ -435,34 +435,6 @@ export default function PatientDetailPage() {
           )}
         </div>
 
-        <aside className="flex flex-col gap-4">
-          <Card title="Next action">
-            <p className="text-[12px] text-ink-muted mb-3">{intakeIncomplete ? "Patient is still completing intake." : reviewNeeded ? "Review intake and medication history before creating a prescription." : "Patient is active — keep refills and check-ins on track."}</p>
-            <button className="btn btn-primary w-full" onClick={() => setTab(intakeIncomplete ? "intake" : reviewNeeded ? "intake" : "weight")}>{nextAction}</button>
-          </Card>
-          <Card title="Clinical snapshot">
-            <SideRow k="Start weight" v={`${patient.wtStart} lb`} />
-            <SideRow k="Current weight" v={`${currentWeight} lb`} ok />
-            <SideRow k="Total lost" v={`${Math.round((patient.wtStart - currentWeight) * 10) / 10} lb`} ok />
-            <SideRow k="ID status" v={idVerified ? "Verified" : "Pending"} ok={idVerified} />
-            <SideRow k="Refill due" v={patient.nextRefill} />
-          </Card>
-          <Card title="Safety flags">
-            {patient.allergies && patient.allergies !== "None" ? <AlertBox tone="amber" icon="!" title="Allergies on file" body={patient.allergies} /> : <AlertBox tone="green" icon="✓" title="No allergies" body="None reported on intake." />}
-            <AlertBox tone="green" icon="✓" title="Consent complete" body="Telehealth consent on file." />
-            <AlertBox tone={idVerified ? "green" : "amber"} icon={idVerified ? "✓" : "!"} title={idVerified ? "ID verified" : "ID pending"} body={idVerified ? "Identity confirmed." : "Verification needed."} />
-          </Card>
-          <Card title="Quick actions">
-            <div className="grid grid-cols-2 gap-2">
-              <button className="btn btn-ghost btn-sm" onClick={() => setTab("weight")}>Add Weight</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setMsgOpen(true)}>Message</button>
-              <Link href={`/patients/${pid}/prescribe?tx=${encodeURIComponent(patient.plan)}`} className="btn btn-ghost btn-sm">Create Rx</Link>
-              <button className="btn btn-ghost btn-sm" onClick={() => setModal("note")}>Add Note</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setModal("id")}>View ID</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setOrderOpen(true)}>Order</button>
-            </div>
-          </Card>
-        </aside>
       </div>
 
       <NewOrderModal patient={patient} open={orderOpen} onClose={() => setOrderOpen(false)} />
