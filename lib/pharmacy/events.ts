@@ -19,6 +19,7 @@ export interface PharmacyEvent {
   patientId?: string;
   patientName?: string;
   medication?: string;
+  location?: string;
   status?: string;
   stage?: string;
   trackingNumber?: string;

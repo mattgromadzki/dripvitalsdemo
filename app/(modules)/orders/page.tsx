@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
 import type { PharmacyEvent } from "@/lib/pharmacy/events";
-import { estDisplay } from "@/lib/time/est";
+import { estDate } from "@/lib/time/est";
 
 const STAGE: Record<string, { label: string; intent: "muted" | "amber" | "green" | "red" }> = {
   requested: { label: "Order received",   intent: "muted" },
@@ -40,8 +40,8 @@ const shipLabel = (status?: string, stage?: string) =>
   SHIP_LABELS[(status || "").toUpperCase()] || stageMeta(stage).label;
 
 interface OrderRow {
-  key: string; orderId: string | number; patientId?: string; patientName: string;
-  medication: string; stage?: string; status?: string; tracking?: string; trackingUrl?: string; dateMs: number;
+  key: string; orderId: string | number; patientId?: string; patientName: string; location: string;
+  medication: string; stage?: string; status?: string; tracking?: string; trackingUrl?: string; createdMs: number; deliveredMs?: number;
 }
 
 export default function OrdersPage() {
@@ -73,20 +73,23 @@ export default function OrdersPage() {
       const sorted = evs.slice().sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
       const latest = sorted[0];
       const submit = sorted.find((e) => e.event === "order_submitted") || sorted[sorted.length - 1];
+      const deliveredEv = sorted.find((e) => (e.stage || "").toLowerCase() === "delivered");
       rows.push({
         key,
         orderId: latest.orderId ?? key,
         patientId: sorted.find((e) => e.patientId)?.patientId,
         patientName: sorted.find((e) => e.patientName)?.patientName || "—",
+        location: sorted.find((e) => e.location)?.location || "—",
         medication: sorted.find((e) => e.medication)?.medication || "—",
         stage: latest.stage,
         status: latest.status,
         tracking: sorted.find((e) => e.trackingNumber)?.trackingNumber,
         trackingUrl: sorted.find((e) => e.trackingUrl)?.trackingUrl,
-        dateMs: new Date(submit.at).getTime(),
+        createdMs: new Date(submit.at).getTime(),
+        deliveredMs: deliveredEv ? new Date(deliveredEv.at).getTime() : undefined,
       });
     });
-    rows.sort((a, b) => b.dateMs - a.dateMs);
+    rows.sort((a, b) => b.createdMs - a.createdMs);
     return rows;
   }, [events]);
 
@@ -96,7 +99,8 @@ export default function OrdersPage() {
     return orders.filter((o) =>
       String(o.orderId).toLowerCase().includes(q) ||
       o.patientName.toLowerCase().includes(q) ||
-      o.medication.toLowerCase().includes(q));
+      o.medication.toLowerCase().includes(q) ||
+      o.location.toLowerCase().includes(q));
   }, [orders, search]);
 
   const delivered = orders.filter((o) => o.stage === "delivered").length;
@@ -132,10 +136,10 @@ export default function OrdersPage() {
 
       <div className="bg-surface border border-border rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="border-collapse w-full min-w-[900px] text-[12.5px]">
+          <table className="border-collapse w-full min-w-[1080px] text-[12.5px]">
             <thead>
               <tr className="bg-surface-2">
-                {["Order ID", "Patient", "Medication prescribed", "Status", "Tracking", "Date completed"].map((h) => (
+                {["Order ID", "Patient", "Location", "Medication prescribed", "Status", "Tracking", "Created", "Delivered"].map((h) => (
                   <th key={h} className="text-[10px] uppercase tracking-wide text-ink-muted font-bold text-left px-3 py-2.5 border-b border-border whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -151,6 +155,7 @@ export default function OrdersPage() {
                         ? <Link href={`/patients/${o.patientId}`} className="font-semibold hover:text-brand-dk hover:underline">{o.patientName}</Link>
                         : <span className="font-semibold">{o.patientName}</span>}
                     </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{o.location}</td>
                     <td className="px-3 py-2.5">{o.medication}</td>
                     <td className="px-3 py-2.5">
                       <Pill intent={st.intent} dot>{shipLabel(o.status, o.stage)}</Pill>
@@ -162,12 +167,13 @@ export default function OrdersPage() {
                           : <span className="font-mono text-[11.5px]">{o.tracking}</span>
                       ) : <span className="text-ink-muted">Pending</span>}
                     </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{estDisplay(o.dateMs)}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{estDate(o.createdMs)}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">{o.deliveredMs ? <span className="text-green font-semibold">{estDate(o.deliveredMs)}</span> : <span className="text-ink-muted">—</span>}</td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-3 py-12 text-center text-ink-muted">{loading ? "Loading orders…" : "No orders yet. An order appears here when a provider submits a prescription to the pharmacy from e-Prescribe."}</td></tr>
+                <tr><td colSpan={8} className="px-3 py-12 text-center text-ink-muted">{loading ? "Loading orders…" : "No orders yet. An order appears here when a provider submits a prescription to the pharmacy from e-Prescribe."}</td></tr>
               )}
             </tbody>
           </table>

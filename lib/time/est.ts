@@ -20,3 +20,16 @@ export function estDisplay(ms?: number | null): string {
   if (isNaN(d.getTime())) return "—";
   return EST_FMT.format(d) + " ET";
 }
+
+const EST_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric", month: "short", day: "numeric",
+});
+
+/** Date-only Eastern-time format, e.g. "Jan 21, 2026". */
+export function estDate(ms?: number | null): string {
+  if (ms == null) return "—";
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return "—";
+  return EST_DATE_FMT.format(d);
+}

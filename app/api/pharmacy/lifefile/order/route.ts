@@ -33,6 +33,7 @@ export async function POST(req: Request) {
         patientId,
         patientName: [p.firstName, p.lastName].filter(Boolean).join(" ").trim() || undefined,
         medication: body.order.rxs.map((r) => r.drugName).filter(Boolean).join(", ") || undefined,
+        location: [body.order.shipping?.city || p.city, body.order.shipping?.state || p.state].filter(Boolean).join(", ") || undefined,
         status: "TO_BE_FILLED",
         stage: "requested",
         at: new Date().toISOString(),
