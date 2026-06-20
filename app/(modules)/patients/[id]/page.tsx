@@ -14,6 +14,8 @@ import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageC
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 import { PatientPharmacyTracking } from "@/components/modules/pharmacy/PatientPharmacyTracking";
+import { OrderCard } from "@/components/modules/orders/OrderCard";
+import { getFulfillmentOrders } from "@/lib/data/fulfillmentOrders";
 
 type TabKey = "summary" | "intake" | "treatment" | "orders" | "weight" | "messages" | "documents" | "billing" | "admin";
 const TABS: { key: TabKey; label: string }[] = [
@@ -37,6 +39,7 @@ export default function PatientDetailPage() {
   const params = useParams<{ id: string }>();
   const patient = usePatients((s) => s.patients.find((p) => p.id === params.id));
   const updatePatient = usePatients((s) => s.update);
+  const allPatients = usePatients((s) => s.patients);
   const addEmail = useEmails((s) => s.add);
   const allRx = usePrescriptions((s) => s.prescriptions);
   const allDocs = usePatientDocuments((s) => s.documents);
@@ -89,6 +92,7 @@ export default function PatientDetailPage() {
 
   const pid = patient.id;
   const patientRx = allRx.filter((r) => r.patientId === pid).sort((a, b) => b.prescribedAt - a.prescribedAt);
+  const patientOrders = getFulfillmentOrders(allPatients).filter((o) => o.patientId === pid);
   const patientDocs = allDocs.filter((d) => d.patientId === pid).sort((a, b) => b.createdAt - a.createdAt);
   const logAudit = (action: string, area = "Chart") => setAudit((a) => [{ time: `Now`, user: "Admin", action, area, device: "Browser" }, ...a]);
   const addr = extra.address;
@@ -295,6 +299,9 @@ export default function PatientDetailPage() {
 
           {tab === "orders" && (
             <>
+              <div className="flex flex-col gap-2.5 mb-4">
+                {patientOrders.map((o) => <OrderCard key={o.id} order={o} patient={patient} />)}
+              </div>
               <PatientPharmacyTracking patientId={pid} />
               <Card title="Patient Orders &amp; Prescriptions" sub="Prescriptions transmitted to the pharmacy via e-prescribe, with status and timestamps." action={<button className="btn btn-primary btn-sm" onClick={() => setOrderOpen(true)}>Create Order</button>}>
               {patientRx.length === 0 && <div className="text-ink-muted text-[12.5px] py-6 text-center">No prescriptions yet. Use Create Rx to send one through e-prescribe.</div>}

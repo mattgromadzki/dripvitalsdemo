@@ -5,9 +5,7 @@ import Link from "next/link";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { getPatientExtra } from "@/lib/data/patientExtras";
 import { heightForPatient, type FulfillmentOrder } from "@/lib/data/fulfillmentOrders";
-import { usePharmacyOrders } from "@/lib/hooks/usePharmacyOrders";
 import { usePayments } from "@/lib/hooks/usePayments";
-import { SendToPharmacyModal, PharmacyStatusPanel } from "./SendToPharmacy";
 import { PaymentModal } from "@/components/modules/PaymentModal";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/lib/hooks/useToast";
@@ -15,12 +13,8 @@ import { PatientPharmacyTracking } from "@/components/modules/pharmacy/PatientPh
 
 export function OrderPreviewDrawer({ order, onClose }: { order: FulfillmentOrder; onClose: () => void }) {
   const patient = usePatients((s) => s.patients.find((p) => p.id === order.patientId));
-  const sent = usePharmacyOrders((s) => s.byOrder[order.id]);
-  const setSent = usePharmacyOrders((s) => s.setSent);
-  const clearSent = usePharmacyOrders((s) => s.clear);
   const paid = usePayments((s) => s.byRef[order.id]);
   const setPaid = usePayments((s) => s.setPaid);
-  const [pharmOpen, setPharmOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   if (!patient) return null;
   const amountCents = Math.round((parseFloat((order.total || "0").replace(/[^0-9.]/g, "")) || 0) * 100);
@@ -97,17 +91,6 @@ export function OrderPreviewDrawer({ order, onClose }: { order: FulfillmentOrder
           )}
         </Section>
 
-        <Section title="RXCompound Store" last>
-          {sent ? (
-            <PharmacyStatusPanel sent={sent} onCancelled={() => clearSent(order.id)} />
-          ) : (
-            <>
-              <div className="text-[12px] text-ink-muted mb-2.5">Submit this signed prescription to RXCompound Store for fulfillment.</div>
-              <button className="btn btn-primary w-full" onClick={() => setPharmOpen(true)}>💊 Send to pharmacy</button>
-            </>
-          )}
-        </Section>
-
         <div className="px-[18px] pt-[14px]">
           <PatientPharmacyTracking patientId={order.patientId} />
         </div>
@@ -117,7 +100,6 @@ export function OrderPreviewDrawer({ order, onClose }: { order: FulfillmentOrder
           <Link href={`/patients/${patient.id}`} className="btn btn-primary flex-1 text-center">Open full chart →</Link>
         </div>
       </aside>
-      <SendToPharmacyModal open={pharmOpen} onClose={() => setPharmOpen(false)} order={order} patient={patient} onSent={(s) => setSent(order.id, s)} />
       <PaymentModal open={payOpen} onClose={() => setPayOpen(false)} amountCents={amountCents} referenceId={order.id} note={`DripVitals ${order.id} · ${patient.name}`} onPaid={(r) => setPaid(order.id, { paymentId: r.paymentId || "", last4: r.last4, brand: r.cardBrand, amountCents: r.amountCents || amountCents, provider: r.provider, at: new Date().toISOString() })} />
     </>
   );
