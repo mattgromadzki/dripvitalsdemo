@@ -86,23 +86,57 @@ export function PatientPharmacyTracking({ patientId }: { patientId: string }) {
   }, [msgDraft, gsOrderId, loadMessages]);
 
   const voidOrder = useCallback(async () => {
-    if (!window.confirm("Cancel this order at GreenstoneRX?\n\nThis sends a cancellation to the pharmacy. If they accept it, the order is marked Cancelled in the chart and patient portal. Orders already being filled or shipped may be rejected by the pharmacy.")) return;
+    const stageKey = (events[0]?.stage || "").toLowerCase();
+    const status = events[0]?.status || "the current stage";
+
+    // Terminal — nothing to cancel.
+    if (["delivered", "cancelled", "voided"].includes(stageKey)) {
+      window.alert(stageKey === "delivered"
+        ? "This order is already delivered and can't be cancelled."
+        : "This order is already cancelled.");
+      return;
+    }
+
+    // Labeled / in transit / on hold — a direct cancel will be rejected, so
+    // route it as a pharmacist-reviewed cancellation request via the order
+    // message thread. The chart flips to Cancelled when they process it.
+    const labeled = ["ready", "shipped", "issue", "held"].includes(stageKey);
+    if (labeled) {
+      if (!window.confirm("This order already has a shipping label or is in progress, so it can't be cancelled directly.\n\nSend a cancellation request to the pharmacist to review? They'll pull the order, and you'll see it flip to Cancelled here once they confirm.")) return;
+      const note = window.prompt("Add a note for the pharmacist (optional):", "Please cancel this order — patient request.") || "Please cancel this order.";
+      setSending(true);
+      try {
+        const r = await fetch("/api/pharmacy/greenstone/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: gsOrderId, message: `⚠ CANCELLATION REQUEST from clinic (order is ${status}): ${note}` }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (j?.ok) { window.alert("Cancellation request sent to the pharmacist. The order will show as Cancelled here once they process it."); if (gsOrderId != null) loadMessages(gsOrderId); }
+        else window.alert("Couldn't send the cancellation request: " + (j?.error || "use the message thread below or contact GreenstoneRX directly."));
+      } catch { window.alert("Request failed. Use the message thread below or contact GreenstoneRX directly."); }
+      setSending(false);
+      return;
+    }
+
+    // Pre-label — direct cancel via update_one.
+    if (!window.confirm("Cancel this order at GreenstoneRX?\n\nThis sends a direct cancellation. If accepted, the order is marked Cancelled here and in the patient portal.")) return;
     try {
       const r = await fetch("/api/pharmacy/greenstone/void", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patientId,
-          orderId: events.find((e) => e.orderId != null)?.orderId,
+          orderId: gsOrderId ?? events.find((e) => e.orderId != null)?.orderId,
           internalOrderId: events.find((e) => e.internalOrderId)?.internalOrderId,
           patientName: events.find((e) => e.patientName)?.patientName,
         }),
       });
       const j = await r.json().catch(() => ({}));
-      if (!j?.ok) window.alert("Cancellation not completed: " + (j?.error || "the pharmacy did not accept it. Contact GreenstoneRX directly."));
+      if (!j?.ok) window.alert("Cancellation not completed: " + (j?.error || "the pharmacy did not accept it. Try the message thread below or contact GreenstoneRX."));
     } catch { window.alert("Cancellation request failed. Check your connection and try again."); }
     load();
-  }, [patientId, events, load]);
+  }, [events, gsOrderId, patientId, load, loadMessages]);
 
   if (loading) {
     return <div className="bg-surface border border-border rounded-2xl p-4 mb-4 text-[12.5px] text-ink-muted">Loading pharmacy status…</div>;
