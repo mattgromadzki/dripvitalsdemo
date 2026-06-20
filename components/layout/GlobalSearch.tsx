@@ -14,7 +14,7 @@ interface Item { type: string; label: string; sub: string; href: string; icon: s
 
 const PAGES: Item[] = [
   { type: "Page", label: "Dashboard", sub: "Overview", href: "/dashboard", icon: "📊" },
-  { type: "Page", label: "Orders", sub: "Fulfillment", href: "/orders", icon: "📦" },
+  { type: "Page", label: "Visits", sub: "Fulfillment", href: "/orders", icon: "📦" },
   { type: "Page", label: "Shipments", sub: "Tracking", href: "/shipments", icon: "🚚" },
   { type: "Page", label: "Intake Review", sub: "Clinical", href: "/intake-review", icon: "🧾" },
   { type: "Page", label: "Dose Titration", sub: "Clinical", href: "/titration", icon: "💉" },

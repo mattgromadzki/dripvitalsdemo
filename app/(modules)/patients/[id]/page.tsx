@@ -20,7 +20,7 @@ import { getFulfillmentOrders } from "@/lib/data/fulfillmentOrders";
 type TabKey = "summary" | "intake" | "treatment" | "orders" | "weight" | "messages" | "documents" | "billing" | "admin";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "summary", label: "Summary" }, { key: "intake", label: "Intake" }, { key: "treatment", label: "Treatment" },
-  { key: "orders", label: "Orders" }, { key: "weight", label: "Weight" }, { key: "messages", label: "Messages" },
+  { key: "orders", label: "Visits" }, { key: "weight", label: "Weight" }, { key: "messages", label: "Messages" },
   { key: "documents", label: "Documents / ID" }, { key: "billing", label: "Billing" }, { key: "admin", label: "Admin" },
 ];
 

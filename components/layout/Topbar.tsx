@@ -22,6 +22,7 @@ const CRUMB_LABELS: Record<string, string> = {
   staff: "Staff",
   pharmacies: "Pharmacies",
   integrations: "Integrations",
+  orders: "Visits",
 };
 
 export function Topbar() {

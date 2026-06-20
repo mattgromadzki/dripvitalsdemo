@@ -87,8 +87,8 @@ export default function OrdersPage() {
       {/* Page head */}
       <div className="flex items-start gap-3.5 mb-4 flex-wrap">
         <div>
-          <h1 className="text-[23px] font-extrabold tracking-tight">All Orders</h1>
-          <div className="text-[12.5px] text-ink-muted mt-1 max-w-[680px]">Incoming orders, prescription status, pharmacy progress, shipment tracking, payment, and delivery issues — across the full fulfillment workflow.</div>
+          <h1 className="text-[23px] font-extrabold tracking-tight">Visits</h1>
+          <div className="text-[12.5px] text-ink-muted mt-1 max-w-[680px]">Each visit begins when a patient starts their intake form — treatment selection, payment, prescription, pharmacy progress, and shipment tracking across the full fulfillment workflow.</div>
         </div>
         <div className="flex-1" />
         <button className="btn btn-ghost btn-sm" onClick={() => toast("⬇ Exporting CSV…")}>Export CSV</button>
