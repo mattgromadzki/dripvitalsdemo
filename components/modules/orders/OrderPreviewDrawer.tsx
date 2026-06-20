@@ -11,6 +11,7 @@ import { SendToPharmacyModal, PharmacyStatusPanel } from "./SendToPharmacy";
 import { PaymentModal } from "@/components/modules/PaymentModal";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/lib/hooks/useToast";
+import { PatientPharmacyTracking } from "@/components/modules/pharmacy/PatientPharmacyTracking";
 
 export function OrderPreviewDrawer({ order, onClose }: { order: FulfillmentOrder; onClose: () => void }) {
   const patient = usePatients((s) => s.patients.find((p) => p.id === order.patientId));
@@ -106,6 +107,10 @@ export function OrderPreviewDrawer({ order, onClose }: { order: FulfillmentOrder
             </>
           )}
         </Section>
+
+        <div className="px-[18px] pt-[14px]">
+          <PatientPharmacyTracking patientId={order.patientId} />
+        </div>
 
         <div className="mt-auto px-[18px] py-[14px] border-t border-border flex gap-2">
           <button className="btn btn-ghost flex-1" onClick={() => toast("⚡ Quick actions")}>Quick actions</button>
