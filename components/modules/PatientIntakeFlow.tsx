@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { toast } from "@/lib/hooks/useToast";
@@ -10,6 +10,8 @@ import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
 import { disqualifierReason } from "@/lib/clinical/glp1Screening";
 import { INTAKE_CONSENTS } from "@/lib/legal/documents";
+import { fetchSuggestions, cleanStreet } from "@/lib/usps/autocomplete";
+import type { AddressSuggestion } from "@/lib/usps/types";
 
 function nowStamp(): string {
   const d = new Date();
@@ -72,6 +74,90 @@ function renderShell(opts: {
 }
 
 /** Shared patient intake flow — used by the admin Preview and the public /intake-form/[slug] route. */
+type IntakeAddr = { line1: string; line2: string; city: string; state: string; zip: string };
+
+// Address step with type-ahead suggestions (same Smarty-backed source the
+// patient portal uses). Controlled internally so picking a suggestion can fill
+// city / state / ZIP in one tap. Degrades to plain typing if lookup is offline.
+function IntakeAddressField({ initial, onChange }: { initial: IntakeAddr; onChange: (a: IntakeAddr) => void }) {
+  const [addr, setAddr] = useState<IntakeAddr>(initial);
+  const [sug, setSug] = useState<AddressSuggestion[]>([]);
+  const [showSug, setShowSug] = useState(false);
+  const tRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function update(patch: Partial<IntakeAddr>) {
+    const next = { ...addr, ...patch };
+    setAddr(next);
+    onChange(next);
+  }
+  function onStreet(v: string) {
+    update({ line1: v });
+    if (tRef.current) clearTimeout(tRef.current);
+    if (v.trim().length < 3) { setSug([]); setShowSug(false); return; }
+    tRef.current = setTimeout(async () => {
+      const r = await fetchSuggestions(v, addr.state || undefined);
+      setSug(r); setShowSug(r.length > 0);
+    }, 180);
+  }
+  function pick(s: AddressSuggestion) {
+    const next: IntakeAddr = { ...addr, line1: cleanStreet(s.street), city: s.city, state: s.state, zip: s.zip };
+    setAddr(next); onChange(next); setShowSug(false); setSug([]);
+  }
+
+  return (
+    <div className="dv-fields">
+      <div style={{ position: "relative" }}>
+        <div className="dv-field-label">Street address</div>
+        <div className="dv-input-wrap">
+          <input className="dv-input" value={addr.line1} autoComplete="off" placeholder="Start typing your address…"
+            onChange={(e) => onStreet(e.target.value)}
+            onFocus={() => { if (sug.length) setShowSug(true); }}
+            onBlur={() => setTimeout(() => setShowSug(false), 150)} />
+        </div>
+        {showSug && sug.length > 0 && (
+          <div style={{ position: "absolute", zIndex: 60, left: 0, right: 0, top: "100%", marginTop: 4, background: "#fff", border: "1px solid var(--dv-border, #dde3e8)", borderRadius: 10, boxShadow: "0 12px 32px rgba(20,30,50,.18)", overflow: "hidden" }}>
+            {sug.map((s, i) => (
+              <button type="button" key={i} onMouseDown={() => pick(s)} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", fontSize: 13.5, background: "transparent", border: "none", borderBottom: i < sug.length - 1 ? "1px solid var(--dv-border, #eef1f4)" : "none", cursor: "pointer" }}>
+                <span style={{ fontWeight: 600 }}>{s.street}</span>
+                <span style={{ color: "var(--dv-muted, #5b6b78)" }}>, {s.city}, {s.state} {s.zip}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div>
+        <div className="dv-field-label">Apartment / Suite (optional)</div>
+        <div className="dv-input-wrap">
+          <input className="dv-input" value={addr.line2} autoComplete="off" placeholder="Apt 4B" onChange={(e) => update({ line2: e.target.value })} />
+        </div>
+      </div>
+      <div className="dv-field-row">
+        <div>
+          <div className="dv-field-label">City</div>
+          <div className="dv-input-wrap">
+            <input className="dv-input" value={addr.city} autoComplete="off" onChange={(e) => update({ city: e.target.value })} />
+          </div>
+        </div>
+        <div>
+          <div className="dv-field-label">State</div>
+          <div className="dv-input-wrap">
+            <select className="dv-input" value={addr.state} onChange={(e) => update({ state: e.target.value })}>
+              <option value="" disabled>Select state…</option>
+              {US_STATES.map((s) => <option key={s.abbr} value={s.abbr}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div className="dv-field-label">ZIP Code</div>
+        <div className="dv-input-wrap">
+          <input className="dv-input" value={addr.zip} autoComplete="off" onChange={(e) => update({ zip: e.target.value })} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, onLead, onProgress }: { formId: number; onExit: () => void; live?: boolean; onComplete?: (clientId: number, treatmentId: number | null) => void; onLead?: (info: { first: string; last: string; phone: string; email: string }) => void; onProgress?: (info: { stage: string; step: number; total: number }) => void }) {
   const treatments   = useTreatmentsIntake((s) => s.treatments);
   const addClient    = useTreatmentsIntake((s) => s.addClient);
@@ -189,7 +275,14 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     return { anchorId: anchor.id, nameId: nameQ?.id ?? null, emailId: emailQ?.id ?? null, phoneId: phoneQ?.id ?? null, hideIds };
   })();
 
-  const visibleQs = form.questions.filter((q) => q.type !== "section" && !(contactGroup && contactGroup.hideIds.includes(q.id)));
+  const hasAddressQ = form.questions.some((q) => q.type === "address");
+  const visibleQs = form.questions.filter((q) =>
+    q.type !== "section" &&
+    !(contactGroup && contactGroup.hideIds.includes(q.id)) &&
+    // ZIP is captured inside the address step, so a standalone ZIP question is
+    // redundant whenever the form also has an address question — hide it.
+    !(hasAddressQ && q.type === "text" && /\bzip\b|postal/i.test(q.text)),
+  );
   const totalQ = visibleQs.length;
 
   // Fraction of overall flow complete: welcome 2%, each Q step adds, treatment 90%, checkout 95%
@@ -242,6 +335,12 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
         try { const o = JSON.parse(v); patch.first = (o.first || "").trim(); patch.last = (o.last || "").trim(); patch.email = (o.email || "").trim(); patch.phone = (o.phone || "").trim(); } catch { /* ignore */ }
         continue;
       }
+      // Full shipping address (now the source of ZIP, since the standalone
+      // ZIP question is hidden whenever an address question is present).
+      if (q.type === "address") {
+        try { const o = JSON.parse(v); patch.address = { line1: o.line1 || "", apt: o.line2 || o.apt || "", city: o.city || "", state: o.state || "", zip: o.zip || "" }; } catch { /* ignore */ }
+        continue;
+      }
       if (lbl.includes("full") && lbl.includes("name")) {
         if (v.startsWith("{")) {
           try { const o = JSON.parse(v); patch.first = (o.first || "").trim(); patch.last = (o.last || "").trim(); } catch { /* ignore */ }
@@ -263,7 +362,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
       }
     }
 
-    if (zipFromAnswer) {
+    if (zipFromAnswer && !patch.address) {
       patch.address = { line1: "", apt: "", city: "", state: "", zip: zipFromAnswer };
     }
 
@@ -855,50 +954,10 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
       );
     } else if (q.type === "address") {
       // Address is stored as a JSON string ({line1, line2, city, state, zip})
-      let parsed: { line1: string; line2: string; city: string; state: string; zip: string } = { line1: "", line2: "", city: "", state: "", zip: "" };
+      let parsed: IntakeAddr = { line1: "", line2: "", city: "", state: "", zip: "" };
       try { if (typeof a === "string" && a) parsed = { ...parsed, ...JSON.parse(a) }; } catch { /* ignore */ }
-      function patchAddr(field: keyof typeof parsed, v: string) {
-        const next = { ...parsed, [field]: v };
-        commitAnswer(q.id, JSON.stringify(next));
-      }
       body = (
-        <div className="dv-fields">
-          <div>
-            <div className="dv-field-label">Street address</div>
-            <div className="dv-input-wrap">
-              <input key={`${q.id}-line1`} className="dv-input" defaultValue={parsed.line1} onChange={(e) => patchAddr("line1", e.target.value)} autoComplete="off" placeholder="123 Main St" />
-            </div>
-          </div>
-          <div>
-            <div className="dv-field-label">Apartment / Suite (optional)</div>
-            <div className="dv-input-wrap">
-              <input key={`${q.id}-line2`} className="dv-input" defaultValue={parsed.line2} onChange={(e) => patchAddr("line2", e.target.value)} autoComplete="off" placeholder="Apt 4B" />
-            </div>
-          </div>
-          <div className="dv-field-row">
-            <div>
-              <div className="dv-field-label">City</div>
-              <div className="dv-input-wrap">
-                <input key={`${q.id}-city`} className="dv-input" defaultValue={parsed.city} onChange={(e) => patchAddr("city", e.target.value)} autoComplete="off" />
-              </div>
-            </div>
-            <div>
-              <div className="dv-field-label">State</div>
-              <div className="dv-input-wrap">
-                <select key={`${q.id}-state`} className="dv-input" defaultValue={parsed.state} onChange={(e) => patchAddr("state", e.target.value)}>
-                  <option value="" disabled>Select state…</option>
-                  {US_STATES.map((s) => <option key={s.abbr} value={s.abbr}>{s.name}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div className="dv-field-label">ZIP Code</div>
-            <div className="dv-input-wrap">
-              <input key={`${q.id}-zip`} className="dv-input" defaultValue={parsed.zip} onChange={(e) => patchAddr("zip", e.target.value)} autoComplete="off" />
-            </div>
-          </div>
-        </div>
+        <IntakeAddressField key={q.id} initial={parsed} onChange={(addr) => commitAnswer(q.id, JSON.stringify(addr))} />
       );
     } else if (q.type === "signature") {
       // Lightweight signature input — captures the typed name as a "drawn"
