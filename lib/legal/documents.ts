@@ -18,7 +18,7 @@ export interface LegalDoc {
   sections: LegalSection[];
 }
 
-const CLINIC = "[Clinic Legal Name]";
+const CLINIC = "Drip Vitals LLC";
 
 export const TELEHEALTH_CONSENT: LegalDoc = {
   id: "telehealth", slug: "telehealth-consent",
@@ -140,7 +140,7 @@ export const TERMS_OF_SERVICE: LegalDoc = {
 
 export const GLP1_CONSENT: LegalDoc = {
   id: "glp1", slug: "glp1-informed-consent",
-  title: "GLP-1 Treatment Informed Consent", version: "v1.0", effective: "Effective [Date]",
+  title: "GLP-1 Treatment Informed Consent", version: "v1.0", effective: "Effective June 30, 2026",
   summary: "Your understanding of the benefits, risks, and alternatives of treatment with a GLP-1 (or GLP-1/GIP) medication such as semaglutide or tirzepatide, including important information about compounded medications.",
   sections: [
     { heading: "1. What this medication is", paragraphs: [
