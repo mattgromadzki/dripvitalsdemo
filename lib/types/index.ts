@@ -920,7 +920,7 @@ export interface TreatmentRequest {
 export interface PatientDocument {
   id: string;
   patientId: string;
-  category: "rx" | "intake" | "lab" | "consent" | "id" | "other";
+  category: "rx" | "intake" | "lab" | "consent" | "id" | "visit" | "other";
   title: string;
   icon: string;
   createdAt: number;       // YYYYMMDDHHMM int
@@ -973,6 +973,27 @@ export interface PatientDocument {
     signedAt: string;
     signatureText: string;  // cursive provider name
   };
+  // Visit-packet snapshot (denormalized so the document is self-contained).
+  visitPayload?: VisitPacket;
+}
+
+export interface VisitPacketConsent { title: string; version: string; acceptedAt: string; }
+export interface VisitPacketQA { question: string; helper?: string; answer: string; flagged?: boolean; }
+export interface VisitPacketSection { title: string; items: VisitPacketQA[]; }
+export interface VisitPacket {
+  visitId: string;
+  createdDisplay: string;       // "Jun 18, 2026, 9:14 PM ET"
+  status: string;               // "Paid"
+  provider?: string;
+  pharmacyOrder?: string;
+  patient: { name: string; patientId: string; dob?: string; age?: number; email?: string; phone?: string; sex?: string };
+  shipping?: { line1?: string; line2?: string; city?: string; state?: string; zip?: string };
+  treatment: { program: string; medication: string; totalMg?: string; supply?: string; price: string; intakeFormName?: string; intakeFormId?: string };
+  screening: { eligibility: string; flaggedCount: number; decision?: string };
+  consents: VisitPacketConsent[];
+  sections: VisitPacketSection[];
+  signedName?: string;
+  signedDisplay?: string;
 }
 
 // ─── Questionnaire / Intake Form Builder ─────────────────────────────────

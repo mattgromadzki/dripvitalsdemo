@@ -11,6 +11,9 @@ import { alertWelcome } from "@/lib/notify/alert";
 import { resolveBrandId } from "@/lib/brands/resolve";
 import { consentsFor } from "@/lib/legal/documents";
 import { screenAnswers } from "@/lib/clinical/glp1Screening";
+import { buildVisitPacket } from "@/lib/visits/packet";
+import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
+import { estDisplay } from "@/lib/time/est";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
 const newVisitId = () => "V-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -150,6 +153,47 @@ export default function IntakeFormPage() {
       shippingAddress: { street: client.address?.line1, line2: client.address?.apt, city: client.address?.city, state: client.address?.state, zip: client.address?.zip },
     }) }).catch(() => {});
     if (client.email) alertWelcome({ email: client.email, name, first, brandId });
+
+    // ── Generate the Visit Packet (visit record + intake Q&A) and file it under
+    // the patient's Documents tab. Self-contained snapshot — no binary storage. ──
+    try {
+      const ts = nowParts();
+      const createdDisplay = estDisplay(Date.now());
+      const packetConsents = consentsFor({ treatmentName: tx.name, medication: tx.med, formName: form.name })
+        .map((d) => ({ title: d.title, version: d.version, acceptedAt: new Date().toISOString() }));
+      const packet = buildVisitPacket({
+        visitId: visitIdRef.current,
+        createdDisplay,
+        status: "Paid",
+        patient: {
+          name, patientId: String(pid),
+          dob: dob || undefined, age: dob ? ageFrom(dob) : undefined,
+          email: client.email, phone: client.phone,
+          sex: gender === "M" ? "Male" : gender === "F" ? "Female" : (gender || undefined),
+        },
+        shipping: { line1: client.address?.line1, line2: client.address?.apt, city: client.address?.city, state: client.address?.state, zip: client.address?.zip },
+        treatment: {
+          program: tx.name, medication: `${tx.med} (compounded)`,
+          totalMg: tx.strength || undefined,
+          supply: `${tx.duration} month${tx.duration === "1" ? "" : "s"}`,
+          price: tx.price, intakeFormName: form.name, intakeFormId: `FORM-${form.id}`,
+        },
+        screening: { eligibility: "Eligible", flaggedCount: reviewFlags.length, decision: "Awaiting provider review" },
+        consents: packetConsents,
+        questions: form.questions,
+        answers: client.answers,
+        signedName: name,
+        signedDisplay: createdDisplay,
+      });
+      usePatientDocuments.getState().add({
+        patientId: pid, category: "visit",
+        title: `Visit Record & Intake — ${form.name}`,
+        icon: "📋",
+        createdAt: ts.int, createdDate: `Today · ${ts.display}`,
+        signedBy: name,
+        visitPayload: packet,
+      });
+    } catch { /* non-fatal: completion still succeeds */ }
 
     const np = nowParts();
     addRequest({

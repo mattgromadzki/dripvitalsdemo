@@ -16,6 +16,8 @@ const TYPE_ICON: Record<string, string> = {
   "Insurance":       "🏥",
   "Progress Photo":  "📷",
   "Prescription":    "💊",
+  "Visit Record":    "📋",
+  "Intake":          "📝",
 };
 
 const TYPE_INTENT: Record<string, "teal" | "green" | "blue" | "purple" | "amber" | "coral"> = {
@@ -25,6 +27,12 @@ const TYPE_INTENT: Record<string, "teal" | "green" | "blue" | "purple" | "amber"
   "Insurance":       "purple",
   "Progress Photo":  "amber",
   "Prescription":    "coral",
+  "Visit Record":    "blue",
+  "Intake":          "teal",
+};
+
+const DOC_TYPE_LABEL: Record<string, string> = {
+  rx: "Prescription", visit: "Visit Record", consent: "Consent Form", intake: "Intake", lab: "Lab Report", id: "ID Verification", other: "Document",
 };
 
 interface Row {
@@ -34,6 +42,7 @@ interface Row {
   date:      string;
   size:      string;
   isRx:      boolean;
+  openable?: boolean;
   rxDocId?:  string;
   signedBy?: string;
 }
@@ -48,10 +57,11 @@ export function DocumentsTab({ patient, extra }: { patient: Patient; extra: Pati
         .map((d) => ({
           id:       d.id,
           name:     d.title,
-          type:     "Prescription",
+          type:     DOC_TYPE_LABEL[d.category] || "Document",
           date:     d.createdDate,
-          size:     "1 PDF page",
+          size:     d.category === "visit" ? "Visit packet" : "1 PDF page",
           isRx:     d.category === "rx",
+          openable: d.category === "rx" || d.category === "visit",
           rxDocId:  d.id,
           signedBy: d.signedBy,
         })),
@@ -163,7 +173,7 @@ export function DocumentsTab({ patient, extra }: { patient: Patient; extra: Pati
                     </Td>
                     <Td>
                       <div className="flex gap-1">
-                        {d.isRx && d.rxDocId ? (
+                        {(d.isRx || d.openable) && d.rxDocId ? (
                           <>
                             <Link
                               href={`/documents/${d.rxDocId}`}

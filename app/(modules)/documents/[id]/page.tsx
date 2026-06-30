@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
 import { RxPreviewBask } from "@/components/modules/RxPreviewBask";
+import { VisitPacketPreview } from "@/components/modules/VisitPacketPreview";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 
 export default function DocumentViewerPage() {
@@ -59,6 +60,8 @@ export default function DocumentViewerPage() {
       {/* Document body */}
       {doc.category === "rx" && doc.rxPayload ? (
         <RxPreviewBask rx={doc.rxPayload} status="signed" refNum={doc.rxPayload.refNum} />
+      ) : doc.category === "visit" && doc.visitPayload ? (
+        <VisitPacketPreview payload={doc.visitPayload} />
       ) : (
         <div className="bg-surface border border-border rounded-md p-8 text-center max-w-[640px] mx-auto">
           <div className="text-[36px] opacity-50 mb-3">{doc.icon}</div>
