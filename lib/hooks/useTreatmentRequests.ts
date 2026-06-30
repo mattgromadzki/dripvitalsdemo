@@ -4,6 +4,7 @@ import { create } from "@/lib/hooks/zustand-shim";
 import type { TreatmentRequest } from "@/lib/types";
 import { TREATMENT_REQUESTS as SEED } from "@/lib/data/treatmentRequests";
 import { seedList } from "@/lib/config/runtime";
+import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 
 interface TreatmentRequestsState {
   requests: TreatmentRequest[];
@@ -44,20 +45,29 @@ export const useTreatmentRequests = create<TreatmentRequestsState>((set) => ({
     return created;
   },
   approve: (id, approvedBy, notes) => {
+    let target: TreatmentRequest | undefined;
     set((s) => ({
-      requests: s.requests.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: "approved" as const,
-              approvedBy,
-              approvedAt: nowInt(),
-              approvedDate: nowDisplay(),
-              notes: notes ?? r.notes,
-            }
-          : r
-      ),
+      requests: s.requests.map((r) => {
+        if (r.id !== id) return r;
+        target = r;
+        return {
+          ...r,
+          status: "approved" as const,
+          approvedBy,
+          approvedAt: nowInt(),
+          approvedDate: nowDisplay(),
+          notes: notes ?? r.notes,
+        };
+      }),
     }));
+    // Stamp the approving provider onto the patient's visit packet (record + intake).
+    if (target?.patientId) {
+      try {
+        usePatientDocuments.getState().stampVisitApproval({
+          patientId: target.patientId, visitId: target.visitId, provider: approvedBy,
+        });
+      } catch { /* non-fatal */ }
+    }
   },
   deny: (id, deniedBy, reason) => {
     set((s) => ({

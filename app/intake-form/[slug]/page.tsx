@@ -199,6 +199,7 @@ export default function IntakeFormPage() {
     addRequest({
       brandId,
       patientId: pid, patientName: name,
+      visitId: visitIdRef.current ?? undefined,
       treatmentId: `BX-${tx.id}`, treatmentName: tx.name, medication: `${tx.med} (compounded)`,
       dosingProtocol: tx.strength, duration: `${tx.duration} month${tx.duration === "1" ? "" : "s"}`, price,
       category: "GLP-1 / Weight Loss", icon: tx.icon, color: `var(--color-${tx.color})`,
