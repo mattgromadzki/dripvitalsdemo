@@ -138,10 +138,87 @@ export const TERMS_OF_SERVICE: LegalDoc = {
   ],
 };
 
-export const LEGAL_DOCS: LegalDoc[] = [TELEHEALTH_CONSENT, PRIVACY_POLICY, TERMS_OF_SERVICE];
+export const GLP1_CONSENT: LegalDoc = {
+  id: "glp1", slug: "glp1-informed-consent",
+  title: "GLP-1 Treatment Informed Consent", version: "v1.0", effective: "Effective [Date]",
+  summary: "Your understanding of the benefits, risks, and alternatives of treatment with a GLP-1 (or GLP-1/GIP) medication such as semaglutide or tirzepatide, including important information about compounded medications.",
+  sections: [
+    { heading: "1. What this medication is", paragraphs: [
+      `Your provider may prescribe a medication in the GLP-1 receptor agonist class (for example, semaglutide) or a combined GIP/GLP-1 receptor agonist (for example, tirzepatide). These medications mimic hormones your body makes to regulate appetite, blood sugar, and digestion. They are prescribed by ${CLINIC} to support weight management when clinically appropriate.`,
+    ]},
+    { heading: "2. Compounded medication disclosure", paragraphs: [
+      "The medication you are prescribed may be a COMPOUNDED preparation prepared by a licensed compounding pharmacy. Compounded medications are NOT approved by the U.S. Food and Drug Administration (FDA). The FDA does not review compounded drugs for safety, effectiveness, or quality before they are marketed. Compounded semaglutide and tirzepatide are not the same as the brand-name products (such as Ozempic, Wegovy, Mounjaro, or Zepbound) and may differ in formulation, strength, inactive ingredients, or salt form.",
+    ], bullets: [
+      "Compounded medications are permitted to be prepared for an individual patient pursuant to a valid prescription.",
+      "The safety and effectiveness data for brand-name products may not fully apply to compounded versions.",
+      "You have the right to ask which pharmacy is preparing your medication and to discuss brand-name alternatives with your provider.",
+    ]},
+    { heading: "3. Intended benefits", paragraphs: [
+      "When combined with a reduced-calorie diet and increased physical activity, GLP-1 medications can help reduce appetite and support weight loss. Individual results vary. No specific amount of weight loss — or any weight loss at all — is guaranteed.",
+    ]},
+    { heading: "4. Common side effects", paragraphs: [
+      "Most side effects are gastrointestinal and tend to be greatest when starting or increasing the dose. They include:",
+    ], bullets: [
+      "Nausea, vomiting, diarrhea, constipation, and abdominal pain",
+      "Indigestion, bloating, gas, and acid reflux",
+      "Decreased appetite, fatigue, headache, and dizziness",
+      "Injection-site reactions (redness, itching, or discomfort)",
+    ]},
+    { heading: "5. Serious risks and warnings", paragraphs: [
+      "Less commonly, GLP-1 medications can cause serious problems. You should review each of the following with your provider and seek care promptly if symptoms occur:",
+    ], bullets: [
+      "Thyroid C-cell tumors: In animal studies, these medications caused thyroid tumors, including medullary thyroid carcinoma (MTC). They are contraindicated if you or a family member has had MTC or Multiple Endocrine Neoplasia syndrome type 2 (MEN 2). Report any neck mass, hoarseness, trouble swallowing, or shortness of breath.",
+      "Pancreatitis (inflammation of the pancreas): Stop the medication and seek care for severe, persistent abdominal pain, with or without vomiting.",
+      "Gallbladder disease and gallstones, which may require surgery.",
+      "Low blood sugar (hypoglycemia), especially if you also take insulin or a sulfonylurea.",
+      "Kidney injury, often related to dehydration from vomiting or diarrhea.",
+      "Worsening of diabetic eye disease (retinopathy).",
+      "Severe slowing of the stomach (gastroparesis) or, rarely, intestinal blockage (ileus).",
+      "Increased risk of food or fluid entering the lungs during surgery or procedures requiring sedation — tell your anesthesia provider you take this medication, as it may need to be paused beforehand.",
+      "Serious allergic reactions — seek emergency care for swelling, rash, or difficulty breathing.",
+      "Mood changes, depression, or thoughts of self-harm — report these to your provider immediately.",
+    ]},
+    { heading: "6. Pregnancy, breastfeeding, and contraception", paragraphs: [
+      "These medications are not recommended during pregnancy or while breastfeeding and may harm a developing baby. If you can become pregnant, you should use effective contraception. Stop the medication and notify your provider right away if you are or may be pregnant, or are planning pregnancy.",
+    ]},
+    { heading: "7. Alternatives to treatment", paragraphs: [
+      "Alternatives include lifestyle changes alone (nutrition, physical activity, behavioral support), other prescription weight-management medications, FDA-approved brand-name GLP-1 products, surgical options such as bariatric surgery, and choosing no treatment. Your provider can discuss the risks and benefits of these alternatives with you.",
+    ]},
+    { heading: "8. Your responsibilities", bullets: [
+      "Provide complete and accurate information about your health, medications, allergies, and history.",
+      "Follow the prescribed dose and titration schedule, and do not share your medication with anyone.",
+      "Store and self-administer the medication as instructed; ask for training if you are unsure.",
+      "Stay hydrated, follow dietary guidance, and attend follow-up check-ins.",
+      "Report side effects, and seek emergency care (call 911) for severe symptoms.",
+    ]},
+    { heading: "9. Results, discontinuation, and financial terms", paragraphs: [
+      "Results are not guaranteed, and weight regain is common after stopping treatment. This is an elective, generally non-insurance service. Because medications are dispensed specifically for you, shipped prescription products are generally non-refundable. Payment and refund terms are described in our Terms of Service.",
+    ]},
+    { heading: "10. Acknowledgement and consent", paragraphs: [
+      "By agreeing, you confirm that you have read and understood this consent; that the benefits, risks, serious warnings, compounded-medication disclosure, and alternatives have been explained; that you have had the opportunity to ask questions; and that you voluntarily consent to treatment with a GLP-1 or GLP-1/GIP medication if your provider determines it is appropriate. You may withdraw your consent at any time before the medication is dispensed.",
+    ]},
+  ],
+};
+
+
 
 /** Documents the patient must agree to during intake, in display order. */
 export const INTAKE_CONSENTS: LegalDoc[] = [TELEHEALTH_CONSENT, PRIVACY_POLICY, TERMS_OF_SERVICE];
+
+export const LEGAL_DOCS: LegalDoc[] = [TELEHEALTH_CONSENT, PRIVACY_POLICY, TERMS_OF_SERVICE, GLP1_CONSENT];
+
+// Detects whether a treatment / form is GLP-1 (or GLP-1/GIP) based.
+export function isGlp1(text: string): boolean {
+  return /semaglutide|tirzepatide|glp[\s-]?1|gip|ozempic|wegovy|zepbound|mounjaro|liraglutide|saxenda|retatrutide/i.test(text || "");
+}
+
+// The consent set that applies to a given treatment. GLP-1 treatments get the
+// GLP-1-specific informed consent in addition to the base three; everything
+// else (e.g. NAD+, peptides) gets only the base three.
+export function consentsFor(opts: { treatmentName?: string; medication?: string; formName?: string }): LegalDoc[] {
+  const hay = `${opts.treatmentName || ""} ${opts.medication || ""} ${opts.formName || ""}`;
+  return isGlp1(hay) ? [...INTAKE_CONSENTS, GLP1_CONSENT] : INTAKE_CONSENTS;
+}
 
 export const getLegalDoc = (slugOrId: string) =>
   LEGAL_DOCS.find((d) => d.slug === slugOrId || d.id === slugOrId);

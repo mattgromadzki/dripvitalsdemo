@@ -9,7 +9,7 @@ import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
 import { disqualifierReason } from "@/lib/clinical/glp1Screening";
-import { INTAKE_CONSENTS } from "@/lib/legal/documents";
+import { consentsFor } from "@/lib/legal/documents";
 import { fetchSuggestions, cleanStreet } from "@/lib/usps/autocomplete";
 import type { AddressSuggestion } from "@/lib/usps/types";
 
@@ -214,6 +214,13 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
   const [coCardName, setCoCardName] = useState("");
   const [coAddr, setCoAddr] = useState({ line1: "", apt: "", city: "", state: "", zip: "" });
   const [legalAck, setLegalAck] = useState<Record<string, boolean>>({});
+
+  // Which consents apply right now — GLP-1 treatments add the GLP-1-specific
+  // informed consent; other treatments (NAD+, peptides) get only the base set.
+  const activeConsents = useMemo(() => {
+    const tx = treatments.find((t) => t.id === selectedTxId);
+    return consentsFor({ treatmentName: tx?.name, medication: tx?.med, formName: form?.name });
+  }, [treatments, selectedTxId, form]);
   const [payProvider, setPayProvider] = useState<{ provider: string; ready: boolean } | null>(null);
   useEffect(() => {
     let alive = true;
@@ -531,7 +538,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     // the card is collected on the provider's PCI-compliant page, never here.
     if (isHosted && leadId !== null) {
       if (!coAddr.line1 || !coAddr.city || !coAddr.state || !coAddr.zip) { toast("Please complete your shipping address"); return; }
-      if (!INTAKE_CONSENTS.every((d) => legalAck[d.id])) { toast("Please review and agree to the consent documents to continue"); return; }
+      if (!activeConsents.every((d) => legalAck[d.id])) { toast("Please review and agree to the consent documents to continue"); return; }
       const lead = useTreatmentsIntake.getState().clients.find((c) => c.id === leadId);
       const tx = treatments.find((t) => t.id === selectedTxId);
       updateClient(leadId, { status: "paid", paidAt: nowStamp(), address: coAddr });
@@ -561,7 +568,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     if (coCardCvc.length < 3) { toast("Please enter a valid CVC"); return; }
     if (!coCardName.trim()) { toast("Please enter the name on the card"); return; }
     if (!coAddr.line1 || !coAddr.city || !coAddr.state || !coAddr.zip) { toast("Please complete your shipping address"); return; }
-    if (!INTAKE_CONSENTS.every((d) => legalAck[d.id])) { toast("Please review and agree to the consent documents to continue"); return; }
+    if (!activeConsents.every((d) => legalAck[d.id])) { toast("Please review and agree to the consent documents to continue"); return; }
     if (leadId !== null) {
       const lastFour = coCardNum.slice(-4);
       const brand = coCardNum[0] === "4" ? "Visa"
@@ -1474,7 +1481,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
         {/* ─── Agreements ─── */}
         <h2 className="dv-section-h">Agreements</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-          {INTAKE_CONSENTS.map((d) => (
+          {activeConsents.map((d) => (
             <label key={d.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--dv-ink)", cursor: "pointer" }}>
               <input type="checkbox" checked={!!legalAck[d.id]} onChange={(e) => setLegalAck((x) => ({ ...x, [d.id]: e.target.checked }))} style={{ marginTop: 2, width: 16, height: 16, flexShrink: 0 }} />
               <span>I have read and agree to the <a href={`/legal/${d.slug}`} target="_blank" rel="noreferrer" style={{ color: "#3b7fc4", textDecoration: "underline" }}>{d.title}</a> <span style={{ color: "var(--dv-muted)" }}>({d.version})</span>.</span>
@@ -1488,7 +1495,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
           <span className="dv-total-val">{tx.price}</span>
         </div>
 
-        <button className="dv-btn-primary" onClick={submitPayment} disabled={!INTAKE_CONSENTS.every((d) => legalAck[d.id])} style={!INTAKE_CONSENTS.every((d) => legalAck[d.id]) ? { opacity: 0.55, cursor: "not-allowed" } : undefined}>{isHosted ? "Continue to secure payment →" : "Complete purchase →"}</button>
+        <button className="dv-btn-primary" onClick={submitPayment} disabled={!activeConsents.every((d) => legalAck[d.id])} style={!activeConsents.every((d) => legalAck[d.id]) ? { opacity: 0.55, cursor: "not-allowed" } : undefined}>{isHosted ? "Continue to secure payment →" : "Complete purchase →"}</button>
 
         <div className="dv-trust">
           <span>🔒 256-bit SSL secured</span>·
