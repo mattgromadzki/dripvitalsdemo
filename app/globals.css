@@ -1628,7 +1628,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
   }
 .dv-portal .login-brand { margin-bottom: 48px; }
 .dv-portal .login-brand-name {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 4px;
@@ -1696,7 +1696,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     justify-content: flex-end;
   }
 .dv-portal .login-quote-text {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;
     font-size: 38px;
     line-height: 1.12;
     font-weight: 600;
@@ -1733,7 +1733,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;
     font-weight: 700;
     font-size: 22px;
     margin-bottom: 28px;
@@ -2407,7 +2407,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     margin-bottom: 10px;
   }
 .dv-portal .pdp-name {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;
     font-size: 38px;
     font-weight: 700;
     line-height: 1.1;
@@ -2508,7 +2508,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     margin-bottom: 40px;
   }
 .dv-portal .pdp-section-h {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;
     font-size: 26px;
     font-weight: 700;
     letter-spacing: -0.01em;
