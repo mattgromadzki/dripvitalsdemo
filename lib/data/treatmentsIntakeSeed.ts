@@ -124,6 +124,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:102, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:119, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:120, type:"address",  text:"If prescribed, where should we ship your order?", helper:"", impact:"none", required:true },
+      { id:121, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
       // Consent
       { id:113, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
@@ -179,6 +180,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:202, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:239, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:240, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+      { id:250, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
       { id:241, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:242, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
@@ -240,6 +242,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:422, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:423, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:424, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+      { id:425, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
       { id:430, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:431, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
@@ -293,6 +296,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:522, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:523, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:524, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+      { id:525, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
       { id:530, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:531, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
@@ -341,6 +345,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:622, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:623, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:624, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+      { id:625, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:630, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:631, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
         { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
@@ -379,6 +384,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:722, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:723, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:724, type:"address",  text:"If approved, where should we ship your order?", helper:"", impact:"none", required:true },
+      { id:725, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:730, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:731, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
         { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
@@ -431,6 +437,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:822, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:823, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:824, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+      { id:825, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:830, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:831, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
         { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
@@ -487,6 +494,7 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:922, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
       { id:923, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:924, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
+      { id:925, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:930, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
       { id:931, type:"checkbox", text:"Please confirm the following before submitting:", helper:"", impact:"qualify", required:true, options:[
         { label:"I certify that the information I provided is accurate and complete", flag:"ok" },
