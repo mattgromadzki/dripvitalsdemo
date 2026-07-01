@@ -29,7 +29,7 @@ import type { UspsValidateResult, UspsValidateInput, AddressSuggestion } from "@
    so anything an admin publishes shows up here automatically.
    ───────────────────────────────────────────────────────────────────────── */
 
-type Page = "home" | "chat" | "treatments" | "shots" | "reminders" | "shop" | "account";
+type Page = "home" | "chat" | "treatments" | "shots" | "reminders" | "shop" | "account" | "help";
 type TxTab = "current" | "dose" | "orders" | "subscription";
 type AcctTab = "profile" | "billing" | "phi";
 type ModalType =
@@ -39,6 +39,7 @@ type ModalType =
 const PAGE_TITLES: Record<Page, string> = {
   home: "Home", chat: "Chat", treatments: "Treatments",
   shots: "Shots", reminders: "Reminders", shop: "Shop", account: "Account",
+  help: "Help Center",
 };
 
 const GENERIC_BENEFITS = [
@@ -421,8 +422,7 @@ export default function PatientPortalPage() {
           <NavBtn active={page === "shop"} onClick={() => nav("shop")} ico="🛍️">Shop</NavBtn>
           <div className="sidebar-foot">
             <NavBtn active={page === "account"} onClick={() => nav("account")} ico="👤">Manage account</NavBtn>
-            <NavBtn active={false} onClick={() => nav("home")} ico="🌐">Homepage</NavBtn>
-            <NavBtn active={false} onClick={() => toast("Help center opens in a new tab")} ico="❔">Help Center</NavBtn>
+            <NavBtn active={page === "help"} onClick={() => nav("help")} ico="❔">Help Center</NavBtn>
             <button className="nav-link" onClick={() => { patientLogout(); setAuthView("login"); }} style={{ color: "var(--red)" }}>
               <span className="ico">↩</span> Sign out
             </button>
@@ -461,6 +461,7 @@ export default function PatientPortalPage() {
                 : <ShopPage list={shopList} count={shopList.length} filter={shopFilter} setFilter={setShopFilter} search={shopSearch} setSearch={setShopSearch} onOpen={setPdpId} />
             )}
             {page === "account" && <AccountPage tab={acctTab} setTab={setAcctTab} theme={theme} setTheme={setTheme} openModal={setModal} toast={toast} fullName={fullName} initials={initials} cardLast4={mySub?.cardLast4} onUpdateCard={updateCard} />}
+            {page === "help" && <HelpPage nav={nav} />}
           </div>
         </main>
       </div>
@@ -611,6 +612,59 @@ function QaCard({ ico, title, desc, onClick }: { ico: string; title: string; des
       </div>
       <div className="qa-arrow">→</div>
     </button>
+  );
+}
+
+/* ── HELP CENTER ── */
+function HelpPage({ nav }: { nav: (p: Page) => void }) {
+  const faqs: { q: string; a: string }[] = [
+    { q: "How soon will my medication arrive?", a: "Once a provider approves your treatment and your payment clears, your compounding pharmacy typically ships within 2–5 business days. You'll get a tracking link by email, and you can follow every step under Treatments → Orders." },
+    { q: "When and how do I take my dose?", a: "Your provider sets a personalized titration schedule, which you can view any time under Treatments. Log each injection in the Shots tab so your care team can keep your plan on track. If you're ever unsure about timing or you miss a dose, message your care team before making any changes." },
+    { q: "What should I do about side effects?", a: "Mild nausea, fatigue, or appetite changes are common early on and usually ease over time. Message your care team about anything that concerns you. Seek immediate medical attention for severe symptoms such as trouble breathing, severe abdominal pain, or signs of an allergic reaction." },
+    { q: "How do I pause, adjust, or cancel my plan?", a: "You're in control. Open Treatments → Subscription to pause, change your cadence, or cancel — no fees and no penalties. Changes take effect on your next billing cycle." },
+    { q: "How does billing work?", a: "Your first month is billed at the intro price shown at checkout, then your plan renews monthly (or quarterly) until you pause or cancel. Manage your card and view past charges under Manage account → Billing." },
+    { q: "How do I update my shipping address or payment card?", a: "Go to Manage account. You can edit your profile and shipping address under Profile, and update your payment method under Billing. Address changes apply to your next shipment." },
+    { q: "Is my information private?", a: "Yes. DripVitals is HIPAA-compliant and your health information is encrypted in transit and at rest. You can review what's on file and request an export or deletion under Manage account → Privacy." },
+  ];
+  return (
+    <section className="page active">
+      <div className="hero" style={{ marginBottom: 22 }}>
+        <div className="hero-inner">
+          <div>
+            <h2 className="hero-title">How can we help?</h2>
+            <p className="hero-sub">Answers to common questions about your treatment, shipping, and account. Still stuck? Your care team is one message away.</p>
+          </div>
+          <div className="hero-vial">❔</div>
+        </div>
+      </div>
+
+      <div className="row two" style={{ marginBottom: 22 }}>
+        <QaCard ico="💬" title="Message your care team" desc="Average response: 2 hours" onClick={() => nav("chat")} />
+        <QaCard ico="💊" title="View your treatment plan" desc="Dose schedule, orders & tracking" onClick={() => nav("treatments")} />
+      </div>
+
+      <h2 className="pdp-section-h" style={{ fontSize: 20, marginBottom: 14 }}>Frequently asked questions</h2>
+      {faqs.map((f, i) => (
+        <details className="pdp-faq" key={i}>
+          <summary>{f.q}</summary>
+          <div className="pdp-faq-answer">{f.a}</div>
+        </details>
+      ))}
+
+      <div className="help-card">
+        <div className="help-ico">💬</div>
+        <div style={{ flex: 1 }}>
+          <div className="help-title">Still need help?</div>
+          <div className="help-desc">Message your DripVitals care team — we usually reply within a few hours.</div>
+        </div>
+        <button className="btn btn-primary" onClick={() => nav("chat")}>Message us</button>
+      </div>
+
+      <div className="pdp-safety" style={{ marginTop: 22 }}>
+        <div className="pdp-safety-h">⚠️ In an emergency</div>
+        <div className="pdp-safety-body">This portal is not for medical emergencies. If you are experiencing a medical emergency, call 911 or go to the nearest emergency room.</div>
+      </div>
+    </section>
   );
 }
 function TimelineItem({ dot, title, desc, date }: { dot: string; title: string; desc: string; date?: string }) {
