@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { ReactNode, CSSProperties } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useShop } from "@/lib/hooks/useShop";
 import { usePatients } from "@/lib/hooks/usePatients";
 import { useSubscriptions } from "@/lib/hooks/useSubscriptions";
@@ -76,7 +77,9 @@ const INJECTION_SITES = [
 
 interface ChatMsg { from: "mine" | "them"; text: string; time: string; attachment?: { name: string; kind: "image" | "pdf"; url: string }; }
 
-export default function PatientPortalPage() {
+export default function PortalApp({ initialAuthed = false }: { initialAuthed?: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const allProducts = useShop((s) => s.products);
 
   // Pull the persisted storefront (incl. admin-uploaded thumbnails) so customers
@@ -143,6 +146,27 @@ export default function PatientPortalPage() {
 
   const loggedIn = authHydrated && !!me;
   useEffect(() => { hydrateAuth(); }, [hydrateAuth]);
+
+  // On the patient subdomain the app lives at "/" and sign-in at "/login". On
+  // any other host (staff app, preview URLs) the patient app is namespaced under
+  // /patient so it never collides with the staff /login and /. These are the
+  // public paths used for client-side login/logout navigation.
+  const portalPaths = useMemo(() => {
+    if (typeof window !== "undefined" && /^(patient|portal)\./i.test(window.location.host)) {
+      return { login: "/login", app: "/" };
+    }
+    return { login: "/patient/login", app: "/patient" };
+  }, []);
+
+  // Keep the URL in step with auth state: the sign-in path is always the
+  // signed-out screen and the app path is always the app. Runs only after auth
+  // hydrates so it never redirects on a not-yet-known session; server middleware
+  // enforces the same rules for direct navigation / no-JS.
+  useEffect(() => {
+    if (!authHydrated) return;
+    if (loggedIn && pathname === portalPaths.login) router.replace(portalPaths.app);
+    else if (!loggedIn && pathname === portalPaths.app) router.replace(portalPaths.login);
+  }, [authHydrated, loggedIn, pathname, portalPaths, router]);
   const [authView, setAuthView] = useState<"login" | "forgot" | "reset">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -333,6 +357,18 @@ export default function PatientPortalPage() {
 
   // ── Login screen ──────────────────────────────────────────────────────────
   if (!loggedIn) {
+    // On the app URL we expect a session (server said so). Until auth hydrates,
+    // show a neutral splash rather than flashing the sign-in form.
+    if (initialAuthed && !authHydrated) {
+      return (
+        <div className="dv-portal">
+          <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="DripVitals" style={{ width: 132, height: "auto", opacity: 0.85 }} />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="dv-portal">
         <div id="login-view" className="login-page">

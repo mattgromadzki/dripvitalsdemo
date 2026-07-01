@@ -1,15 +1,16 @@
 import type { MetadataRoute } from "next";
 
-// Web App Manifest — makes the patient portal installable as a standalone app.
-// Scoped to /patient-portal so installing it launches straight into the patient
-// experience (the provider EMR keeps its own normal browser behavior).
+// Web App Manifest — makes the patient app installable as a standalone app.
+// On the patient subdomain the sign-in is at /login and the app at "/", so
+// start_url is /login and scope is "/". Installed from the patient host, the
+// PWA stays within the patient experience.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "DripVitals — Patient",
     short_name: "DripVitals",
     description: "Manage your GLP-1 treatment, log your progress, chat with your care team, and reorder — all from your phone.",
-    start_url: "/patient-portal",
-    scope: "/patient-portal",
+    start_url: "/login",
+    scope: "/",
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",
