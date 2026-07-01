@@ -1625,7 +1625,14 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: center;
   }
+.dv-portal .login-brand,
+.dv-portal .login-h,
+.dv-portal .login-input,
+.dv-portal .login-btn,
+.dv-portal .login-helpers,
+.dv-portal .login-foot { width: 100%; max-width: 384px; }
 .dv-portal .login-brand { margin-bottom: 48px; }
 .dv-portal .login-brand-name {
     font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;

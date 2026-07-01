@@ -488,7 +488,7 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
                 onAttach={attachFile}
               />
             )}
-            {page === "treatments" && <TreatmentsPage tab={txTab} setTab={setTxTab} openModal={setModal} toast={toast} />}
+            {page === "treatments" && <TreatmentsPage tab={txTab} setTab={setTxTab} openModal={setModal} toast={toast} medication={me?.plan ?? ""} dose={me?.dose} products={published} />}
             {page === "shots" && <ShotsPage openModal={setModal} shots={record.shots} />}
             {page === "reminders" && <RemindersPage doseReminder={doseReminder} setDoseReminder={setDoseReminder} refillReminder={refillReminder} setRefillReminder={setRefillReminder} toast={toast} />}
             {page === "shop" && (
@@ -926,7 +926,51 @@ function PortalShipmentTracking({ toast }: { toast: (s: string) => void }) {
   );
 }
 
-function TreatmentsPage({ tab, setTab, openModal, toast }: { tab: TxTab; setTab: (t: TxTab) => void; openModal: (m: ModalType) => void; toast: (s: string) => void }) {
+/* Map a patient's plan/medication text (e.g. "3-Month Sema", "Compounded
+   Tirzepatide") to the matching Shop product, so the Treatments page can show
+   that product's real photo instead of a generic icon. */
+const MED_KEYWORDS: { key: string; needle: string }[] = [
+  { key: "semaglutide", needle: "semaglutide" },
+  { key: "sema", needle: "semaglutide" },
+  { key: "tirzepatide", needle: "tirzepatide" },
+  { key: "tirz", needle: "tirzepatide" },
+  { key: "metformin", needle: "metformin" },
+  { key: "sermorelin", needle: "sermorelin" },
+  { key: "testosterone", needle: "testosterone" },
+  { key: "trt", needle: "testosterone" },
+  { key: "sildenafil", needle: "sildenafil" },
+  { key: "tadalafil", needle: "tadalafil" },
+  { key: "nad", needle: "nad" },
+  { key: "b12", needle: "b12" },
+];
+
+function matchTreatmentProduct(medication: string, products: ShopProduct[]): ShopProduct | undefined {
+  const m = (medication || "").toLowerCase();
+  if (!m || !products.length) return undefined;
+  const needle = MED_KEYWORDS.find((k) => m.includes(k.key))?.needle;
+  if (needle) {
+    const byName = products.find((p) => p.name.toLowerCase().includes(needle));
+    if (byName) return byName;
+  }
+  // Fallback: a product whose name shares a distinctive word with the plan.
+  return products.find((p) => {
+    const n = p.name.toLowerCase();
+    return m.split(/\s+/).some((w) => w.length >= 4 && n.includes(w));
+  });
+}
+
+function prettifyMedication(plan: string): string {
+  const m = (plan || "").toLowerCase();
+  if (m.includes("tirz")) return "Compounded Tirzepatide";
+  if (m.includes("sema")) return "Compounded Semaglutide";
+  if (m.includes("metformin")) return "Metformin";
+  return plan || "";
+}
+
+function TreatmentsPage({ tab, setTab, openModal, toast, medication = "", dose, products = [] }: { tab: TxTab; setTab: (t: TxTab) => void; openModal: (m: ModalType) => void; toast: (s: string) => void; medication?: string; dose?: string; products?: ShopProduct[] }) {
+  const rx = matchTreatmentProduct(medication, products);
+  const medName = rx?.name || prettifyMedication(medication) || "Your treatment plan";
+  const subLine = `${dose ? `${dose} · ` : ""}Compounded · Pharmacy: Partner Network FL`;
   return (
     <section className="page active">
       <div className="inner-tabs">
@@ -945,14 +989,23 @@ function TreatmentsPage({ tab, setTab, openModal, toast }: { tab: TxTab; setTab:
                   <span className="pill active">Active</span>
                   <span style={{ fontSize: 11.5, color: "var(--muted)" }}>Started Mar 12, 2026</span>
                 </div>
-                <div className="hero-title">3-Month Semaglutide Treatment</div>
-                <div className="hero-sub">Semaglutide 0.5–1.0mg · Compounded · Pharmacy: Partner Network FL</div>
+                <div className="hero-title">{medName}</div>
+                <div className="hero-sub">{subLine}</div>
                 <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button className="btn btn-primary" onClick={() => openModal("refill")}>Request refill</button>
                   <button className="btn btn-secondary" onClick={() => openModal("pause")}>Pause subscription</button>
                 </div>
               </div>
-              <div className="hero-vial">💉</div>
+              <div
+                className="hero-vial"
+                style={rx?.imageUrl
+                  ? { overflow: "hidden", padding: 0, transform: "none", background: "#eef4fa", boxShadow: "0 10px 28px rgba(30,45,75,.18)" }
+                  : undefined}
+              >
+                {rx?.imageUrl
+                  ? <img src={rx.imageUrl} alt={rx.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : (rx?.img || "💉")}
+              </div>
             </div>
           </div>
           <div className="plan-meta-grid">
