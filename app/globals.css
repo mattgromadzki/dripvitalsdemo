@@ -1659,7 +1659,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal .login-helpers a { margin: 0 6px; }
 .dv-portal .login-foot { margin-top: auto; padding-top: 40px; font-size: 11px; color: var(--muted-2); }
 .dv-portal .login-right {
-    background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dk) 100%);
+    background: #3a7ab0 url('/portal-login.jpg') center 20% / cover no-repeat;
     position: relative;
     overflow: hidden;
   }
@@ -1667,8 +1667,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     position: absolute;
     inset: 0;
     background-image:
-      radial-gradient(circle at 25% 25%, rgba(255,255,255,.10) 0%, transparent 40%),
-      radial-gradient(circle at 75% 70%, rgba(255,255,255,.06) 0%, transparent 50%);
+      linear-gradient(180deg, rgba(20,40,60,.10) 0%, rgba(20,40,60,0) 32%, rgba(20,40,60,.30) 68%, rgba(20,40,60,.68) 100%);
   }
 .dv-portal .login-quote {
     position: relative;
@@ -1682,11 +1681,12 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
   }
 .dv-portal .login-quote-text {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 28px;
-    line-height: 1.3;
+    font-size: 30px;
+    line-height: 1.25;
     font-weight: 600;
-    margin: 0 0 14px;
+    margin: 0;
     letter-spacing: -0.01em;
+    text-shadow: 0 1px 12px rgba(15,30,45,.45);
   }
 .dv-portal .login-quote-by { font-size: 12px; opacity: 0.85; }
 .dv-portal .portal {

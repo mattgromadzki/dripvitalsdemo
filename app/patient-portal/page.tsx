@@ -380,8 +380,7 @@ export default function PatientPortalPage() {
           <div className="login-right">
             <div className="login-pattern" />
             <div className="login-quote">
-              <div className="login-quote-text">&ldquo;Personalized care delivered to your door — review your plan, message your provider, and track your progress.&rdquo;</div>
-              <div className="login-quote-by">— The DripVitals care team</div>
+              <div className="login-quote-text">Modern care for weight loss, energy, and longevity</div>
             </div>
           </div>
         </div>
