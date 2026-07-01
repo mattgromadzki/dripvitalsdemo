@@ -111,16 +111,18 @@ export default function PatientPortalPage() {
   const seed = useMemo(() => (me && extra ? seedRecordFromPatient(me, extra) : emptyRecord()), [me, extra]);
 
   const records = usePortalRecords((s) => s.records);
+  const chatReads = usePortalRecords((s) => s.chatReads);
   const hydrate = usePortalRecords((s) => s.hydrate);
   const ensureSeeded = usePortalRecords((s) => s.ensureSeeded);
   const addShot = usePortalRecords((s) => s.addShot);
   const addWeight = usePortalRecords((s) => s.addWeight);
   const addMessage = usePortalRecords((s) => s.addMessage);
+  const markChatRead = usePortalRecords((s) => s.markChatRead);
 
   // Load persisted entries, then seed this patient if first-seen.
   useEffect(() => { hydrate(); }, [hydrate]);
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === "dv_portal_records_v2") hydrate(); };
+    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === "dv_portal_records_v2" || e.key === "dv_portal_chat_reads_v1") hydrate(); };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [hydrate]);
@@ -189,6 +191,19 @@ export default function PatientPortalPage() {
   const currentWeight = record.weights.length
     ? String(record.weights[record.weights.length - 1].lbs)
     : me ? String(me.wt) : "197";
+
+  // Unread = care-team messages the patient hasn't opened yet. The read marker
+  // is how many messages were in the thread the last time they viewed it.
+  const chatReadCount = chatReads[pid] ?? 0;
+  const chatUnread = record.messages
+    .slice(chatReadCount)
+    .filter((m) => m.from === "care").length;
+
+  // Reading the thread clears unread. Re-runs as new messages arrive while the
+  // thread is open, so replies that come in mid-conversation stay marked read.
+  useEffect(() => {
+    if (pid && page === "chat" && threadOpen) markChatRead(pid, record.messages.length);
+  }, [pid, page, threadOpen, record.messages.length, markChatRead]);
 
   // ── Toasts ──────────────────────────────────────────────────────────────
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
@@ -399,7 +414,7 @@ export default function PatientPortalPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="DripVitals" style={{ width: 150, height: "auto", maxWidth: "100%", marginBottom: 24, marginLeft: 2 }} />
           <NavBtn active={page === "home"} onClick={() => nav("home")} ico="🏠">Home</NavBtn>
-          <NavBtn active={page === "chat"} onClick={() => nav("chat")} ico="💬" badge={3}>Chat</NavBtn>
+          <NavBtn active={page === "chat"} onClick={() => nav("chat")} ico="💬" badge={chatUnread || undefined}>Chat</NavBtn>
           <NavBtn active={page === "treatments"} onClick={() => nav("treatments")} ico="💊">Treatments</NavBtn>
           <NavBtn active={page === "shots"} onClick={() => nav("shots")} ico="💉">Shots</NavBtn>
           <NavBtn active={page === "reminders"} onClick={() => nav("reminders")} ico="🔔">Reminders</NavBtn>
