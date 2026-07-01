@@ -34,6 +34,15 @@ export const viewport: Viewport = {
 export default function PatientPortalLayout({ children }: { children: ReactNode }) {
   return (
     <>
+      {/* Satoshi (patient portal + login only). Loaded at runtime like the site's
+          other fonts so a font-CDN hiccup can never fail the build. The provider
+          EMR is unaffected — it keeps Inter. */}
+      <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
+      <link
+        rel="stylesheet"
+        precedence="default"
+        href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap"
+      />
       {children}
       <PwaInstallHint />
     </>

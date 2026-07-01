@@ -1599,7 +1599,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal, .dv-portal { height: 100%; }
 .dv-portal {
     margin: 0;
-    font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: "Satoshi", "Satoshi Variable", ui-sans-serif, system-ui, sans-serif;
     background: var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
@@ -1607,6 +1607,13 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal button { font-family: inherit; cursor: pointer; }
 .dv-portal input, .dv-portal select, .dv-portal textarea { font-family: inherit; }
 .dv-portal a { color: var(--blue); text-decoration: none; }
+/* Base H1 spec for the patient portal + login: Satoshi Medium, inherited family. */
+.dv-portal h1 {
+    font-weight: 500;
+    font-size: 28px;
+    letter-spacing: -0.03em;
+    color: #282828;
+  }
 .dv-portal .login-page {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1786,9 +1793,10 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     margin-bottom: 28px;
   }
 .dv-portal .main-title {
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    color: #282828;
     margin: 0;
   }
 .dv-portal .main-actions { display: flex; align-items: center; gap: 14px; }
