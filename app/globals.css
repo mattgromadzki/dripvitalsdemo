@@ -1632,7 +1632,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     text-transform: uppercase;
     letter-spacing: 1.6px;
   }
-.dv-portal .login-h { font-size: 16px; font-weight: 600; margin: 0 0 18px; color: var(--text-2); }
+.dv-portal .login-h { font-size: 18px; font-weight: 700; margin: 0 0 20px; color: var(--text); letter-spacing: -0.01em; }
 .dv-portal .login-input {
     width: 100%;
     padding: 16px 18px;
@@ -1659,9 +1659,18 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal .login-helpers a { margin: 0 6px; }
 .dv-portal .login-foot { margin-top: auto; padding-top: 40px; font-size: 11px; color: var(--muted-2); }
 .dv-portal .login-right {
-    background: #3a7ab0 url('/portal-login.jpg') center 20% / cover no-repeat;
+    background: #fff;
+    padding: 30px;
+    display: flex;
+  }
+.dv-portal .login-media {
     position: relative;
+    flex: 1;
+    align-self: stretch;
+    border-radius: 26px;
     overflow: hidden;
+    background: #3a7ab0 url('/portal-login.jpg') center 18% / cover no-repeat;
+    box-shadow: 0 24px 60px rgba(30, 45, 75, 0.16);
   }
 .dv-portal .login-pattern {
     position: absolute;
@@ -1672,7 +1681,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal .login-quote {
     position: relative;
     z-index: 2;
-    padding: 60px 60px 50px;
+    padding: 46px 44px;
     color: #fff;
     height: 100%;
     display: flex;
@@ -1681,12 +1690,16 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
   }
 .dv-portal .login-quote-text {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 30px;
-    line-height: 1.25;
+    font-size: 38px;
+    line-height: 1.12;
     font-weight: 600;
     margin: 0;
-    letter-spacing: -0.01em;
-    text-shadow: 0 1px 12px rgba(15,30,45,.45);
+    letter-spacing: -0.015em;
+    text-shadow: 0 1px 14px rgba(15, 30, 45, 0.5);
+  }
+.dv-portal .login-quote-accent {
+    display: block;
+    color: #a9d4f2;
   }
 .dv-portal .login-quote-by { font-size: 12px; opacity: 0.85; }
 .dv-portal .portal {

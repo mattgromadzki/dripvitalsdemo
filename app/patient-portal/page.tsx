@@ -378,9 +378,11 @@ export default function PatientPortalPage() {
             <div className="login-foot">© 2026 DripVitals · Terms · Privacy</div>
           </div>
           <div className="login-right">
-            <div className="login-pattern" />
-            <div className="login-quote">
-              <div className="login-quote-text">Modern care for weight loss, energy, and longevity</div>
+            <div className="login-media">
+              <div className="login-pattern" />
+              <div className="login-quote">
+                <div className="login-quote-text">Modern care for<span className="login-quote-accent">weight loss, energy, and longevity</span></div>
+              </div>
             </div>
           </div>
         </div>
