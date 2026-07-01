@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { listPatients, savePatient } from "@/lib/crm/patients";
 
 /**
  * Server-side record of real Stripe activity (subscriptions, payments, refunds),
@@ -65,13 +66,11 @@ export function isPersistent(): boolean {
 
 /** Look up a patient's email from the persisted store, by id then by name. */
 export async function patientEmail(patientId?: string, name?: string): Promise<string> {
-  const r = redis();
-  if (!r) return "";
-  const v = await r.get("store:patients");
-  const arr = typeof v === "string" ? JSON.parse(v) : v;
-  if (!Array.isArray(arr)) return "";
-  const byId = patientId ? arr.find((p: { id?: string }) => p?.id === patientId) : null;
-  const byName = !byId && name ? arr.find((p: { name?: string }) => (p?.name || "").toLowerCase() === name.toLowerCase()) : null;
+  let arr: Awaited<ReturnType<typeof listPatients>>;
+  try { arr = await listPatients(); } catch { return ""; }
+  if (!Array.isArray(arr) || !arr.length) return "";
+  const byId = patientId ? arr.find((p) => p?.id === patientId) : null;
+  const byName = !byId && name ? arr.find((p) => (p?.name || "").toLowerCase() === name.toLowerCase()) : null;
   return (byId?.email || byName?.email || "") as string;
 }
 
@@ -80,21 +79,16 @@ export async function patientEmail(patientId?: string, name?: string): Promise<s
  * stamp their plan, so the EMR reflects a real subscription started via Checkout.
  */
 export async function markPatientPaidByEmail(email: string, planName?: string): Promise<void> {
-  const r = redis();
-  if (!r || !email) return;
-  const v = await r.get("store:patients");
-  const arr = typeof v === "string" ? JSON.parse(v) : v;
-  if (!Array.isArray(arr)) return;
+  if (!email) return;
+  let arr: Awaited<ReturnType<typeof listPatients>>;
+  try { arr = await listPatients(); } catch { return; }
+  if (!Array.isArray(arr) || !arr.length) return;
   const lc = email.toLowerCase();
-  let changed = false;
   for (const p of arr) {
-    if ((p?.email || "").toLowerCase() === lc) {
-      p.lifecycle = "active";
-      p.status = "active";
-      if (planName) p.plan = planName;
-      p.sub = "active";
-      changed = true;
-    }
+    if ((p?.email || "").toLowerCase() !== lc) continue;
+    p.status = "active";
+    p.lifecycle = "active_treatment";
+    if (planName) p.plan = planName;
+    try { await savePatient(p); } catch { /* best-effort */ }
   }
-  if (changed) await r.set("store:patients", JSON.stringify(arr));
 }

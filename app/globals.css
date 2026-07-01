@@ -2987,7 +2987,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 /* ───────── EMR readability scale (left nav + content enlarged ~10%) ───────── */
 /* Uniformly enlarges the sidebar nav and the module content for easier reading.
    Top bar is intentionally left at 100%. Adjust --emr-scale to taste. */
-:root { --emr-scale: 1.10; }
+:root { --emr-scale: 1.0; }
 .emr-content { zoom: var(--emr-scale, 1); overflow-x: auto; }
 .dv-sidebar  { zoom: var(--emr-scale, 1); }
 

@@ -1,5 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { advance } from "@/lib/subscriptions/util";
+import { listPatients } from "@/lib/crm/patients";
 import type { Subscription } from "@/lib/subscriptions/types";
 
 /**
@@ -62,13 +63,12 @@ export async function getPendingOrder(clientOrderId: string): Promise<PendingOrd
 
 /** Find a patient (id + display name) by email from the persisted patients store. */
 export async function patientByEmail(email?: string): Promise<{ id?: string; name?: string }> {
-  const r = redis();
-  if (!r || !email) return {};
-  const v = await r.get("store:patients");
-  const arr = typeof v === "string" ? JSON.parse(v) : v;
-  if (!Array.isArray(arr)) return {};
+  if (!email) return {};
+  let arr: Awaited<ReturnType<typeof listPatients>>;
+  try { arr = await listPatients(); } catch { return {}; }
+  if (!Array.isArray(arr) || !arr.length) return {};
   const lc = email.toLowerCase();
-  const p = arr.find((x: { email?: string }) => (x?.email || "").toLowerCase() === lc) as { id?: string; name?: string } | undefined;
+  const p = arr.find((x) => (x?.email || "").toLowerCase() === lc);
   return p ? { id: p.id, name: p.name } : {};
 }
 
