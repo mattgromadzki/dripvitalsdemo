@@ -18,6 +18,10 @@ function makeId(n: number): string {
   return "PT-" + String(n).padStart(4, "0");
 }
 
+// New patient numbering starts here (PT-1001, PT-1002, …). Existing lower-
+// numbered records are left as-is; the next NEW id is always at least this.
+const ID_FLOOR = 1001;
+
 function highestNumericId(patients: Patient[]): number {
   let max = 0;
   for (const p of patients) {
@@ -32,7 +36,7 @@ function highestNumericId(patients: Patient[]): number {
 
 export const usePatients = create<PatientsState>((set) => ({
   patients: seedList(SEED),
-  nextNumericId: highestNumericId(SEED) + 1,
+  nextNumericId: Math.max(ID_FLOOR, highestNumericId(SEED) + 1),
   add: (input) => {
     let created: Patient = { id: "PT-9999", ...input };
     set((s) => {
@@ -57,7 +61,7 @@ export const usePatients = create<PatientsState>((set) => ({
         ? s.patients.map((x) => (x.id === p.id ? { ...x, ...p } : x))
         : [p, ...s.patients];
       const n = parseInt((p.id.match(/PT-(\d+)/) || [])[1] || "0", 10);
-      return { patients, nextNumericId: Math.max(s.nextNumericId, n + 1) };
+      return { patients, nextNumericId: Math.max(s.nextNumericId, n + 1, ID_FLOOR) };
     });
   },
   remove: (id) => {

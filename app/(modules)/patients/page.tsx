@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
@@ -92,6 +92,54 @@ export default function PatientsPage() {
   const wt = (r: Row) => r.p.wt ? (<><b className="font-bold">{r.p.wt}</b> lbs{r.lost > 0 && <span className="text-green font-semibold text-[11px] ml-1.5">↓{r.lost}</span>}</>) : "—";
   const wk = (r: Row) => (r.p.week ? `Wk ${r.p.week}` : "—");
 
+  // ── Portal login status ──────────────────────────────────────────────────
+  // "Activated" patients have set their own password (welcome/reset flow); we
+  // read the authoritative set from the server. "Invited" is optimistic local
+  // feedback after we send a welcome email this session.
+  const [activated, setActivated] = useState<Set<string>>(new Set());
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/patient/activation")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive && Array.isArray(j?.emails)) setActivated(new Set((j.emails as string[]).map((e) => e.toLowerCase()))); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const isActivated = (p: Patient) => !!p.email && activated.has(p.email.toLowerCase());
+
+  async function sendWelcome(p: Patient): Promise<boolean> {
+    if (!p.email) return false;
+    try {
+      const r = await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "welcome", to: p.email, toName: p.name }),
+      });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.ok !== false) { setInvited((s) => new Set(s).add(p.email.toLowerCase())); return true; }
+      return false;
+    } catch { return false; }
+  }
+
+  async function sendOne(p: Patient) {
+    if (!p.email) { toast(`No email on file for ${p.name}`); return; }
+    toast(await sendWelcome(p) ? `✉️ Welcome email sent to ${p.name}` : `Couldn't send to ${p.name}`);
+  }
+
+  async function sendBulkInvites() {
+    const targets = filtered.map((r) => r.p).filter((p) => p.email && !isActivated(p));
+    if (!targets.length) { toast("Everyone shown already has a portal login"); return; }
+    setBulkBusy(true);
+    let sent = 0;
+    for (const p of targets) { if (await sendWelcome(p)) sent++; }
+    setBulkBusy(false);
+    toast(`✉️ Sent ${sent} welcome email${sent === 1 ? "" : "s"}`);
+  }
+
   return (
     <div className="px-7 py-6 text-[14px]">
       <div className="flex items-center gap-3.5 mb-4 flex-wrap">
@@ -100,6 +148,9 @@ export default function PatientsPage() {
           <div className="text-[12px] text-ink-muted mt-0.5">Panel management · track every patient's lifecycle stage, program &amp; progress</div>
         </div>
         <div className="flex-1" />
+        <button className="btn btn-ghost btn-sm" onClick={sendBulkInvites} disabled={bulkBusy} title="Email a set-password link to every patient shown who hasn't set up their portal login yet">
+          {bulkBusy ? "Sending…" : "✉️ Send login invites"}
+        </button>
         <button className="btn btn-ghost btn-sm" onClick={() => toast("⬇ Exporting…")}>⬇ Export</button>
         <button className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>+ Add patient</button>
       </div>
@@ -162,7 +213,7 @@ export default function PatientsPage() {
           <div className="overflow-x-auto">
             <table className="border-collapse w-full min-w-[1180px]">
               <thead><tr className="bg-surface-2">
-                {["Patient","Status","Program","Provider","State","Week","Weight","BMI","Next Refill","Last Activity",""].map((h, i) => (
+                {["Patient","Status","Program","Provider","State","Week","Weight","BMI","Next Refill","Last Activity","Portal",""].map((h, i) => (
                   <th key={i} className="text-[10px] uppercase tracking-wide text-ink-muted font-bold text-left px-3 py-2.5 border-b border-border whitespace-nowrap">{h}</th>
                 ))}
               </tr></thead>
@@ -190,10 +241,19 @@ export default function PatientsPage() {
                     <td className="px-3 py-2.5">{r.p.bmi || "—"}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap">{r.p.nextRefill || "—"}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-ink-muted">{r.p.lastVisit || "—"}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {isActivated(r.p)
+                        ? <Pill intent="green" dot>Active</Pill>
+                        : !r.p.email
+                          ? <span className="text-ink-muted text-[11px]">No email</span>
+                          : invited.has(r.p.email.toLowerCase())
+                            ? <span className="text-[11px] text-ink-muted">✓ Invited · <button className="text-brand font-semibold hover:underline" onClick={() => sendOne(r.p)}>Resend</button></span>
+                            : <button className="text-[11.5px] text-brand font-semibold hover:underline" onClick={() => sendOne(r.p)}>Send invite</button>}
+                    </td>
                     <td className="px-3 py-2.5 text-right"><Link href={`/patients/${r.p.id}`} className="text-ink-muted hover:text-ink">›</Link></td>
                   </tr>
                 ))}
-                {filtered.length === 0 && <tr><td colSpan={11} className="px-3 py-10 text-center text-ink-muted text-[12px]">No patients match these filters.</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan={12} className="px-3 py-10 text-center text-ink-muted text-[12px]">No patients match these filters.</td></tr>}
               </tbody>
             </table>
           </div>

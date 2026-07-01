@@ -1639,30 +1639,44 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     text-transform: uppercase;
     letter-spacing: 1.6px;
   }
-.dv-portal .login-h { font-size: 18px; font-weight: 700; margin: 0 0 20px; color: var(--text); letter-spacing: -0.01em; }
+.dv-portal .login-h { font-size: 18px; font-weight: 700; margin: 0 0 20px; color: var(--text); letter-spacing: -0.01em; max-width: 384px; }
 .dv-portal .login-input {
     width: 100%;
-    padding: 16px 18px;
+    max-width: 384px;
+    padding: 13px 15px;
     border: 1.5px solid var(--border);
-    border-radius: 12px;
-    font-size: 15px;
-    margin-bottom: 14px;
+    border-radius: 11px;
+    background: var(--surface);
+    font-size: 14.5px;
+    margin-bottom: 12px;
     outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
   }
-.dv-portal .login-input:focus { border-color: var(--blue); box-shadow: 0 0 0 4px var(--blue-soft); }
+.dv-portal .login-input::placeholder { color: var(--muted); }
+.dv-portal .login-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-soft); }
+/* Keep autofilled fields on-brand instead of the browser's blue/yellow fill. */
+.dv-portal .login-input:-webkit-autofill,
+.dv-portal .login-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--text);
+    -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+    caret-color: var(--text);
+  }
 .dv-portal .login-btn {
     width: 100%;
-    padding: 15px;
+    max-width: 384px;
+    padding: 13px;
     background: var(--blue);
     color: #fff;
     border: none;
-    border-radius: 12px;
+    border-radius: 11px;
     font-size: 14.5px;
     font-weight: 600;
-    margin-bottom: 20px;
+    margin-top: 4px;
+    margin-bottom: 18px;
+    transition: background .15s ease;
   }
 .dv-portal .login-btn:hover { background: var(--blue-dk); }
-.dv-portal .login-helpers { font-size: 12.5px; color: var(--muted); }
+.dv-portal .login-helpers { font-size: 12.5px; color: var(--muted); max-width: 384px; }
 .dv-portal .login-helpers a { margin: 0 6px; }
 .dv-portal .login-foot { margin-top: auto; padding-top: 40px; font-size: 11px; color: var(--muted-2); }
 .dv-portal .login-right {

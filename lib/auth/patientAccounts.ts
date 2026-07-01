@@ -52,3 +52,21 @@ export async function setPatientPassword(email: string, newPassword: string): Pr
   const r = redis();
   if (r) await r.hset(PW_KEY, { [email.trim().toLowerCase()]: hashPassword(newPassword) });
 }
+
+/**
+ * Emails (lowercased) of patients who have set their own portal password — i.e.
+ * activated their login via the welcome / reset flow. A patient is "activated"
+ * exactly when they have an entry in `patient:auth:v1`; everyone else is still on
+ * the shared demo password and hasn't finished portal setup. Returns [] when no
+ * Redis is configured (nothing is authoritative in that demo-only mode).
+ */
+export async function listActivatedEmails(): Promise<string[]> {
+  const r = redis();
+  if (!r) return [];
+  try {
+    const keys = await r.hkeys(PW_KEY);
+    return Array.isArray(keys) ? keys.map((k) => String(k).trim().toLowerCase()) : [];
+  } catch {
+    return [];
+  }
+}
