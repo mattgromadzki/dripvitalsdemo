@@ -6,6 +6,7 @@ import type { PatientDocument } from "@/lib/types";
 interface PatientDocumentsState {
   documents: PatientDocument[];
   add: (doc: Omit<PatientDocument, "id">) => PatientDocument;
+  update: (id: string, patch: Partial<PatientDocument>) => void;
   remove: (id: string) => void;
   // Stamps the approving provider onto a patient's visit packet (record + intake).
   stampVisitApproval: (opts: { patientId: string; visitId?: string; provider: string; decision?: string }) => void;
@@ -23,6 +24,9 @@ export const usePatientDocuments = create<PatientDocumentsState>((set, get) => (
     const created: PatientDocument = { id: nextId(), ...input };
     set((s) => ({ documents: [created, ...s.documents] }));
     return created;
+  },
+  update: (id, patch) => {
+    set((s) => ({ documents: s.documents.map((d) => (d.id === id ? { ...d, ...patch } : d)) }));
   },
   remove: (id) => {
     set((s) => ({ documents: s.documents.filter((d) => d.id !== id) }));

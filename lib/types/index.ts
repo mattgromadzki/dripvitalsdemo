@@ -975,6 +975,19 @@ export interface PatientDocument {
   };
   // Visit-packet snapshot (denormalized so the document is self-contained).
   visitPayload?: VisitPacket;
+  // Government-ID image (stored inline as a compressed data URL).
+  idPayload?: {
+    dataUrl: string;
+    mimeType: string;
+    label?: string;
+    width?: number;
+    height?: number;
+    sizeKb?: number;
+    side?: "front" | "back";
+    verified?: boolean;
+    verifiedBy?: string;
+    verifiedAt?: string;
+  };
 }
 
 export interface VisitPacketConsent { title: string; version: string; acceptedAt: string; }

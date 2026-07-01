@@ -13,6 +13,7 @@ import { NewOrderModal } from "@/components/modules/chart/NewOrderModal";
 import { PatientMessageCenter } from "@/components/modules/chart/PatientMessageCenter";
 import { usePrescriptions } from "@/lib/hooks/usePrescriptions";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
+import { compressImageFile } from "@/lib/images/idImage";
 import { PatientPharmacyTracking } from "@/components/modules/pharmacy/PatientPharmacyTracking";
 import { OrderCard } from "@/components/modules/orders/OrderCard";
 import { getFulfillmentOrders } from "@/lib/data/fulfillmentOrders";
@@ -43,6 +44,8 @@ export default function PatientDetailPage() {
   const addEmail = useEmails((s) => s.add);
   const allRx = usePrescriptions((s) => s.prescriptions);
   const allDocs = usePatientDocuments((s) => s.documents);
+  const addDoc = usePatientDocuments((s) => s.add);
+  const updateDoc = usePatientDocuments((s) => s.update);
 
   const [tab, setTab] = useState<TabKey>("summary");
   const [msgOpen, setMsgOpen] = useState(false);
@@ -95,6 +98,39 @@ export default function PatientDetailPage() {
   const patientOrders = getFulfillmentOrders(allPatients).filter((o) => o.patientId === pid);
   const patientDocs = allDocs.filter((d) => d.patientId === pid).sort((a, b) => b.createdAt - a.createdAt);
   const logAudit = (action: string, area = "Chart") => setAudit((a) => [{ time: `Now`, user: "Admin", action, area, device: "Browser" }, ...a]);
+
+  // ── Government-ID photo (real capture, stored inline on a patient document) ──
+  const idDoc = patientDocs.find((d) => d.category === "id" && d.idPayload?.dataUrl);
+  const idImg = idDoc?.idPayload?.dataUrl;
+  const idIsVerified = idDoc ? !!idDoc.idPayload?.verified : extra.idVerified;
+  async function handleIdUpload(file: File | undefined) {
+    if (!file || !patient) return;
+    try {
+      const img = await compressImageFile(file, { maxDim: 1500, quality: 0.82 });
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      addDoc({
+        patientId: pid, category: "id",
+        title: `Government ID — ${patient.name}`, icon: "🪪",
+        createdAt: +`${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`,
+        createdDate: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        idPayload: { dataUrl: img.dataUrl, mimeType: img.mimeType, label: `${patient.state} ID`, width: img.width, height: img.height, sizeKb: img.sizeKb, side: "front", verified: false },
+      });
+      toast("✓ ID image uploaded");
+      logAudit("Uploaded government ID", "Documents");
+    } catch (e) {
+      toast("⚠️ " + ((e as Error).message || "Could not upload ID"));
+    }
+  }
+  function verifyId() {
+    if (idDoc?.idPayload) {
+      updateDoc(idDoc.id, { idPayload: { ...idDoc.idPayload, verified: true, verifiedBy: "Admin", verifiedAt: new Date().toISOString() } });
+      logAudit("Marked ID verified", "Documents");
+      toast("✓ ID marked verified");
+    } else {
+      toast("⚠️ Upload an ID image first");
+    }
+  }
   const addr = extra.address;
   const buildProfile = () => ({
     name: patient.name, email: patient.email, phone: patient.phone,
@@ -172,7 +208,7 @@ export default function PatientDetailPage() {
             <Pill intent={patient.status === "active" ? "green" : "muted"}>{patient.status}</Pill>
             <Pill intent="purple">{patient.plan}</Pill>
             {reviewNeeded && <Pill intent="amber">Needs Review</Pill>}
-            <Pill intent={idVerified ? "blue" : "muted"}>{idVerified ? "ID Verified" : "ID Pending"}</Pill>
+            <Pill intent={idIsVerified ? "blue" : "muted"}>{idIsVerified ? "ID Verified" : "ID Pending"}</Pill>
           </div>
         </div>
         <div className="flex gap-2 flex-wrap ml-auto">
@@ -224,7 +260,7 @@ export default function PatientDetailPage() {
               <Card title="Current Workflow" sub="What's stuck right now.">
                 {reviewNeeded ? <AlertBox tone="amber" icon="!" title="Provider review needed" body="Intake submitted. Review medication history before creating an Rx." />
                   : <AlertBox tone="green" icon="✓" title="Review complete" body="Provider review is done for this patient." />}
-                <AlertBox tone={idVerified ? "green" : "amber"} icon={idVerified ? "✓" : "!"} title={idVerified ? "ID verified" : "ID not verified"} body={idVerified ? "Name, DOB, and state match the uploaded license." : "Government ID still needs verification."} />
+                <AlertBox tone={idIsVerified ? "green" : "amber"} icon={idIsVerified ? "✓" : "!"} title={idIsVerified ? "ID verified" : "ID not verified"} body={idIsVerified ? "Name, DOB, and state match the uploaded license." : "Government ID still needs verification."} />
                 <AlertBox tone={patient.status === "active" ? "green" : "amber"} icon={patient.status === "active" ? "✓" : "!"} title={patient.status === "active" ? "Payment active" : "Payment inactive"} body={`Plan: ${patient.sub}`} />
               </Card>
               <Card title="Refill Readiness" sub="Required before next shipment.">
@@ -383,12 +419,22 @@ export default function PatientDetailPage() {
             <Card title="Documents & ID" sub="ID, consent forms, intake PDFs, prescriptions, and invoices." action={<button className="btn btn-ghost btn-sm" onClick={() => setModal("id")}>View ID</button>}>
               <div className="grid md:grid-cols-2 gap-5">
                 <div className="flex gap-3">
-                  <div className="w-[96px] h-[64px] rounded-xl bg-surface-3 border border-border flex items-center justify-center text-[24px] shrink-0">🪪</div>
+                  {idImg ? (
+                    <button onClick={() => setModal("id")} className="w-[96px] h-[64px] rounded-xl border border-border shrink-0 overflow-hidden p-0 cursor-pointer" title="View ID">
+                      <img src={idImg} alt="Government ID" className="w-full h-full object-cover" />
+                    </button>
+                  ) : (
+                    <div className="w-[96px] h-[64px] rounded-xl bg-surface-3 border border-border flex items-center justify-center text-[24px] shrink-0">🪪</div>
+                  )}
                   <div>
-                    <h3 className="text-[14px]">{patient.state} Driver License</h3>
-                    <div className="text-[11px] text-ink-muted">Uploaded {patient.since} · {idVerified ? "Name, DOB & state match profile." : "Pending verification."}</div>
-                    <div className="flex gap-1.5 mt-1.5"><Pill intent={idVerified ? "green" : "amber"}>{idVerified ? "Verified" : "Pending"}</Pill><Pill intent="blue">Front Image</Pill></div>
-                    <label className="btn btn-ghost btn-sm mt-2 cursor-pointer">Upload / Replace ID<input type="file" accept="image/*" className="hidden" onChange={() => { toast("ID image selected"); logAudit("Selected replacement ID", "Documents"); }} /></label>
+                    <h3 className="text-[14px]">{idImg ? `${patient.state} Government ID` : "No ID on file"}</h3>
+                    <div className="text-[11px] text-ink-muted">{idImg ? `Uploaded ${idDoc?.createdDate} · ${idIsVerified ? "Verified by staff." : "Awaiting verification."}` : "No government ID has been uploaded for this patient yet."}</div>
+                    <div className="flex gap-1.5 mt-1.5">
+                      {idImg
+                        ? <><Pill intent={idIsVerified ? "green" : "amber"}>{idIsVerified ? "Verified" : "Pending"}</Pill><Pill intent="blue">Front image</Pill></>
+                        : <Pill intent="muted">Not uploaded</Pill>}
+                    </div>
+                    <label className="btn btn-ghost btn-sm mt-2 cursor-pointer">{idImg ? "Replace ID" : "Upload ID"}<input type="file" accept="image/*" className="hidden" onChange={(e) => { handleIdUpload(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -473,13 +519,22 @@ export default function PatientDetailPage() {
         </Modal>
       )}
       {modal === "id" && (
-        <Modal title="Patient ID" onClose={() => setModal(null)} onSave={() => { toast("ID verified"); setModal(null); }} saveLabel="Mark Verified">
+        <Modal title="Patient ID" onClose={() => setModal(null)} onSave={() => { if (idImg) verifyId(); setModal(null); }} saveLabel={idImg ? (idIsVerified ? "Verified ✓" : "Mark Verified") : "Close"}>
           <div className="flex gap-3">
-            <div className="w-[200px] h-[126px] rounded-xl bg-surface-3 border border-border flex items-center justify-center text-[40px] shrink-0">🪪</div>
+            {idImg ? (
+              <img src={idImg} alt="Government ID" className="w-[280px] max-h-[200px] rounded-xl border border-border object-contain bg-surface-3 shrink-0" />
+            ) : (
+              <div className="w-[200px] h-[126px] rounded-xl bg-surface-3 border border-border flex items-center justify-center text-[40px] shrink-0">🪪</div>
+            )}
             <div className="text-[12px] text-ink-muted leading-relaxed">
-              <h3 className="text-[14px] text-ink mb-1">{patient.state} Driver License</h3>
-              Status: {idVerified ? "Verified" : "Pending"}<br />Name: {patient.name}<br />State: {patient.state}<br />Gov ID: {extra.govId}
-              <div className="flex gap-1.5 mt-2"><Pill intent={idVerified ? "green" : "amber"}>{idVerified ? "Verified" : "Pending"}</Pill><Pill intent="blue">Front image on file</Pill></div>
+              <h3 className="text-[14px] text-ink mb-1">{idImg ? `${patient.state} Government ID` : "No ID on file"}</h3>
+              {idImg ? (
+                <>Status: {idIsVerified ? "Verified" : "Pending"}<br />Name: {patient.name}<br />State: {patient.state}<br />Uploaded: {idDoc?.createdDate}
+                <div className="flex gap-1.5 mt-2"><Pill intent={idIsVerified ? "green" : "amber"}>{idIsVerified ? "Verified" : "Pending"}</Pill><Pill intent="blue">Front image on file</Pill></div>
+                <div className="text-[11px] mt-2">Confirm the name, date of birth, and state on the ID match this patient&apos;s profile before marking verified.</div></>
+              ) : (
+                <>No government ID has been uploaded for this patient. Use the Upload ID button on the Documents tab to add one.</>
+              )}
             </div>
           </div>
         </Modal>

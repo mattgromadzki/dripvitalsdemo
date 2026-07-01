@@ -11,6 +11,7 @@ import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/
 import { disqualifierReason } from "@/lib/clinical/glp1Screening";
 import { consentsFor } from "@/lib/legal/documents";
 import { fetchSuggestions, cleanStreet } from "@/lib/usps/autocomplete";
+import { compressImageFile } from "@/lib/images/idImage";
 import type { AddressSuggestion } from "@/lib/usps/types";
 
 function nowStamp(): string {
@@ -1194,14 +1195,28 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
                 key={q.id}
                 type="file"
                 style={{ display: "none" }}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (file) commitAnswer(q.id, file.name);
+                  if (!file) return;
+                  if (file.type.startsWith("image/")) {
+                    try { const img = await compressImageFile(file, { maxDim: 1500, quality: 0.8 }); commitAnswer(q.id, img.dataUrl); }
+                    catch { commitAnswer(q.id, file.name); }
+                  } else {
+                    commitAnswer(q.id, file.name);
+                  }
                 }}
               />
               <div style={{ fontSize: 32, marginBottom: 6 }}>📎</div>
               {hasFile ? (
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dv-ink)" }}>{a as string}</div>
+                (a as string).startsWith("data:image") ? (
+                  <div>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={a as string} alt="Uploaded" style={{ maxHeight: 120, borderRadius: 8, margin: "0 auto 6px", display: "block" }} />
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--dv-ink)" }}>Image uploaded ✓ — tap to replace</div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dv-ink)" }}>{a as string}</div>
+                )
               ) : (
                 <>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dv-ink)" }}>Click to upload</div>

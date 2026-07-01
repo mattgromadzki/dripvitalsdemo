@@ -61,7 +61,7 @@ export function DocumentsTab({ patient, extra }: { patient: Patient; extra: Pati
           date:     d.createdDate,
           size:     d.category === "visit" ? "Visit packet" : "1 PDF page",
           isRx:     d.category === "rx",
-          openable: d.category === "rx" || d.category === "visit",
+          openable: d.category === "rx" || d.category === "visit" || d.category === "id",
           rxDocId:  d.id,
           signedBy: d.signedBy,
         })),

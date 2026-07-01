@@ -62,6 +62,16 @@ export default function DocumentViewerPage() {
         <RxPreviewBask rx={doc.rxPayload} status="signed" refNum={doc.rxPayload.refNum} />
       ) : doc.category === "visit" && doc.visitPayload ? (
         <VisitPacketPreview payload={doc.visitPayload} />
+      ) : doc.category === "id" && doc.idPayload?.dataUrl ? (
+        <div className="bg-surface border border-border rounded-md p-6 max-w-[760px] mx-auto text-center">
+          <div className="text-[13px] font-bold text-ink mb-1">{doc.title}</div>
+          <div className="text-[11.5px] text-ink-muted mb-4">
+            {doc.idPayload.label || "Government ID"} · {doc.createdDate}
+            {doc.idPayload.verified ? " · Verified" : " · Pending verification"}
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={doc.idPayload.dataUrl} alt="Government ID" className="max-w-full rounded-lg border border-border mx-auto" />
+        </div>
       ) : (
         <div className="bg-surface border border-border rounded-md p-8 text-center max-w-[640px] mx-auto">
           <div className="text-[36px] opacity-50 mb-3">{doc.icon}</div>

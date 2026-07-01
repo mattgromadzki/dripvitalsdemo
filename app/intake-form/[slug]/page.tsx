@@ -12,7 +12,6 @@ import { resolveBrandId } from "@/lib/brands/resolve";
 import { consentsFor } from "@/lib/legal/documents";
 import { screenAnswers } from "@/lib/clinical/glp1Screening";
 import { buildVisitPacket } from "@/lib/visits/packet";
-import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 import { estDisplay } from "@/lib/time/est";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
@@ -185,15 +184,33 @@ export default function IntakeFormPage() {
         signedName: name,
         signedDisplay: createdDisplay,
       });
-      usePatientDocuments.getState().add({
+      fetch("/api/patient-documents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         patientId: pid, category: "visit",
         title: `Visit Record & Intake — ${form.name}`,
         icon: "📋",
         createdAt: ts.int, createdDate: `Today · ${ts.display}`,
         signedBy: name,
         visitPayload: packet,
-      });
+      }) }).catch(() => {});
     } catch { /* non-fatal: completion still succeeds */ }
+
+    // File any government-ID image uploaded during intake as an "id" document.
+    try {
+      const ts = nowParts();
+      for (const q of form.questions) {
+        if (q.type !== "file") continue;
+        const raw = client.answers[q.id];
+        if (typeof raw !== "string" || !raw.startsWith("data:image")) continue;
+        if (!/\b(id|identity|licen[sc]e|passport|government)\b/i.test(q.text)) continue;
+        fetch("/api/patient-documents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          patientId: pid, category: "id",
+          title: `Government ID — ${name}`, icon: "🪪",
+          createdAt: ts.int, createdDate: `Today · ${ts.display}`,
+          idPayload: { dataUrl: raw, mimeType: "image/jpeg", label: `${state} ID`, side: "front", verified: false },
+        }) }).catch(() => {});
+        break; // one ID document per intake
+      }
+    } catch { /* non-fatal */ }
 
     const np = nowParts();
     addRequest({
