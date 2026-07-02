@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Pill } from "@/components/ui/Pill";
 import { getLicenseStatus, formatLicenseExp } from "@/lib/hooks/useDoctors";
 import { US_STATES_ALL } from "@/lib/types";
+import { DOCTORS as SEED_DOCTORS } from "@/lib/data/doctors";
 import type { Doctor, DoctorStateLicense } from "@/lib/types";
 
 interface LicenseManagerModalProps {
@@ -49,6 +50,21 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
     setNewState("");
     setNewNumber("");
     setNewExp("");
+    setError("");
+  }
+
+  // Merge in this doctor's default licenses from the code (matched by id),
+  // adding any states not already present — so it fills the roster without
+  // overwriting numbers/dates already entered here.
+  const seedDoc = SEED_DOCTORS.find((d) => d.id === doc.id);
+  const seedCount = seedDoc?.licenses?.length || 0;
+  function loadDefaults() {
+    if (!seedDoc || !seedDoc.licenses.length) { setError("No default licenses on file for this doctor"); return; }
+    setLicenses((prev) => {
+      const have = new Set(prev.map((l) => l.state));
+      const additions = seedDoc.licenses.filter((l) => !have.has(l.state)).map((l) => ({ ...l }));
+      return [...prev, ...additions];
+    });
     setError("");
   }
 
@@ -135,6 +151,11 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
           </div>
           <button className="btn btn-primary btn-sm" onClick={addLicense}>+ Add</button>
         </div>
+        {seedCount > licenses.length && (
+          <button className="btn btn-ghost btn-sm mt-2.5" onClick={loadDefaults} title="Fill in all of this provider's licenses on file, without overwriting any you've already entered">
+            ↺ Load Dr. {doc.last}&rsquo;s {seedCount} licenses from file
+          </button>
+        )}
       </div>
 
       {/* License list */}
