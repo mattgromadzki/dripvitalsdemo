@@ -53,10 +53,12 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
     setError("");
   }
 
-  // Merge in this doctor's default licenses from the code (matched by id),
-  // adding any states not already present — so it fills the roster without
-  // overwriting numbers/dates already entered here.
-  const seedDoc = SEED_DOCTORS.find((d) => d.id === doc.id);
+  // Merge in this doctor's default licenses from the code, adding any states not
+  // already present — so it fills the roster without overwriting entries here.
+  // Match by id, or fall back to name (a saved record may carry a different id).
+  const seedDoc =
+    SEED_DOCTORS.find((d) => d.id === doc.id) ||
+    SEED_DOCTORS.find((d) => d.first.toLowerCase() === doc.first.toLowerCase() && d.last.toLowerCase() === doc.last.toLowerCase());
   const seedCount = seedDoc?.licenses?.length || 0;
   function loadDefaults() {
     if (!seedDoc || !seedDoc.licenses.length) { setError("No default licenses on file for this doctor"); return; }
@@ -151,7 +153,7 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
           </div>
           <button className="btn btn-primary btn-sm" onClick={addLicense}>+ Add</button>
         </div>
-        {seedCount > licenses.length && (
+        {seedCount > 0 && (
           <button className="btn btn-ghost btn-sm mt-2.5" onClick={loadDefaults} title="Fill in all of this provider's licenses on file, without overwriting any you've already entered">
             ↺ Load Dr. {doc.last}&rsquo;s {seedCount} licenses from file
           </button>
