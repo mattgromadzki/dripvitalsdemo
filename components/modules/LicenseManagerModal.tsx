@@ -60,6 +60,7 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
     SEED_DOCTORS.find((d) => d.id === doc.id) ||
     SEED_DOCTORS.find((d) => d.first.toLowerCase() === doc.first.toLowerCase() && d.last.toLowerCase() === doc.last.toLowerCase());
   const seedCount = seedDoc?.licenses?.length || 0;
+  const seedMissing = seedDoc ? seedDoc.licenses.filter((l) => !existingStates.has(l.state)) : [];
   function loadDefaults() {
     if (!seedDoc || !seedDoc.licenses.length) { setError("No default licenses on file for this doctor"); return; }
     setLicenses((prev) => {
@@ -121,6 +122,15 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
         </div>
       )}
 
+      {seedMissing.length > 0 && (
+        <div className="mb-3 px-3 py-3 rounded-md bg-amber-soft border border-border text-[12.5px] flex items-center justify-between gap-3 flex-wrap">
+          <span>
+            <b>{seedMissing.length} more license{seedMissing.length === 1 ? "" : "s"} on file</b> for Dr. {doc.last} {seedMissing.length === 1 ? "isn't" : "aren't"} saved yet. Load them, then click <b>Save Licenses</b> to keep them.
+          </span>
+          <button className="btn btn-primary btn-sm whitespace-nowrap" onClick={loadDefaults}>↺ Load all {seedCount}</button>
+        </div>
+      )}
+
       {/* Add new license */}
       <div className="bg-surface-2 border border-border rounded-md p-3 mb-4">
         <div className="text-[10.5px] font-bold uppercase tracking-widest text-ink-muted mb-2">Add a new license</div>
@@ -153,11 +163,6 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
           </div>
           <button className="btn btn-primary btn-sm" onClick={addLicense}>+ Add</button>
         </div>
-        {seedCount > 0 && (
-          <button className="btn btn-ghost btn-sm mt-2.5" onClick={loadDefaults} title="Fill in all of this provider's licenses on file, without overwriting any you've already entered">
-            ↺ Load Dr. {doc.last}&rsquo;s {seedCount} licenses from file
-          </button>
-        )}
       </div>
 
       {/* License list */}
