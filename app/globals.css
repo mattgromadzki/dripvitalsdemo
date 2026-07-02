@@ -1621,7 +1621,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
   }
 .dv-portal .login-left {
     background: #fff;
-    padding: 60px 70px;
+    padding: 24vh 70px 10vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
