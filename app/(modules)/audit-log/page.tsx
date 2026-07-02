@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import type { Key, ReactNode } from "react";
 import { Pill } from "@/components/ui/Pill";
@@ -8,7 +8,33 @@ import { Toast } from "@/components/ui/Toast";
 import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
 import { toast } from "@/lib/hooks/useToast";
 import { useAudit } from "@/lib/hooks/useAudit";
+import { usePatients } from "@/lib/hooks/usePatients";
 import type { AuditCategory, AuditEvent } from "@/lib/types";
+
+// Map a server audit event (real access log) onto the page's display shape.
+const SERVER_ACTION_META: Record<string, { category: AuditCategory; action: string; resourceType?: string }> = {
+  "chart.view": { category: "patient", action: "Viewed patient chart", resourceType: "chart" },
+  "auth.login": { category: "auth", action: "Signed in", resourceType: "session" },
+  "auth.idle_logout": { category: "security", action: "Auto sign-out (inactivity)", resourceType: "session" },
+};
+interface ServerAuditEvent { id: string; at: string; action: string; actorEmail: string; actorName?: string; actorRole?: string; patientId?: string; detail?: string; ip?: string; }
+function mapServerAudit(e: ServerAuditEvent, patientName?: string): AuditEvent {
+  const at = Date.parse(e.at) || Date.now();
+  const meta = SERVER_ACTION_META[e.action] || { category: "emr" as AuditCategory, action: e.action };
+  return {
+    id: e.id,
+    timestamp: new Date(at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+    orderedAt: at,
+    user: e.actorName || e.actorEmail || "—",
+    category: meta.category,
+    action: meta.action,
+    resourceType: meta.resourceType,
+    patientId: e.patientId,
+    patientName,
+    ipAddress: e.ip || "—",
+    success: true,
+  };
+}
 
 type CategoryFilter = "all" | AuditCategory;
 type DateRange = "today" | "week" | "month" | "all";
@@ -51,6 +77,26 @@ const RANGE_LABEL: Record<DateRange, string> = {
 
 export default function AuditLogPage() {
   const events = useAudit((s) => s.events);
+  const patients = usePatients((s) => s.patients);
+
+  // Pull the real server-side access log and merge it into the viewer (deduped
+  // by id). In production the demo seed is empty, so this shows only real events.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/audit?limit=500")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!alive || !j?.events || !Array.isArray(j.events)) return;
+        const nameById = new Map(patients.map((p) => [p.id, p.name] as const));
+        const mapped = (j.events as ServerAuditEvent[]).map((e) => mapServerAudit(e, e.patientId ? nameById.get(e.patientId) : undefined));
+        useAudit.setState((s) => {
+          const ids = new Set(mapped.map((m) => m.id));
+          return { events: [...mapped, ...s.events.filter((ev) => !ids.has(ev.id))] };
+        });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [patients]);
 
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [range, setRange]       = useState<DateRange>("week");

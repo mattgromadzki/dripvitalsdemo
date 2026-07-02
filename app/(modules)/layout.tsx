@@ -3,12 +3,14 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { RouteGuard } from "@/components/auth/RouteGuard";
+import { IdleLogout } from "@/components/auth/IdleLogout";
 import { CrmHydrator } from "@/components/crm/CrmHydrator";
 import { PersistHydrator } from "@/components/persist/PersistHydrator";
 
 export default function ModulesLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard>
+      <IdleLogout />
       <CrmHydrator />
       <PersistHydrator />
       <Topbar />

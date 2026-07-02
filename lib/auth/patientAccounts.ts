@@ -38,14 +38,22 @@ export async function findPatientByEmail(email: string): Promise<PatientRec | nu
   return p?.id ? { id: p.id, name: p.name || "Patient", email: p.email || lc } : null;
 }
 
-/** True if the password matches the patient's set password, or the demo password. */
+/**
+ * True if the password matches the patient's own set password. The shared demo
+ * password is ONLY accepted in demo mode (NEXT_PUBLIC_SEED_DEMO_DATA != "false").
+ * In production (flag set to "false"), a patient who hasn't set a password cannot
+ * sign in until they do so via the welcome / reset flow — so no real PHI is ever
+ * reachable with a shared default credential.
+ */
 export async function verifyPatientPassword(email: string, password: string): Promise<boolean> {
   const r = redis();
   if (r) {
     const h = await r.hget(PW_KEY, email.trim().toLowerCase());
     if (h && typeof h === "string") return verifyPassword(password, h);
   }
-  return password === DEMO_PW; // no override set → demo password
+  // No password set for this patient.
+  const demoMode = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+  return demoMode ? password === DEMO_PW : false;
 }
 
 export async function setPatientPassword(email: string, newPassword: string): Promise<void> {

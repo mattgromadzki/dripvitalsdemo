@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Pill } from "@/components/ui/Pill";
@@ -53,6 +53,17 @@ export default function PatientDetailPage() {
   const [modal, setModal] = useState<null | "note" | "dose" | "profile" | "id">(null);
 
   const extra = useMemo(() => (patient ? getPatientExtra(patient) : null), [patient]);
+
+  // HIPAA audit: log that this staff member opened this patient's chart. The
+  // actor is derived server-side from the session; this only names the patient.
+  useEffect(() => {
+    if (!params.id) return;
+    fetch("/api/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "chart.view", patientId: params.id }),
+    }).catch(() => {});
+  }, [params.id]);
 
   const [weights, setWeights] = useState<WeightEntry[]>(() =>
     extra ? extra.weightLog.map((w, i) => ({ date: extra.weightDates[i] || `Pt ${i + 1}`, weight: w, source: i === 0 ? "Intake" : "Tracked", note: i === 0 ? "Starting weight" : "" })) : []

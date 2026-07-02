@@ -2,6 +2,7 @@ import { rateLimit } from "@/lib/security/ratelimit";
 import { getByEmail, lockState, recordFailedLogin, clearLoginFailures, recordLogin, consumeBackupCode, LOCK_MINUTES } from "@/lib/auth/accounts";
 import { verifyPassword, signToken } from "@/lib/auth/serverCrypto";
 import { verifyTotp, normalizeBackupCode } from "@/lib/auth/totp";
+import { appendAuditEvent } from "@/lib/audit/store";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,16 @@ export async function POST(req: Request) {
 
   await clearLoginFailures(email);
   await recordLogin(email);
+  try {
+    const xff = req.headers.get("x-forwarded-for");
+    await appendAuditEvent({
+      action: "auth.login",
+      actorEmail: acct.email,
+      actorName: acct.name,
+      actorRole: acct.role,
+      ip: xff ? xff.split(",")[0].trim() : (req.headers.get("x-real-ip") || undefined) || undefined,
+    });
+  } catch { /* audit must never block sign-in */ }
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
   const token = signToken({ email: acct.email, name: acct.name, role: acct.role, exp, twofa: !!acct.totpSecret });
   const maxAge = Math.floor((exp - Date.now()) / 1000);
