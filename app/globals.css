@@ -1709,7 +1709,7 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
 .dv-portal .login-quote {
     position: relative;
     z-index: 2;
-    padding: 46px 44px;
+    padding: 46px 44px 84px;
     color: #fff;
     height: 100%;
     display: flex;
