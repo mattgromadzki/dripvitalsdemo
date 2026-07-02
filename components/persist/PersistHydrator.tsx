@@ -24,7 +24,6 @@ import { useKnowledgeBase } from "@/lib/hooks/useKnowledgeBase";
 import { useReviews } from "@/lib/hooks/useReviews";
 import { useLeads } from "@/lib/hooks/useLeads";
 import { useConsent } from "@/lib/hooks/useConsent";
-import { useInventory } from "@/lib/hooks/useInventory";
 import { usePatientDocuments } from "@/lib/hooks/usePatientDocuments";
 import { useTitration } from "@/lib/hooks/useTitration";
 import { useReferrals } from "@/lib/hooks/useReferrals";
@@ -71,7 +70,6 @@ export function PersistHydrator() {
     serverPersist(useReviews, "reviews", "reviews", CATALOG_POLL);
     serverPersist(useLeads, "leads", "leads", CATALOG_POLL);
     serverPersist(useConsent, "consent", "records", CATALOG_POLL);
-    serverPersist(useInventory, "inventory", "items", CATALOG_POLL);
     serverPersist(usePatientDocuments, "patient-documents", "documents", CATALOG_POLL);
     serverPersist(useTitration, "titration", "plans", CATALOG_POLL);
     serverPersist(useReferrals, "referrals", "referrals", CATALOG_POLL);

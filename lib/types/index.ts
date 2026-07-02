@@ -253,23 +253,6 @@ export interface MessageThread {
   thread: ThreadMessage[];
 }
 
-export type InventoryStatus = "ok" | "low" | "critical" | "on_order";
-export type InventoryCategory = "GLP-1" | "IV Therapy" | "Oral" | "Injectable" | "Other";
-
-export interface InventoryItem {
-  id: string;
-  name: string;
-  category: InventoryCategory;
-  pharmacy: string;
-  stock: number;
-  reorderAt: number;
-  expires: string;
-  status: InventoryStatus;
-  onOrder?: number;          // qty currently in transit to top up
-  lastReorderAt?: string;
-  pricePerUnit?: number;
-}
-
 export type LabOrderStatus = "ordered" | "in_lab" | "resulted" | "critical" | "pending" | "cancelled";
 export type LabResultFlag = "normal" | "low" | "high" | "critical";
 

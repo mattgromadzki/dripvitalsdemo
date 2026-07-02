@@ -18,7 +18,7 @@ const ALLOW = new Set([
   // config catalogs / reference data
   "medications", "pharmacies", "doctors", "providers", "staff",
   "integrations", "rbac", "knowledge-base", "reviews", "leads",
-  "consent", "inventory", "patient-documents", "titration",
+  "consent", "patient-documents", "titration",
   "referrals", "adverse", "campaigns", "affiliates", "billing",
 ]);
 
@@ -53,7 +53,6 @@ const WRITE_PERM: Record<string, string> = {
   "reviews": "settings.manage",
   "leads": "patients.edit",
   "consent": "patients.edit",
-  "inventory": "settings.manage",
   "patient-documents": "patients.edit",
   "titration": "titration.manage",
   "referrals": "patients.edit",
