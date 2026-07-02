@@ -155,6 +155,29 @@ export default function DashboardPage() {
     return { today, month, monthCount };
   }, [subscriptions]);
 
+  // Headline stat strip (mirrors an at-a-glance analytics header).
+  const strip = useMemo(() => {
+    const active = patients.filter((p) => p.status === "active").length;
+    const inactive = Math.max(0, patients.length - active);
+    const processing = requests.filter((r) => r.status === "approved").length;
+    const rxSent = prescriptions.filter((r) => r.status !== "pending" && r.status !== "denied").length;
+    const failed = subscriptions.filter((s) => s.status === "past_due").length;
+    return { active, inactive, processing, rxSent, shipped: shipping.length + delivered.length, failed };
+  }, [patients, requests, prescriptions, subscriptions, shipping, delivered]);
+
+  // Monthly revenue for the current year (paid subscription cycles).
+  const yearRevenue = useMemo(() => {
+    const year = new Date().getFullYear();
+    const months = new Array(12).fill(0) as number[];
+    for (const s of subscriptions) for (const c of s.cycles || []) {
+      if (c.status !== "paid") continue;
+      const d = new Date(c.date);
+      if (isNaN(d.getTime()) || d.getFullYear() !== year) continue;
+      months[d.getMonth()] += c.amountCents;
+    }
+    return { months, ytd: months.reduce((a, b) => a + b, 0), year };
+  }, [subscriptions]);
+
   const hr = new Date().getHours();
   const greeting = hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
   const dateStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -172,19 +195,27 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Revenue */}
+      {/* Headline stats */}
+      <div className="grid grid-cols-6 gap-3 mb-4 max-[1100px]:grid-cols-3 max-[560px]:grid-cols-2">
+        <Stat label="Rx patients" value={strip.active} sub={`${strip.inactive} inactive`} icon="🧑‍⚕️" href="/patients" />
+        <Stat label="Visits pending" value={awaitingReview.length} icon="🕓" tone={awaitingReview.length ? "amber" : undefined} href="/intake-review" />
+        <Stat label="Visits processing" value={strip.processing} icon="⚙️" href="/intake-review" />
+        <Stat label="Rx sent" value={strip.rxSent} icon="✅" href="/e-prescribe" />
+        <Stat label="Shipped" value={strip.shipped} icon="📦" href="/shipments" />
+        <Stat label="Failed payments" value={strip.failed} icon="⚠️" tone={strip.failed ? "red" : undefined} href="/subscriptions" />
+      </div>
+
+      {/* Revenue overview */}
       <div className="card p-4 mb-4">
-        <div className="grid grid-cols-2 gap-4 max-[560px]:grid-cols-1">
-          <div className="pr-4 border-r border-border max-[560px]:border-r-0 max-[560px]:border-b max-[560px]:pb-3">
-            <div className="text-[11.5px] text-ink-muted font-medium mb-1">💵 Revenue today</div>
-            <div className="text-[30px] font-extrabold tracking-tight text-ink leading-none">{money(revenue.today)}</div>
-          </div>
-          <div>
-            <div className="text-[11.5px] text-ink-muted font-medium mb-1">📆 Revenue this month</div>
-            <div className="text-[30px] font-extrabold tracking-tight text-ink leading-none">{money(revenue.month)}</div>
-            <div className="text-[11px] text-ink-muted mt-1.5">{revenue.monthCount} paid charge{revenue.monthCount === 1 ? "" : "s"} this month</div>
+        <div className="flex items-start justify-between flex-wrap gap-3 mb-3">
+          <div className="text-[13px] font-bold text-ink">Revenue overview <span className="text-ink-muted font-medium">· {yearRevenue.year}</span></div>
+          <div className="flex gap-6">
+            <Figure label="This year" value={money(yearRevenue.ytd)} />
+            <Figure label="This month" value={money(revenue.month)} />
+            <Figure label="Today" value={money(revenue.today)} />
           </div>
         </div>
+        <RevenueChart months={yearRevenue.months} />
       </div>
 
       {/* Sections */}
@@ -293,4 +324,67 @@ function Row({ left, sub, right, rightSub, href }: {
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="px-2.5 py-6 text-center text-[12px] text-ink-muted">{children}</div>;
+}
+
+function Stat({ label, value, sub, icon, tone, href }: {
+  label: string; value: number | string; sub?: string; icon: string; tone?: "red" | "amber"; href?: string;
+}) {
+  const body = (
+    <div className="card px-4 py-3.5 h-full hover:shadow-sm hover:border-border-2 transition-all">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <span className="text-[13px]">{icon}</span>
+        <span className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold truncate">{label}</span>
+      </div>
+      <div className={`text-[24px] font-extrabold tracking-tight leading-none ${tone === "red" ? "text-red" : tone === "amber" ? "text-amber" : "text-ink"}`}>{value}</div>
+      {sub && <div className="text-[11px] text-ink-muted mt-1">{sub}</div>}
+    </div>
+  );
+  return href ? <Link href={href} className="block">{body}</Link> : body;
+}
+
+function Figure({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[9.5px] uppercase tracking-wide text-ink-muted font-semibold">{label}</div>
+      <div className="text-[17px] font-extrabold text-ink tracking-tight leading-tight">{value}</div>
+    </div>
+  );
+}
+
+// Dependency-free area chart of monthly revenue (dollars). Uniform scaling keeps
+// the line, dots, and labels crisp at any width.
+function RevenueChart({ months }: { months: number[] }) {
+  const W = 1000, H = 220, pad = { l: 48, r: 14, t: 14, b: 26 };
+  const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const max = Math.max(1, ...months);
+  const innerW = W - pad.l - pad.r, innerH = H - pad.t - pad.b;
+  const xOf = (i: number) => pad.l + (i / (months.length - 1)) * innerW;
+  const yOf = (v: number) => pad.t + innerH - (v / max) * innerH;
+  const pts = months.map((v, i) => [xOf(i), yOf(v)] as const);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const area = `${line} L${xOf(months.length - 1).toFixed(1)},${(pad.t + innerH).toFixed(1)} L${xOf(0).toFixed(1)},${(pad.t + innerH).toFixed(1)} Z`;
+  const grid = [0, 0.25, 0.5, 0.75, 1];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" width="100%" style={{ display: "block", height: "auto" }}>
+      <defs>
+        <linearGradient id="rev-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.26" />
+          <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      {grid.map((g, i) => {
+        const y = pad.t + innerH - g * innerH;
+        return (
+          <g key={i}>
+            <line x1={pad.l} y1={y} x2={W - pad.r} y2={y} stroke="var(--color-border)" strokeWidth="1" />
+            <text x={pad.l - 7} y={y + 3.5} fontSize="10.5" fill="var(--color-ink-muted)" textAnchor="end">${Math.round((max * g) / 100).toLocaleString()}</text>
+          </g>
+        );
+      })}
+      <path d={area} fill="url(#rev-grad)" />
+      <path d={line} fill="none" stroke="var(--color-brand)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="2.6" fill="var(--color-brand)" />)}
+      {labels.map((l, i) => <text key={i} x={xOf(i)} y={H - 8} fontSize="10.5" fill="var(--color-ink-muted)" textAnchor="middle">{l}</text>)}
+    </svg>
+  );
 }
