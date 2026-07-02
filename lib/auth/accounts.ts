@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import crypto from "crypto";
 import { hashPassword, verifyPassword } from "@/lib/auth/serverCrypto";
 
 export interface StaffAccount {
@@ -46,6 +47,16 @@ function parse(v: unknown): StaffAccount | null {
 
 function demoEnabled(): boolean {
   return process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+}
+
+/**
+ * Placeholder credential for a staff account created with no explicit password.
+ * In demo mode this is the shared demo password (for convenience); in production
+ * it's an unguessable random value, so the account cannot be signed into with a
+ * known default — the user must set their own password via reset before access.
+ */
+function defaultAccountPassword(): string {
+  return demoEnabled() ? "demo1234" : crypto.randomBytes(24).toString("base64url");
 }
 
 async function ensureSeeded(): Promise<void> {
@@ -118,7 +129,7 @@ export async function upsertAccount(a: { email: string; name: string; role: stri
     email: a.email.trim().toLowerCase(),
     name: a.name,
     role: a.role,
-    pwd: a.password ? hashPassword(a.password) : (existing?.pwd || hashPassword("demo1234")),
+    pwd: a.password ? hashPassword(a.password) : (existing?.pwd || hashPassword(defaultAccountPassword())),
     active: a.active ?? existing?.active ?? true,
   };
   await save(acct);
@@ -144,7 +155,7 @@ export async function createAccount(email: string, name: string, role: string, p
   const e = email.trim().toLowerCase();
   if (!e.includes("@")) return { ok: false, error: "Enter a valid email address." };
   if (!name.trim()) return { ok: false, error: "Enter a name." };
-  if ((password || "").length < 6) return { ok: false, error: "Temporary password must be at least 6 characters." };
+  if ((password || "").length < 8) return { ok: false, error: "Temporary password must be at least 8 characters." };
   if (await getByEmail(e)) return { ok: false, error: "An account with that email already exists." };
   await save({ email: e, name: name.trim(), role, pwd: hashPassword(password), active: true });
   return { ok: true };

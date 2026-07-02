@@ -111,7 +111,7 @@ export default function TeamPage() {
               {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
           </div>
-          <div><label className="fl">Temp password</label><input className="fi" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="min 6 chars" /></div>
+          <div><label className="fl">Temp password</label><input className="fi" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="min 8 chars" /></div>
           <button className="btn btn-primary" onClick={addMember}>Add</button>
         </div>
         <div className="text-[11.5px] text-ink-muted mt-2">They sign in with this temporary password, then can reset it from the login screen.</div>
@@ -164,7 +164,7 @@ export default function TeamPage() {
             </div>
             {resetFor === a.email && (
               <div className="px-4 pb-3 flex gap-2 items-center">
-                <input className="fi" style={{ maxWidth: 260 }} value={resetPw} onChange={(e) => setResetPw(e.target.value)} placeholder="New password (min 6)" />
+                <input className="fi" style={{ maxWidth: 260 }} value={resetPw} onChange={(e) => setResetPw(e.target.value)} placeholder="New password (min 8)" />
                 <button className="btn btn-primary btn-sm" onClick={async () => { if (await post({ action: "reset", email: a.email, password: resetPw }, "✓ Password reset")) { setResetFor(null); setResetPw(""); } }}>Save</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => setResetFor(null)}>Cancel</button>
               </div>

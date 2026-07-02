@@ -63,7 +63,7 @@ export default function RolesPage() {
   function genPwd() { setIPwd(Math.random().toString(36).slice(2, 9) + Math.floor(Math.random() * 90 + 10) + "!"); }
   async function sendInvite() {
     if (!iName.trim() || !iEmail.trim()) { toast("Name and email required"); return; }
-    if (iPwd.trim().length < 6) { toast("Set a temporary password (min 6 characters)"); return; }
+    if (iPwd.trim().length < 8) { toast("Set a temporary password (min 8 characters)"); return; }
     setBusy(true);
     const ok = await act({ action: "create", email: iEmail.trim(), name: iName.trim(), role: iRole, password: iPwd.trim() }, `Account created for ${iEmail.trim()}`);
     setBusy(false);
@@ -157,7 +157,7 @@ export default function RolesPage() {
         <label className="fl">Role</label><select className="fsel w-full mb-2.5" value={iRole} onChange={(e) => setIRole(e.target.value)}>{ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}</select>
         <label className="fl">Temporary password</label>
         <div className="flex gap-2">
-          <input className="fi flex-1" value={iPwd} onChange={(e) => setIPwd(e.target.value)} placeholder="At least 6 characters" />
+          <input className="fi flex-1" value={iPwd} onChange={(e) => setIPwd(e.target.value)} placeholder="At least 8 characters" />
           <button type="button" className="btn btn-ghost btn-sm whitespace-nowrap" onClick={genPwd}>Generate</button>
         </div>
         <div className="text-[11px] text-ink-muted-2 mt-2">Share this password securely with the new member. They'll log in with it, then can change it and enable 2FA from their account.</div>

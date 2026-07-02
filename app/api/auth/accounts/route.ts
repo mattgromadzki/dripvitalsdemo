@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       return json({ ok, error: ok ? undefined : "Account not found." });
     }
     case "reset": {
-      if ((b.password || "").length < 6) return json({ ok: false, error: "Password must be at least 6 characters." }, 400);
+      if ((b.password || "").length < 8) return json({ ok: false, error: "Password must be at least 8 characters." }, 400);
       const ok = await setPassword(email, b.password!);
       return json({ ok, error: ok ? undefined : "Account not found." });
     }
