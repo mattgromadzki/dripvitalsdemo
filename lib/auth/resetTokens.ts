@@ -21,12 +21,12 @@ function redis(): Redis | null {
 }
 const hash = (t: string) => crypto.createHash("sha256").update(t).digest("hex");
 
-export async function createResetToken(email: string): Promise<string> {
+export async function createResetToken(email: string, ttlMinutes: number = TTL_MIN): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
-  const rec: TokenRec = { email: email.trim().toLowerCase(), exp: Date.now() + TTL_MIN * 60_000 };
+  const rec: TokenRec = { email: email.trim().toLowerCase(), exp: Date.now() + ttlMinutes * 60_000 };
   const k = PREFIX + hash(token);
   const r = redis();
-  if (r) await r.set(k, JSON.stringify(rec), { ex: TTL_MIN * 60 });
+  if (r) await r.set(k, JSON.stringify(rec), { ex: ttlMinutes * 60 });
   else mem.set(k, rec);
   return token;
 }

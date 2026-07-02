@@ -75,6 +75,25 @@ export default function TeamPage() {
     }
   }
 
+  async function inviteMember() {
+    if (!name.trim() || !email.includes("@")) { toast("⚠️ Enter a name and a valid email first"); return; }
+    const r = await fetch("/api/auth/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "invite", name, email, role }) });
+    const d = await r.json().catch(() => null);
+    if (!d?.ok) { toast("⚠️ " + (d?.error || "Could not send invite")); return; }
+    if (role === "provider" && !doctors.some((x) => x.email.trim().toLowerCase() === email.trim().toLowerCase())) {
+      addDoctor(makeDoctorStub(name, email));
+      toast("✓ Doctor profile created — add their NPI & licenses in Doctors");
+    }
+    if (d.devLink) {
+      try { await navigator.clipboard.writeText(d.devLink); toast("🔗 No email provider set — set-password link copied to clipboard"); }
+      catch { toast("Invite created — set-password link: " + d.devLink); }
+    } else {
+      toast("✉️ Invite sent — they'll get a link to set their password");
+    }
+    setName(""); setEmail(""); setPw(""); setRole("support");
+    await load();
+  }
+
   if (!canManage) {
     return (
       <div className="px-7 py-6">
@@ -111,10 +130,13 @@ export default function TeamPage() {
               {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
           </div>
-          <div><label className="fl">Temp password</label><input className="fi" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="min 8 chars" /></div>
-          <button className="btn btn-primary" onClick={addMember}>Add</button>
+          <div><label className="fl">Temp password <span className="text-ink-muted-2 font-normal">(optional)</span></label><input className="fi" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="min 8 chars" /></div>
+          <div className="flex gap-2">
+            <button className="btn btn-primary" onClick={addMember}>Add</button>
+            <button className="btn btn-secondary whitespace-nowrap" onClick={inviteMember} title="Create the account and email them a link to set their own password">✉️ Invite</button>
+          </div>
         </div>
-        <div className="text-[11.5px] text-ink-muted mt-2">They sign in with this temporary password, then can reset it from the login screen.</div>
+        <div className="text-[11.5px] text-ink-muted mt-2">Enter a temporary password and click <b>Add</b>, or leave it blank and click <b>Invite</b> to email a one-time set-password link (no shared password).</div>
       </div>
 
       {/* Member list */}

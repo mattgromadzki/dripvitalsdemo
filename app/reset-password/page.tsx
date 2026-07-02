@@ -13,6 +13,7 @@ export default function ResetPasswordPage() {
   const [pw2, setPw2] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [welcome, setWelcome] = useState(false);
 
   // Read ?token= and ?email= from the URL (avoids useSearchParams Suspense requirement).
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function ResetPasswordPage() {
       const p = new URLSearchParams(window.location.search);
       const e = p.get("email"); if (e) setEmail(e);
       const t = p.get("token"); if (t) setToken(t);
+      if (p.get("welcome")) setWelcome(true);
     } catch { /* ignore */ }
   }, []);
 
@@ -52,7 +54,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthShell title="Set a new password" subtitle="Choose a new password for your account">
+    <AuthShell title={welcome ? "Welcome to DripVitals" : "Set a new password"} subtitle={welcome ? "Set your password to activate your account" : "Choose a new password for your account"}>
       {err && <div className="mb-3 px-3 py-2 rounded-md bg-red-soft text-red text-[12.5px] font-medium">{err}</div>}
       <label className="fl">Email</label>
       <input className="fi mb-3" type="email" value={email} readOnly placeholder="you@dripvitals.com" />
