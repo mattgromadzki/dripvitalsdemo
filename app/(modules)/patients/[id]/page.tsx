@@ -31,6 +31,21 @@ const nowTime = () => { const d = new Date(); return d.toLocaleTimeString("en-US
 const initialsOf = (s: string) => s.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 const INP = "border border-border rounded-[9px] px-3 py-2 text-[12.5px] bg-surface w-full";
 
+// Display DOB as mm/dd/yyyy from whatever format is stored (ISO "1988-03-14",
+// "03/14/1988", or a parseable date string). Returns "" when absent/unparseable.
+function fmtDob(raw?: string): string {
+  if (!raw) return "";
+  const s = raw.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[2].padStart(2, "0")}/${iso[3].padStart(2, "0")}/${iso[1]}`;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()}`;
+  return s; // show what we have rather than hiding it
+}
+const fmtHeight = (inches?: number) => (inches && inches > 0 ? `${Math.floor(inches / 12)}′ ${inches % 12}″` : "—");
+const fmtSex = (g?: "M" | "F" | "Other") => (g === "M" ? "Male" : g === "F" ? "Female" : g ? "Other" : "—");
+
 interface WeightEntry { date: string; weight: number; source: string; note: string }
 interface DoseEntry { date: string; dose: string; status: string; provider: string; note: string }
 interface NoteEntry { author: string; type: string; text: string; at: string }
@@ -88,7 +103,7 @@ export default function PatientDetailPage() {
     { kind: "Email", intent: "blue", title: "Intake received", sub: "Sent · Opened" },
     { kind: "SMS", intent: "purple", title: "Portal login link", sub: "Delivered" },
   ]);
-  const [profile, setProfile] = useState({ name: "", email: "", phone: "", dob: "", allergies: "", street: "", line2: "", city: "", state: "", zip: "" });
+  const [profile, setProfile] = useState({ first: "", last: "", email: "", phone: "", dob: "", sex: "M" as "M" | "F" | "Other", heightIn: "", allergies: "", street: "", line2: "", city: "", state: "", zip: "" });
 
   if (!patient || !extra) {
     return (
@@ -144,8 +159,12 @@ export default function PatientDetailPage() {
   }
   const addr = extra.address;
   const buildProfile = () => ({
-    name: patient.name, email: patient.email, phone: patient.phone,
-    dob: extra.dob || "", allergies: patient.allergies || "",
+    first: patient.first || (patient.name || "").split(" ")[0] || "",
+    last: patient.last || (patient.name || "").split(" ").slice(1).join(" ") || "",
+    email: patient.email, phone: patient.phone,
+    dob: fmtDob(patient.dob || extra.dob) || "", sex: patient.gender || "M",
+    heightIn: patient.heightIn ? String(patient.heightIn) : "",
+    allergies: patient.allergies || "",
     street: addr?.street || patient.address || "",
     line2: addr?.line2 || patient.apt || "",
     city: addr?.city || patient.city || "",
@@ -197,7 +216,16 @@ export default function PatientDetailPage() {
     logAudit(`Changed dose to ${doseField}`, "Treatment"); toast("Dose updated"); setDoseNote(""); setModal(null);
   };
   const saveProfile = () => {
-    updatePatient(pid, { name: profile.name, email: profile.email, phone: profile.phone, dob: profile.dob, allergies: profile.allergies, address: profile.street, apt: profile.line2, city: profile.city, state: profile.state, zip: profile.zip });
+    const first = profile.first.trim(), last = profile.last.trim();
+    const heightIn = parseInt(profile.heightIn, 10);
+    updatePatient(pid, {
+      first, last, name: `${first} ${last}`.trim() || patient.name,
+      email: profile.email, phone: profile.phone,
+      dob: profile.dob, gender: profile.sex,
+      ...(Number.isFinite(heightIn) && heightIn > 0 ? { heightIn } : {}),
+      allergies: profile.allergies,
+      address: profile.street, apt: profile.line2, city: profile.city, state: profile.state, zip: profile.zip,
+    });
     logAudit("Edited patient profile", "Profile"); toast("Profile saved"); setModal(null);
   };
   const decideIntake = (decision: "Approved" | "Info requested" | "Denied") => {
@@ -250,21 +278,54 @@ export default function PatientDetailPage() {
         <div className="flex flex-col gap-4 min-w-0">
 
           {tab === "summary" && (<>
-            <Card title="Patient Summary" sub="Demographics, address, clinical flags, treatment, ID, and order state." action={<button className="btn btn-ghost btn-sm" onClick={() => { setProfile(buildProfile()); setModal("profile"); }}>Edit Profile</button>}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Info k="Phone" v={patient.phone} /><Info k="DOB" v={extra.dob || "—"} /><Info k="State" v={patient.state} /><Info k="Program" v={patient.plan} />
-                <Info k="Provider" v={patient.provider} /><Info k="Allergies" v={patient.allergies || "None reported"} /><Info k="Current Meds" v={(patient as { currentMeds?: string }).currentMeds || "None reported"} /><Info k="Risk" v={extra.riskLabel} />
-                <Info k="Rx Status" v={hasRx ? "Active" : "Signature needed"} /><Info k="Payment" v={patient.sub} />
-              </div>
-              <div className="mt-3 pt-3 border-t border-surface-3">
-                <div className="text-[10px] uppercase tracking-wide text-ink-muted font-bold mb-2">Shipping address</div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Info k="Address" v={addr?.street || "—"} />
-                  <Info k="Address line 2" v={addr?.line2 || "—"} />
-                  <Info k="City" v={addr?.city || "—"} />
-                  <Info k="Zip code" v={addr?.zip || "—"} />
-                  <Info k="State" v={addr?.state || patient.state || "—"} />
+            <Card title="Patient Information" sub="Identity, contact, and address — everything in one place." action={<button className="btn btn-ghost btn-sm" onClick={() => { setProfile(buildProfile()); setModal("profile"); }}>✏️ Edit</button>}>
+              <div className="flex max-[720px]:flex-col -m-4 overflow-hidden rounded-b-2xl">
+                {/* Profile rail */}
+                <div className="w-[230px] max-[720px]:w-full flex-shrink-0 bg-surface-2 border-r max-[720px]:border-r-0 max-[720px]:border-b border-border px-4 py-6 text-center">
+                  <div className="w-[64px] h-[64px] rounded-full mx-auto mb-2.5 flex items-center justify-center text-white font-bold text-[21px]" style={{ background: `linear-gradient(135deg, var(--color-brand), var(--color-brand-dk))` }}>
+                    {(patient.first || patient.name || "P").charAt(0)}{(patient.last || "T").charAt(0)}
+                  </div>
+                  <div className="text-[15px] font-bold tracking-tight mb-3.5">{patient.name}</div>
+                  <div className="flex gap-2 justify-center">
+                    <div className="flex-1 max-w-[90px] bg-surface border border-border rounded-[10px] px-1 py-2">
+                      <div className="text-[9.5px] uppercase tracking-wide text-ink-muted font-semibold">Weight</div>
+                      <div className="text-[14px] font-bold text-ink-2">{currentWeight} lb</div>
+                    </div>
+                    <div className="flex-1 max-w-[90px] bg-surface border border-border rounded-[10px] px-1 py-2">
+                      <div className="text-[9.5px] uppercase tracking-wide text-ink-muted font-semibold">Height</div>
+                      <div className="text-[14px] font-bold text-ink-2">{fmtHeight(patient.heightIn)}</div>
+                    </div>
+                  </div>
                 </div>
+                {/* One field per line */}
+                <div className="flex-1 min-w-0">
+                  {([
+                    ["First name", patient.first || "—"],
+                    ["Last name", patient.last || "—"],
+                    ["Date of birth", fmtDob(patient.dob || extra.dob) || "—"],
+                    ["Sex", fmtSex(patient.gender)],
+                    ["Phone", patient.phone || "—"],
+                    ["Email", patient.email || "—"],
+                    ["Address", addr?.street || patient.address || "—"],
+                    ["Address 2 (Apt)", addr?.line2 || patient.apt || "—"],
+                    ["City", addr?.city || patient.city || "—"],
+                    ["State", addr?.state || patient.state || "—"],
+                    ["Zip code", addr?.zip || patient.zip || "—"],
+                  ] as [string, string][]).map(([k, v]) => (
+                    <div key={k} className="flex items-baseline gap-3 px-5 py-[9px] border-b border-surface-3 last:border-none">
+                      <div className="w-[122px] flex-shrink-0 text-[10px] uppercase tracking-wide text-ink-muted font-semibold">{k}</div>
+                      <div className="text-[13px] font-semibold text-ink-2 min-w-0 break-words">{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+            <Card title="Care Snapshot" sub="Program, clinical flags, and billing at a glance.">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Info k="Program" v={patient.plan} /><Info k="Provider" v={patient.provider} />
+                <Info k="Allergies" v={patient.allergies || "None reported"} /><Info k="Risk" v={extra.riskLabel} />
+                <Info k="Rx Status" v={hasRx ? "Active" : "Signature needed"} /><Info k="Payment" v={patient.sub} />
+                <Info k="Current Meds" v={(patient as { currentMeds?: string }).currentMeds || "None reported"} /><Info k="Member since" v={patient.since} />
               </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-4">
@@ -516,16 +577,23 @@ export default function PatientDetailPage() {
       {modal === "profile" && (
         <Modal title="Edit Patient Profile" onClose={() => setModal(null)} onSave={saveProfile} saveLabel="Save Profile">
           <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-            <PField label="Full name" full><input className={INP} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /></PField>
-            <PField label="Email"><input className={INP} value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} /></PField>
+            <PField label="First name"><input className={INP} value={profile.first} onChange={(e) => setProfile({ ...profile, first: e.target.value })} /></PField>
+            <PField label="Last name"><input className={INP} value={profile.last} onChange={(e) => setProfile({ ...profile, last: e.target.value })} /></PField>
+            <PField label="Date of birth (mm/dd/yyyy)"><input className={INP} value={profile.dob} placeholder="03/14/1988" onChange={(e) => setProfile({ ...profile, dob: e.target.value })} /></PField>
+            <PField label="Sex">
+              <select className={INP} value={profile.sex} onChange={(e) => setProfile({ ...profile, sex: e.target.value as "M" | "F" | "Other" })}>
+                <option value="M">Male</option><option value="F">Female</option><option value="Other">Other</option>
+              </select>
+            </PField>
             <PField label="Phone"><input className={INP} value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></PField>
-            <PField label="Date of birth"><input className={INP} value={profile.dob} placeholder="1988-04-12" onChange={(e) => setProfile({ ...profile, dob: e.target.value })} /></PField>
+            <PField label="Email"><input className={INP} value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} /></PField>
+            <PField label="Height (inches)"><input className={INP} type="number" value={profile.heightIn} placeholder="71" onChange={(e) => setProfile({ ...profile, heightIn: e.target.value })} /></PField>
             <PField label="Allergies"><input className={INP} value={profile.allergies} placeholder="None reported" onChange={(e) => setProfile({ ...profile, allergies: e.target.value })} /></PField>
-            <PField label="Street address" full><input className={INP} value={profile.street} placeholder="123 Main St" onChange={(e) => setProfile({ ...profile, street: e.target.value })} /></PField>
-            <PField label="Apt / Suite / Unit (line 2)" full><input className={INP} value={profile.line2} placeholder="Apt 4B" onChange={(e) => setProfile({ ...profile, line2: e.target.value })} /></PField>
+            <PField label="Address" full><input className={INP} value={profile.street} placeholder="123 Main St" onChange={(e) => setProfile({ ...profile, street: e.target.value })} /></PField>
+            <PField label="Address 2 (Apt / Suite / Unit)" full><input className={INP} value={profile.line2} placeholder="Apt 4B" onChange={(e) => setProfile({ ...profile, line2: e.target.value })} /></PField>
             <PField label="City"><input className={INP} value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></PField>
             <PField label="State"><input className={INP} value={profile.state} onChange={(e) => setProfile({ ...profile, state: e.target.value })} /></PField>
-            <PField label="ZIP"><input className={INP} value={profile.zip} onChange={(e) => setProfile({ ...profile, zip: e.target.value })} /></PField>
+            <PField label="Zip code"><input className={INP} value={profile.zip} onChange={(e) => setProfile({ ...profile, zip: e.target.value })} /></PField>
           </div>
         </Modal>
       )}
