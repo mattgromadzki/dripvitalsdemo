@@ -5,7 +5,24 @@ import type { Patient, PatientExtra } from "@/lib/types";
  * In production this would come from your database. Here it's deterministic
  * per-patient so the chart looks consistent across renders.
  */
-export function getPatientExtra(p: Patient): PatientExtra {
+export function getPatientExtra(pIn: Patient): PatientExtra {
+  // Live patients created through real intake can be missing demo-era fields
+  // (plan, dose, sub, phone, wt, week, …). Default them here so none of the
+  // derivations below can crash on undefined — this function must never throw,
+  // because it runs in the patient portal's first render after sign-in.
+  const p: Patient = {
+    ...pIn,
+    id: pIn.id || "PT-0000",
+    plan: pIn.plan || "GLP-1 Program",
+    dose: pIn.dose || "—",
+    sub: pIn.sub || "$0/mo",
+    phone: pIn.phone || "(000) 000-0000",
+    provider: pIn.provider || "—",
+    since: pIn.since || "—",
+    startDate: pIn.startDate || pIn.since || "—",
+    wt: typeof pIn.wt === "number" && isFinite(pIn.wt) ? pIn.wt : 0,
+    week: typeof pIn.week === "number" && isFinite(pIn.week) ? pIn.week : 0,
+  };
   // Stable pseudo-random based on patient ID — same patient gets same numbers
   const seed = p.id.charCodeAt(p.id.length - 1) + p.id.charCodeAt(p.id.length - 2);
   const goalWt = p.goalWt ?? Math.max(p.wt - 20, Math.round(p.wt * 0.85));

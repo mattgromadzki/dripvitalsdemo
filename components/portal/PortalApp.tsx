@@ -141,8 +141,8 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
   }, [pid]);
 
   const record = records[pid] ?? seed;
-  const fullName = me ? `${me.first} ${me.last}` : "Patient";
-  const initials = me ? `${me.first[0]}${me.last[0]}` : "PT";
+  const fullName = me ? (`${me.first || ""} ${me.last || ""}`.trim() || me.name || "Patient") : "Patient";
+  const initials = me ? `${(me.first || me.name || "P").charAt(0)}${(me.last || "T").charAt(0)}`.toUpperCase() : "PT";
 
   const loggedIn = authHydrated && !!me;
   useEffect(() => { hydrateAuth(); }, [hydrateAuth]);
@@ -162,10 +162,24 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
   // signed-out screen and the app path is always the app. Runs only after auth
   // hydrates so it never redirects on a not-yet-known session; server middleware
   // enforces the same rules for direct navigation / no-JS.
+  //
+  // Stale-cookie loop guard: middleware routes on cookie PRESENCE, but the
+  // session APIs verify its signature. A stale/invalid dv_patient cookie would
+  // make middleware treat the visitor as signed in while the client knows they
+  // aren't — bouncing /login → / → /login forever and crashing the router. So
+  // before leaving the app path signed-out, clear the dead cookie and do a full
+  // navigation, letting middleware re-evaluate with a clean slate.
+  const clearingSession = useRef(false);
   useEffect(() => {
     if (!authHydrated) return;
-    if (loggedIn && pathname === portalPaths.login) router.replace(portalPaths.app);
-    else if (!loggedIn && pathname === portalPaths.app) router.replace(portalPaths.login);
+    if (loggedIn && pathname === portalPaths.login) { router.replace(portalPaths.app); return; }
+    if (!loggedIn && pathname === portalPaths.app) {
+      if (clearingSession.current) return;
+      clearingSession.current = true;
+      fetch("/api/patient/logout", { method: "POST" })
+        .catch(() => {})
+        .finally(() => { window.location.replace(portalPaths.login); });
+    }
   }, [authHydrated, loggedIn, pathname, portalPaths, router]);
   const [authView, setAuthView] = useState<"login" | "forgot" | "reset">("login");
   const [authEmail, setAuthEmail] = useState("");
@@ -949,12 +963,12 @@ function matchTreatmentProduct(medication: string, products: ShopProduct[]): Sho
   if (!m || !products.length) return undefined;
   const needle = MED_KEYWORDS.find((k) => m.includes(k.key))?.needle;
   if (needle) {
-    const byName = products.find((p) => p.name.toLowerCase().includes(needle));
+    const byName = products.find((p) => (p?.name || "").toLowerCase().includes(needle));
     if (byName) return byName;
   }
   // Fallback: a product whose name shares a distinctive word with the plan.
   return products.find((p) => {
-    const n = p.name.toLowerCase();
+    const n = (p?.name || "").toLowerCase();
     return m.split(/\s+/).some((w) => w.length >= 4 && n.includes(w));
   });
 }
