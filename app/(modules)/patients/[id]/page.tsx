@@ -148,6 +148,51 @@ export default function PatientDetailPage() {
       toast("⚠️ " + ((e as Error).message || "Could not upload ID"));
     }
   }
+  // Staff upload of a general document (image or PDF) into the patient's chart.
+  // Images are compressed client-side; PDFs are stored as-is with a size cap so
+  // the shared document store stays within backend value limits.
+  const MAX_PDF_MB = 4;
+  async function uploadDocument(file: File | undefined) {
+    if (!file || !patient) return;
+    try {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const stamp = {
+        createdAt: +`${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}`,
+        createdDate: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      };
+      if (file.type.startsWith("image/")) {
+        const img = await compressImageFile(file, { maxDim: 1800, quality: 0.85 });
+        addDoc({
+          patientId: pid, category: "other",
+          title: file.name.replace(/\.[a-z0-9]+$/i, ""), icon: "🖼",
+          ...stamp,
+          filePayload: { dataUrl: img.dataUrl, mimeType: img.mimeType, filename: file.name, sizeKb: img.sizeKb, uploadedBy: "Staff" },
+        });
+      } else if (file.type === "application/pdf") {
+        if (file.size > MAX_PDF_MB * 1024 * 1024) { toast(`⚠️ PDF too large — max ${MAX_PDF_MB} MB`); return; }
+        const dataUrl = await new Promise<string>((res, rej) => {
+          const rd = new FileReader();
+          rd.onload = () => res(String(rd.result));
+          rd.onerror = () => rej(new Error("Could not read the file"));
+          rd.readAsDataURL(file);
+        });
+        addDoc({
+          patientId: pid, category: "other",
+          title: file.name.replace(/\.pdf$/i, ""), icon: "📄",
+          ...stamp,
+          filePayload: { dataUrl, mimeType: "application/pdf", filename: file.name, sizeKb: Math.round(file.size / 1024), uploadedBy: "Staff" },
+        });
+      } else {
+        toast("⚠️ Only images and PDFs are supported");
+        return;
+      }
+      toast("✓ Document uploaded");
+      logAudit(`Uploaded document: ${file.name}`, "Documents");
+    } catch (e) {
+      toast("⚠️ " + ((e as Error).message || "Could not upload the document"));
+    }
+  }
   function verifyId() {
     if (idDoc?.idPayload) {
       updateDoc(idDoc.id, { idPayload: { ...idDoc.idPayload, verified: true, verifiedBy: "Admin", verifiedAt: new Date().toISOString() } });
@@ -488,7 +533,12 @@ export default function PatientDetailPage() {
           )}
 
           {tab === "documents" && (
-            <Card title="Documents & ID" sub="ID, consent forms, intake PDFs, prescriptions, and invoices." action={<button className="btn btn-ghost btn-sm" onClick={() => setModal("id")}>View ID</button>}>
+            <Card title="Documents & ID" sub="ID, consent forms, intake PDFs, prescriptions, invoices, and uploaded files." action={
+              <div className="flex gap-2">
+                <label className="btn btn-primary btn-sm cursor-pointer">⬆ Upload Document<input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { uploadDocument(e.target.files?.[0]); e.currentTarget.value = ""; }} /></label>
+                <button className="btn btn-ghost btn-sm" onClick={() => setModal("id")}>View ID</button>
+              </div>
+            }>
               <div className="grid md:grid-cols-2 gap-5">
                 <div className="flex gap-3">
                   {idImg ? (

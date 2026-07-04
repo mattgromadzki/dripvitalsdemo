@@ -72,6 +72,22 @@ export default function DocumentViewerPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={doc.idPayload.dataUrl} alt="Government ID" className="max-w-full rounded-lg border border-border mx-auto" />
         </div>
+      ) : doc.filePayload?.dataUrl ? (
+        <div className="bg-surface border border-border rounded-md p-6 max-w-[900px] mx-auto">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
+            <div>
+              <div className="text-[13px] font-bold text-ink">{doc.title}</div>
+              <div className="text-[11.5px] text-ink-muted">{doc.filePayload.filename} · {doc.filePayload.sizeKb} KB · Uploaded {doc.createdDate}{doc.filePayload.uploadedBy ? ` by ${doc.filePayload.uploadedBy}` : ""}</div>
+            </div>
+            <a className="btn btn-ghost btn-sm" href={doc.filePayload.dataUrl} download={doc.filePayload.filename}>⬇ Download</a>
+          </div>
+          {doc.filePayload.mimeType === "application/pdf" ? (
+            <iframe src={doc.filePayload.dataUrl} title={doc.title} className="w-full rounded-lg border border-border" style={{ height: "75vh" }} />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={doc.filePayload.dataUrl} alt={doc.title} className="max-w-full rounded-lg border border-border mx-auto block" />
+          )}
+        </div>
       ) : (
         <div className="bg-surface border border-border rounded-md p-8 text-center max-w-[640px] mx-auto">
           <div className="text-[36px] opacity-50 mb-3">{doc.icon}</div>

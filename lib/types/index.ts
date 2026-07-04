@@ -971,6 +971,15 @@ export interface PatientDocument {
     verifiedBy?: string;
     verifiedAt?: string;
   };
+  // Staff-uploaded file (image or PDF), stored inline as a data URL so the
+  // document is self-contained and persists with the rest of the patient docs.
+  filePayload?: {
+    dataUrl: string;
+    mimeType: string;
+    filename: string;
+    sizeKb: number;
+    uploadedBy?: string;
+  };
 }
 
 export interface VisitPacketConsent { title: string; version: string; acceptedAt: string; }
