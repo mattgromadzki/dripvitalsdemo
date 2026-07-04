@@ -15,18 +15,25 @@ function redis(): Redis | null {
   return new Redis({ url, token });
 }
 
+const norm = (s?: string) => (s || "").trim().toLowerCase();
+
+/** Same person? Match by id, or by last name with tolerant first-name check —
+ *  live profiles sometimes fold the middle name into first ("Emmanuel Noel"),
+ *  so containment in either direction counts, and a unique last name suffices. */
+function samePerson(a: Doctor, b: Doctor, seedList: Doctor[]): boolean {
+  if (a.id === b.id) return true;
+  if (norm(a.last) !== norm(b.last)) return false;
+  const fa = norm(a.first), fb = norm(b.first);
+  if (!fa || !fb || fa.includes(fb) || fb.includes(fa)) return true;
+  // Last name unique across the seed roster → safe to treat as the same doctor.
+  return seedList.filter((d) => norm(d.last) === norm(b.last)).length === 1;
+}
+
 /**
- * One-time migration: merge each seed doctor's licenses (lib/data/doctors.ts —
- * the authoritative list the owner supplied) into the SAVED doctors record in
- * the database, then bump the change signal so every open tab refetches.
- *
- * Why this exists: the saved doctors blob predates the license update, and
- * because saved data always hydrates over code defaults (by design), editing the
- * seed alone can't fix the stored copy. This writes the store directly on the
- * server — no client races, no silent failures — and reports what changed.
- *
- * Visit while signed in as an admin: GET /api/admin/sync-doctor-licenses
- * Idempotent: running it again is a no-op once the store matches the seed.
+ * Merge each seed doctor's licenses into the SAVED doctors record, matching the
+ * person tolerantly, and REMOVE any duplicate profile a previous (stricter) run
+ * appended. Idempotent — safe to run repeatedly.
+ * GET /api/admin/sync-doctor-licenses  (admin-gated)
  */
 export async function GET(req: Request) {
   const gate = await requirePerm(req, "settings.manage");
@@ -35,55 +42,62 @@ export async function GET(req: Request) {
   const useDb = hasDb();
   const r = useDb ? null : redis();
 
-  // Read the saved doctors blob through the same backend chain the app uses.
   let saved: Doctor[] | null = null;
   try {
     if (useDb) { const d = await dbGetDomain("doctors"); saved = Array.isArray(d) ? (d as Doctor[]) : null; }
     else if (r) { const v = await r.get("store:doctors"); const d = typeof v === "string" ? JSON.parse(v) : v; saved = Array.isArray(d) ? (d as Doctor[]) : null; }
   } catch { /* fall through */ }
 
-  const report: { doctor: string; before: number; after: number }[] = [];
+  const report: string[] = [];
   let next: Doctor[];
 
   if (!saved || !saved.length) {
-    // Nothing stored yet → store the seed as-is.
     next = SEED;
-    for (const d of SEED) report.push({ doctor: `${d.first} ${d.last}`, before: 0, after: d.licenses.length });
+    for (const d of SEED) report.push(`${d.first} ${d.last}: stored from file with ${d.licenses.length} licenses`);
   } else {
-    next = saved.map((doc) => {
-      const seedDoc =
-        SEED.find((s) => s.id === doc.id) ||
-        SEED.find((s) => s.first.toLowerCase() === (doc.first || "").toLowerCase() && s.last.toLowerCase() === (doc.last || "").toLowerCase());
-      if (!seedDoc || !seedDoc.licenses.length) return doc;
+    // 1) Drop seed-clone duplicates: a record whose id matches a seed doc while a
+    //    DIFFERENT saved record is the same person (the real profile). Union its
+    //    licenses into the real profile before dropping it.
+    const clones = new Set<Doctor>();
+    for (const doc of saved) {
+      const seedTwin = SEED.find((s) => s.id === doc.id);
+      if (!seedTwin) continue;
+      const original = saved.find((o) => o !== doc && samePerson(o, doc, SEED));
+      if (original) {
+        const have = new Set((original.licenses || []).map((l) => l.state));
+        original.licenses = [...(original.licenses || []), ...(doc.licenses || []).filter((l) => !have.has(l.state))];
+        clones.add(doc);
+        report.push(`Removed duplicate profile "${doc.first} ${doc.last}" (${doc.id}); merged its licenses into "${original.first} ${original.last}" (${original.id})`);
+      }
+    }
+    next = saved.filter((d) => !clones.has(d));
+
+    // 2) Merge seed licenses into the matched real profiles (seed authoritative
+    //    per state; manual extra states kept).
+    for (const doc of next) {
+      const seedDoc = SEED.find((s) => samePerson(doc, s, SEED));
+      if (!seedDoc || !seedDoc.licenses.length) continue;
       const before = (doc.licenses || []).length;
-      // Seed is authoritative: take every seed license (number + expDate), and
-      // keep any extra states that were added manually in the UI.
       const seedStates = new Set(seedDoc.licenses.map((l) => l.state));
       const extras = (doc.licenses || []).filter((l) => !seedStates.has(l.state));
-      const merged = [...seedDoc.licenses.map((l) => ({ ...l })), ...extras];
-      report.push({ doctor: `${doc.first} ${doc.last}`, before, after: merged.length });
-      return { ...doc, licenses: merged };
-    });
-    // Seed doctors missing from the store entirely get appended.
+      doc.licenses = [...seedDoc.licenses.map((l) => ({ ...l })), ...extras];
+      if (doc.licenses.length !== before) report.push(`${doc.first} ${doc.last} (${doc.id}): licenses ${before} → ${doc.licenses.length}`);
+    }
+
+    // 3) Append seed doctors that genuinely don't exist yet.
     for (const s of SEED) {
-      const exists = next.some((d) => d.id === s.id || (d.first?.toLowerCase() === s.first.toLowerCase() && d.last?.toLowerCase() === s.last.toLowerCase()));
-      if (!exists) { next.push(s); report.push({ doctor: `${s.first} ${s.last}`, before: 0, after: s.licenses.length }); }
+      if (!next.some((d) => samePerson(d, s, SEED))) { next.push(s); report.push(`${s.first} ${s.last}: added with ${s.licenses.length} licenses`); }
     }
   }
 
   try {
     if (useDb) await dbSetDomain("doctors", next);
     else if (r) await r.set("store:doctors", JSON.stringify(next));
-    else return Response.json({ ok: false, error: "No persistent backend configured (Postgres/Redis missing) — nothing to migrate." }, { status: 400 });
+    else return Response.json({ ok: false, error: "No persistent backend configured — nothing to migrate." }, { status: 400 });
   } catch (e) {
     return Response.json({ ok: false, error: String(e) }, { status: 500 });
   }
   await bumpVersion("doctors");
 
-  return Response.json({
-    ok: true,
-    backend: useDb ? "postgres" : "redis",
-    message: "Doctor licenses synced from file into the saved record. Refresh the Doctors page to see them.",
-    doctors: report,
-  });
+  return Response.json({ ok: true, backend: useDb ? "postgres" : "redis", changes: report.length ? report : ["Already in sync — no changes needed."] });
 }

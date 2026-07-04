@@ -56,9 +56,15 @@ export function LicenseManagerModal({ doctor, onClose, onSave }: LicenseManagerM
   // Merge in this doctor's default licenses from the code, adding any states not
   // already present — so it fills the roster without overwriting entries here.
   // Match by id, or fall back to name (a saved record may carry a different id).
+  // Match by id, or by last name with tolerant first-name check (live profiles
+  // sometimes fold the middle name into first, e.g. "Emmanuel Noel").
   const seedDoc =
     SEED_DOCTORS.find((d) => d.id === doc.id) ||
-    SEED_DOCTORS.find((d) => d.first.toLowerCase() === doc.first.toLowerCase() && d.last.toLowerCase() === doc.last.toLowerCase());
+    SEED_DOCTORS.find((d) => {
+      if (d.last.toLowerCase().trim() !== (doc.last || "").toLowerCase().trim()) return false;
+      const a = d.first.toLowerCase().trim(), b = (doc.first || "").toLowerCase().trim();
+      return !a || !b || a.includes(b) || b.includes(a);
+    });
   const seedCount = seedDoc?.licenses?.length || 0;
   const seedMissing = seedDoc ? seedDoc.licenses.filter((l) => !existingStates.has(l.state)) : [];
   function loadDefaults() {
