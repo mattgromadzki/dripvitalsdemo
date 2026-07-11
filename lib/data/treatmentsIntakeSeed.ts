@@ -542,14 +542,22 @@ export const SEED_CLIENTS: BaskClient[] = [];
    products (FDA rules): the selection screen presents the compounded plans on
    their own, with the not-FDA-approved and no-affiliation disclosures. Public URLs: /intake-form/<slug>. */
 const GLP1_MASTER = SEED_FORMS[0];
-const SEMA_TX_IDS = SEED_TREATMENTS.filter((t) => /semaglutide/i.test(t.med) && t.active).map((t) => t.id);
-const TIRZ_TX_IDS = SEED_TREATMENTS.filter((t) => /tirzepatide/i.test(t.med) && t.active).map((t) => t.id);
+// Compounded plans only (the brand entries share the medication name, so
+// explicitly exclude them here). Order = seed order = display order.
+const SEMA_TX_IDS = SEED_TREATMENTS.filter((t) => /semaglutide/i.test(t.med) && t.compounded && t.active).map((t) => t.id);
+const TIRZ_TX_IDS = SEED_TREATMENTS.filter((t) => /tirzepatide/i.test(t.med) && t.compounded && t.active).map((t) => t.id);
+const brandTxId = (namePrefix: string): number[] => {
+  const hit = SEED_TREATMENTS.find((t) => t.name.startsWith(namePrefix));
+  return hit ? [hit.id] : [];
+};
 
+// Each bridge form lists the compounded plans FIRST (recommended), then the
+// patient's own brand as the last card — the price comparison sells itself.
 const BRAND_BRIDGES = [
-  { id: 31, slug: "ozempic",  brand: "Ozempic\u00AE",  maker: "Novo Nordisk", generic: "semaglutide", genericCap: "Semaglutide", txIds: SEMA_TX_IDS, offset: 31000 },
-  { id: 32, slug: "wegovy",   brand: "Wegovy\u00AE",   maker: "Novo Nordisk", generic: "semaglutide", genericCap: "Semaglutide", txIds: SEMA_TX_IDS, offset: 32000 },
-  { id: 33, slug: "mounjaro", brand: "Mounjaro\u00AE", maker: "Eli Lilly",    generic: "tirzepatide", genericCap: "Tirzepatide", txIds: TIRZ_TX_IDS, offset: 33000 },
-  { id: 34, slug: "zepbound", brand: "Zepbound\u00AE", maker: "Eli Lilly",    generic: "tirzepatide", genericCap: "Tirzepatide", txIds: TIRZ_TX_IDS, offset: 34000 },
+  { id: 31, slug: "ozempic",  brand: "Ozempic\u00AE",  maker: "Novo Nordisk", generic: "semaglutide", genericCap: "Semaglutide", txIds: [...SEMA_TX_IDS, ...brandTxId("Ozempic\u00AE (brand)")], offset: 31000 },
+  { id: 32, slug: "wegovy",   brand: "Wegovy\u00AE",   maker: "Novo Nordisk", generic: "semaglutide", genericCap: "Semaglutide", txIds: [...SEMA_TX_IDS, ...brandTxId("Wegovy\u00AE (brand)")], offset: 32000 },
+  { id: 33, slug: "mounjaro", brand: "Mounjaro\u00AE", maker: "Eli Lilly",    generic: "tirzepatide", genericCap: "Tirzepatide", txIds: [...TIRZ_TX_IDS, ...brandTxId("Mounjaro\u00AE (brand)")], offset: 33000 },
+  { id: 34, slug: "zepbound", brand: "Zepbound\u00AE", maker: "Eli Lilly",    generic: "tirzepatide", genericCap: "Tirzepatide", txIds: [...TIRZ_TX_IDS, ...brandTxId("Zepbound\u00AE (brand)")], offset: 34000 },
 ] as const;
 
 for (const b of BRAND_BRIDGES) {

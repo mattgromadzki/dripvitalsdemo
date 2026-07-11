@@ -60,11 +60,9 @@ function renderShell(opts: {
         )}
         <div style={{ textAlign: "center" }}>
           <div className="dv-logo">DripVitals</div>
-          {opts.formName && (
-            <div style={{ fontSize: 11, color: "var(--dv-muted)", letterSpacing: 0.4, marginTop: 2, textTransform: "uppercase", fontWeight: 500 }}>
-              {opts.formName}
-            </div>
-          )}
+          {/* Form name intentionally NOT shown to patients — internal names like
+              "Zepbound® Alternative — Compounded Tirzepatide" are for the EMR
+              only. The name still flows into visit records and consents. */}
         </div>
         <span />
       </div>
@@ -1314,7 +1312,12 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
 
             return (
               <div className="dv-tx-card-wrap" key={t.id}>
-                {t.featured && <div className="dv-tx-ribbon">⭐ Best Value</div>}
+                {(() => {
+                  const mixed = txs.some((x) => x.compounded) && txs.some((x) => !x.compounded);
+                  if (mixed && t.compounded) return <div className="dv-tx-ribbon" style={{ background: "#2e9e6b" }}>✓ Recommended</div>;
+                  if (mixed && !t.compounded) return <div className="dv-tx-ribbon" style={{ background: "#94a3b8" }}>Brand option</div>;
+                  return t.featured ? <div className="dv-tx-ribbon">⭐ Best Value</div> : null;
+                })()}
                 <button
                   className={`dv-tx-card${isSel ? " sel" : ""}`}
                   onClick={() => setSelectedTxId(t.id)}
