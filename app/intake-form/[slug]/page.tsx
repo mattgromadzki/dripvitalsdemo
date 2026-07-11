@@ -158,7 +158,10 @@ export default function IntakeFormPage() {
       wt: weight, wtStart: weight, bmi, bp: "—", hr: 0,
       ...(heightIn > 0 ? { heightIn: Math.round(heightIn) } : {}),
       since: nowParts().today, startDate: nowParts().today, lastVisit: "—", lastOrder: nowParts().today, nextRefill: "—", _refillDays: 30,
-      sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
+      sub: tx.price, allergies: "None",
+      tags: form.questions.some((q) => q.type === "file" && /\b(id|identity|licen[sc]e|passport|government)\b/i.test(q.text) && client.answers[q.id] === "__SUBMIT_LATER__")
+        ? ["New intake", "ID needed"] : ["New intake"],
+      notes: "", color: COLORS[name.length % COLORS.length],
       intakeProgress: "Completed",
       ...(affiliateRef.current ? { affiliate: affiliateRef.current } : {}),
       consents: consentsFor({ treatmentName: tx.name, medication: tx.med, formName: form.name }).map((d) => ({ docId: d.id, title: d.title, version: d.version, acceptedAt: new Date().toISOString() })),

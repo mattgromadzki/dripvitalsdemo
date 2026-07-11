@@ -25,6 +25,9 @@ const US_STATES: { abbr: string; name: string }[] = [
   ["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","District of Columbia"],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],
 ].map(([abbr, name]) => ({ abbr, name }));
 
+// Sentinel answer for a required upload the patient chose to send later.
+export const SUBMIT_LATER = "__SUBMIT_LATER__";
+
 // Format a phone number as (305) 555-0123.
 function formatPhone(s: string): string {
   const d = (s || "").replace(/\D/g, "").slice(0, 10);
@@ -1179,7 +1182,9 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
         </>
       );
     } else if (q.type === "file") {
-      const hasFile = typeof a === "string" && a;
+      const deferred = a === SUBMIT_LATER;
+      const hasFile = typeof a === "string" && a && !deferred;
+      const isIdQuestion = /\b(id|identity|licen[sc]e|passport|government)\b/i.test(q.text);
       body = (
         <div className="dv-fields">
           <div>
@@ -1217,6 +1222,11 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
                 ) : (
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dv-ink)" }}>{a as string}</div>
                 )
+              ) : deferred ? (
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--dv-ink)" }}>You chose to submit this later ✓</div>
+                  <div style={{ fontSize: 11.5, marginTop: 4 }}>Tap here to upload it now instead</div>
+                </div>
               ) : (
                 <>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--dv-ink)" }}>Click to upload</div>
@@ -1224,6 +1234,20 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
                 </>
               )}
             </label>
+            {isIdQuestion && !hasFile && !deferred && (
+              <button
+                type="button"
+                onClick={() => commitAnswer(q.id, SUBMIT_LATER)}
+                style={{ marginTop: 10, width: "100%", padding: "11px", background: "transparent", border: "1.5px solid #cbd5e1", borderRadius: 10, fontSize: 13, fontWeight: 600, color: "var(--dv-muted)", cursor: "pointer" }}
+              >
+                I&rsquo;ll submit my ID later
+              </button>
+            )}
+            {isIdQuestion && (deferred || !hasFile) && (
+              <div style={{ fontSize: 11, color: "var(--dv-muted)", marginTop: 8, textAlign: "center" }}>
+                A government-issued ID is required before a provider can prescribe — you can send it after checkout, but it may delay your review.
+              </div>
+            )}
           </div>
         </div>
       );
@@ -1312,9 +1336,16 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
                       </div>
                       <div className="dv-tx-price-row">
                         <div>
-                          <div className="dv-tx-price">{t.price}</div>
-                          {monthlyEquivalent(t.price, t.duration) && <div style={{ fontSize: 13, fontWeight: 700, color: "var(--blue, #4a8ec7)" }}>≈ {monthlyEquivalent(t.price, t.duration)} equivalent</div>}
-                          <div className="dv-tx-billing-note">{cadenceText}</div>
+                          {(() => {
+                            const mo = monthlyEquivalent(t.price, t.duration);
+                            const period = ({ quarterly: "every 3 months", "semi-annual": "every 6 months", annual: "annually" } as Record<string, string>)[t.billing];
+                            return (
+                              <>
+                                <div className="dv-tx-price">{mo ?? (t.billing === "monthly" ? `${t.price}/mo` : t.price)}</div>
+                                <div className="dv-tx-billing-note">{mo && period ? `Billed as ${t.price} ${period}` : cadenceText}</div>
+                              </>
+                            );
+                          })()}
                         </div>
                         <div style={{ textAlign: "right" }}>
                           {t.compare && <div className="dv-tx-compare">{t.compare} retail</div>}
@@ -1510,6 +1541,11 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
           <span className="dv-total-lbl">Total today</span>
           <span className="dv-total-val">{tx.price}</span>
         </div>
+        {monthlyEquivalent(tx.price, tx.duration) && (
+          <div style={{ textAlign: "right", fontSize: 12.5, fontWeight: 700, color: "var(--blue, #4a8ec7)", marginTop: 2 }}>
+            ≈ {monthlyEquivalent(tx.price, tx.duration)} over {tx.duration} months
+          </div>
+        )}
 
         <button className="dv-btn-primary" onClick={submitPayment} disabled={!activeConsents.every((d) => legalAck[d.id])} style={!activeConsents.every((d) => legalAck[d.id]) ? { opacity: 0.55, cursor: "not-allowed" } : undefined}>{isHosted ? "Continue to secure payment →" : "Complete purchase →"}</button>
 
