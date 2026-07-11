@@ -4,7 +4,7 @@ export const PATIENTS: Patient[] = [
   {
     id: "PT-0001",
     first: "Matthew", last: "Gromadzki", name: "Matthew Gromadzki",
-    email: "mattgromadzki@gmail.com", phone: "(786) 370-8570",
+    email: "mattgromadzki@gmail.com", phone: "(305) 555-0184",
     age: 39, gender: "M", state: "FL",
     status: "active",
     dob: "1987-06-01",

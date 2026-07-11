@@ -3,7 +3,7 @@ import { create } from "@/lib/hooks/zustand-shim";
 import type { SmsThread, SmsMessage, SmsStatus } from "@/lib/sms/types";
 
 const SEED: SmsThread[] = [
-  { id: "+17863708570", name: "Matthew Gromadzki", phone: "+17863708570", patientId: "PT-0001", unread: 0, messages: [
+  { id: "+13055550184", name: "Matthew Gromadzki", phone: "+13055550184", patientId: "PT-0001", unread: 0, messages: [
     { id: "m1", direction: "out", body: "Hi Matthew, this is DripVitals 👋 Reply to this text to test two-way SMS — your reply should appear here within a few seconds.", status: "delivered", createdAt: "2026-06-03T12:00:00Z" },
   ] },
   { id: "+13055550112", name: "Sarah Lin", phone: "+1 (305) 555-0112", patientId: "PT-1042", unread: 2, messages: [

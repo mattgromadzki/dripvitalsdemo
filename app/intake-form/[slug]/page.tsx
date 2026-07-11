@@ -11,7 +11,7 @@ import { alertWelcome } from "@/lib/notify/alert";
 import { resolveBrandId } from "@/lib/brands/resolve";
 import { consentsFor } from "@/lib/legal/documents";
 import { screenAnswers } from "@/lib/clinical/glp1Screening";
-import { buildVisitPacket } from "@/lib/visits/packet";
+import { buildVisitPacket, buildSections } from "@/lib/visits/packet";
 import { estDisplay } from "@/lib/time/est";
 
 const COLORS = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9", "#db2777"];
@@ -36,6 +36,7 @@ export default function IntakeFormPage() {
   // Affiliate attribution: intake links can carry ?aff=CODE (also accepts ?ref=
   // or ?affiliate=). Captured once on load and stamped onto the patient record.
   const affiliateRef = useRef<string>("");
+  const leadEmailRef = useRef<string>("");
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search);
@@ -98,13 +99,34 @@ export default function IntakeFormPage() {
     const price = parsePrice(tx.price);
     const state = client.address?.state || "—";
 
-    // Pull a few highlights from the answers (BMI, DOB age, gender, goal)
-    let bmi = 0, weight = 0, dob = "", gender = "Other", goal = "";
+    // Pull a few highlights from the answers (BMI, weight, height, DOB, gender, goal)
+    let bmi = 0, weight = 0, heightIn = 0, dob = "", gender = "Other", goal = "";
     for (const q of form.questions) {
       const raw = client.answers[q.id];
       if (raw == null) continue;
       if (q.type === "bmi" && typeof raw === "string" && raw.startsWith("{")) {
-        try { const o = JSON.parse(raw); bmi = +o.bmi || 0; weight = parseFloat(o.weightLbs || o.weightKg) || 0; } catch { /* ignore */ }
+        try {
+          const o = JSON.parse(raw);
+          bmi = +o.bmi || 0;
+          if (o.unit === "metric") {
+            // Metric entries store kg/cm — convert so the chart is always lbs/inches.
+            weight = Math.round((parseFloat(o.weightKg) || 0) * 2.20462);
+            heightIn = Math.round((parseFloat(o.heightCm) || 0) / 2.54);
+          } else {
+            weight = Math.round(parseFloat(o.weightLbs) || 0);
+            heightIn = (parseFloat(o.heightFt) || 0) * 12 + (parseFloat(o.heightIn) || 0);
+          }
+        } catch { /* ignore */ }
+      } else if ((q.type === "number" || q.type === "text") && /\bweight\b/i.test(q.text) && !/goal/i.test(q.text)) {
+        // Plain "What is your weight?" question (forms that don't use the BMI widget).
+        const n = parseFloat(String(raw).replace(/[^0-9.]/g, ""));
+        if (!weight && n > 0) weight = Math.round(n);
+      } else if ((q.type === "number" || q.type === "text") && /\bheight\b/i.test(q.text)) {
+        // Accepts 5'11, 5 ft 11, 5-11, or plain inches (71).
+        const str = String(raw).trim();
+        const ftIn = str.match(/(\d)\s*(?:'|ft|feet|-)\s*(\d{1,2})/i);
+        if (ftIn) heightIn = heightIn || parseInt(ftIn[1], 10) * 12 + parseInt(ftIn[2], 10);
+        else { const n = parseFloat(str.replace(/[^0-9.]/g, "")); if (!heightIn && n >= 36 && n <= 96) heightIn = Math.round(n); }
       } else if (q.type === "date") {
         const r = String(raw);
         if (r.startsWith("{")) { try { const o = JSON.parse(r); if (o.y && o.m && o.d) dob = `${o.y}-${o.m}-${o.d}`; } catch { /* ignore */ } }
@@ -113,6 +135,8 @@ export default function IntakeFormPage() {
       else if (q.type === "multiple" && /gender/i.test(q.text)) { const v = String(raw); gender = v.startsWith("M") ? "M" : v.startsWith("F") ? "F" : "Other"; }
       else if (/goal/i.test(q.text)) { goal = String(raw); }
     }
+
+    if (!bmi && weight > 0 && heightIn > 0) bmi = Math.round(((703 * weight) / (heightIn * heightIn)) * 10) / 10;
 
     const screen = screenAnswers(form.questions, client.answers);
     const reviewFlags = screen.reviewFlags;
@@ -132,6 +156,7 @@ export default function IntakeFormPage() {
       dob: dob || undefined, goalWt: undefined, zip: client.address?.zip || undefined,
       plan: tx.med, dose: "0.25mg", week: 0, provider: "Unassigned", doctorId: 1, pharmacyId: 1,
       wt: weight, wtStart: weight, bmi, bp: "—", hr: 0,
+      ...(heightIn > 0 ? { heightIn: Math.round(heightIn) } : {}),
       since: nowParts().today, startDate: nowParts().today, lastVisit: "—", lastOrder: nowParts().today, nextRefill: "—", _refillDays: 30,
       sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
       intakeProgress: "Completed",
@@ -268,6 +293,7 @@ export default function IntakeFormPage() {
   // the CRM patient profile, then keeps it updated as more is captured.
   async function handleLead(info: { first: string; last: string; phone: string; email: string }) {
     const name = `${info.first} ${info.last}`.trim() || info.email || "New Lead";
+    if (info.email) leadEmailRef.current = info.email;
     if (createdPatientId.current) {
       updatePatient(createdPatientId.current, {
         first: info.first || undefined, last: info.last || undefined, name,
@@ -316,6 +342,21 @@ export default function IntakeFormPage() {
       info.stage === "disqualified" ? "Disqualified" :
       `Question ${Math.min(info.step + 1, info.total || 1)} of ${info.total || 1}`;
     updatePatient(createdPatientId.current, { intakeProgress: label });
+    // Mirror the answers so far onto the patient record — staff can read the
+    // questionnaire on the chart even if the patient never reaches payment.
+    try {
+      if (form && leadEmailRef.current) {
+        const cl = useTreatmentsIntake.getState().clients.find((c) => (c.email || "").toLowerCase() === leadEmailRef.current.toLowerCase());
+        if (cl) {
+          const qa = buildSections(form.questions, cl.answers)
+            .flatMap((sec) => sec.items)
+            .filter((it) => it.answer !== undefined && it.answer !== "")
+            .slice(0, 150)
+            .map((it) => ({ q: String(it.question).slice(0, 300), a: String(it.answer).slice(0, 600) }));
+          if (qa.length) { updatePatient(createdPatientId.current, { intakeQa: qa }); syncCrm(createdPatientId.current); }
+        }
+      }
+    } catch { /* mirroring must never break the intake */ }
     // Mirror progress server-side so the EMR sees it across devices/sessions.
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "progress", id: createdPatientId.current, progress: label }) }).catch(() => {});
     syncCrm(createdPatientId.current);

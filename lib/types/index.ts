@@ -32,6 +32,9 @@ export interface Patient {
   /** Affiliate / referral partner code the patient came through, if any
    *  (captured from ?aff= on the intake link, or set by staff on the chart). */
   affiliate?: string;
+  /** Intake questionnaire answers, mirrored live as the patient progresses —
+   *  visible to staff even if the patient never reaches payment. */
+  intakeQa?: { q: string; a: string }[];
   address?: string;
   apt?: string;
   city?: string;

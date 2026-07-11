@@ -25,7 +25,7 @@ const US_STATES: { abbr: string; name: string }[] = [
   ["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["DC","District of Columbia"],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],
 ].map(([abbr, name]) => ({ abbr, name }));
 
-// Format a phone number as (786) 370-8570.
+// Format a phone number as (305) 555-0123.
 function formatPhone(s: string): string {
   const d = (s || "").replace(/\D/g, "").slice(0, 10);
   if (d.length < 4) return d;
@@ -689,7 +689,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
           </div>
           <div>
             <div className="dv-field-label">Phone number</div>
-            <div className="dv-input-wrap"><input key={`${q.id}-ph`} className="dv-input" type="tel" defaultValue={pi.phone} autoComplete="off" placeholder="(786) 370-8570"
+            <div className="dv-input-wrap"><input key={`${q.id}-ph`} className="dv-input" type="tel" defaultValue={pi.phone} autoComplete="off" placeholder="(305) 555-0123"
               onChange={(e) => patchPI("phone", e.target.value)}
               onBlur={(e) => { const f = formatPhone(e.target.value); e.target.value = f; patchPI("phone", f); }} /></div>
           </div>
@@ -735,7 +735,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
             <div>
               <div className="dv-field-label">Phone number</div>
               <div className="dv-input-wrap">
-                <input key={`${contactGroup.phoneId}-ph`} className="dv-input" type="tel" defaultValue={phoneVal} autoComplete="off" placeholder="(786) 370-8570"
+                <input key={`${contactGroup.phoneId}-ph`} className="dv-input" type="tel" defaultValue={phoneVal} autoComplete="off" placeholder="(305) 555-0123"
                   onChange={(e) => commitAnswer(contactGroup.phoneId as number, e.target.value)}
                   onBlur={(e) => { const f = formatPhone(e.target.value); e.target.value = f; commitAnswer(contactGroup.phoneId as number, f); }} />
               </div>

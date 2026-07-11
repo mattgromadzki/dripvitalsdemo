@@ -25,7 +25,7 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   };
   // Stable pseudo-random based on patient ID — same patient gets same numbers
   const seed = p.id.charCodeAt(p.id.length - 1) + p.id.charCodeAt(p.id.length - 2);
-  const goalWt = p.goalWt ?? Math.max(p.wt - 20, Math.round(p.wt * 0.85));
+  const goalWt = p.goalWt ?? (p.wt > 0 ? Math.max(p.wt - 20, Math.round(p.wt * 0.85)) : 0);
   const streakWeeks = Math.max(1, Math.min(p.week, (seed % 12) + 4));
   const riskScore = p.status === "active"
     ? 70 + (seed % 25)              // 70-94
@@ -141,16 +141,20 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   const weightLog: number[] = [];
   const weightDates: string[] = [];
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  // Start at the program start, sample weekly up to current week
+  // Start at the program start, sample weekly up to current week. Only when a
+  // real weight exists — a brand-new intake with wt=0 must NOT get a fabricated
+  // curve (the noise math was producing phantom entries like "0.8 lb").
   const startDate = new Date(p.startDate || "2026-01-01");
-  for (let w = 0; w <= weeks; w++) {
-    const t = w / weeks;
-    // Add slight noise so the curve isn't dead-straight
-    const noise = (((seed * (w + 1)) % 17) - 8) * 0.15;
-    const val = startW - (startW - currentW) * t + noise;
-    weightLog.push(Math.round(val * 10) / 10);
-    const d = new Date(startDate.getTime() + w * 7 * 86400000);
-    weightDates.push(`${MONTHS[d.getMonth()]} ${d.getDate()}`);
+  if (currentW > 0) {
+    for (let w = 0; w <= weeks; w++) {
+      const t = w / weeks;
+      // Add slight noise so the curve isn't dead-straight
+      const noise = (((seed * (w + 1)) % 17) - 8) * 0.15;
+      const val = startW - (startW - currentW) * t + noise;
+      weightLog.push(Math.round(val * 10) / 10);
+      const d = new Date(startDate.getTime() + w * 7 * 86400000);
+      weightDates.push(`${MONTHS[d.getMonth()]} ${d.getDate()}`);
+    }
   }
 
   // Milestones — earned at specific weight-loss thresholds

@@ -408,6 +408,19 @@ export default function PatientDetailPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                 <Info k="Submitted" v={patient.since} /><Info k="Completion" v={intakeIncomplete ? patient.intakeProgress || "In progress" : "100%"} /><Info k="Risk" v={extra.riskLabel} /><Info k="Status" v={intakeStatus} />
               </div>
+              {(patient.intakeQa?.length ?? 0) > 0 && (
+                <div className="mb-4">
+                  <h3>Intake answers {intakeIncomplete && <span className="text-[11px] font-medium text-ink-muted">· in progress — updates live as the patient answers</span>}</h3>
+                  <div className="mt-2 border border-border rounded-xl overflow-hidden">
+                    {patient.intakeQa!.map((row, i) => (
+                      <div key={i} className="flex gap-3 px-3.5 py-2 border-b border-surface-3 last:border-none">
+                        <div className="w-[46%] flex-shrink-0 text-[12px] text-ink-muted">{row.q}</div>
+                        <div className="text-[12.5px] font-semibold text-ink-2 min-w-0 break-words">{row.a}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="grid md:grid-cols-2 gap-5">
                 <div>
                   <h3>Medical questionnaire</h3>
