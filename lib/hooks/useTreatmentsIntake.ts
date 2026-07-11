@@ -273,6 +273,16 @@ export function useHydrateTreatmentsStore() {
   return hydrated;
 }
 
+/** Monthly-equivalent price for multi-month plans — "$499" over "3" months →
+ *  "$166/mo". Returns null for 1-month plans or unparseable prices, so callers
+ *  can simply hide the line when it doesn't apply. */
+export function monthlyEquivalent(price: string, duration: string): string | null {
+  const months = parseInt(duration, 10);
+  const amount = parseFloat((price || "").replace(/[$,]/g, ""));
+  if (!Number.isFinite(months) || months <= 1 || !Number.isFinite(amount) || amount <= 0) return null;
+  return `$${Math.round(amount / months)}/mo`;
+}
+
 // Reset to seed defaults, clear localStorage, AND overwrite the server-persisted
 // copy — scoped. serverPersist pulls "intake-forms" / "treatments" from the
 // server on every load and applies them over the seed, so resetting locally is

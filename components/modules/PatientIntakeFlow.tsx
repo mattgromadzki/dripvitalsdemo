@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { toast } from "@/lib/hooks/useToast";
-import { useTreatmentsIntake } from "@/lib/hooks/useTreatmentsIntake";
+import { useTreatmentsIntake, monthlyEquivalent } from "@/lib/hooks/useTreatmentsIntake";
 import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
@@ -1313,6 +1313,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
                       <div className="dv-tx-price-row">
                         <div>
                           <div className="dv-tx-price">{t.price}</div>
+                          {monthlyEquivalent(t.price, t.duration) && <div style={{ fontSize: 13, fontWeight: 700, color: "var(--blue, #4a8ec7)" }}>≈ {monthlyEquivalent(t.price, t.duration)} equivalent</div>}
                           <div className="dv-tx-billing-note">{cadenceText}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>

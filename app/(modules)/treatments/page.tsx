@@ -6,7 +6,7 @@ import type { Key, ReactNode } from "react";
 import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
 import { PatientIntakeFlow } from "@/components/modules/PatientIntakeFlow";
-import { useTreatmentsIntake, useHydrateTreatmentsStore, resetTreatmentsStoreToDefaults } from "@/lib/hooks/useTreatmentsIntake";
+import { useTreatmentsIntake, useHydrateTreatmentsStore, resetTreatmentsStoreToDefaults, monthlyEquivalent } from "@/lib/hooks/useTreatmentsIntake";
 import type {
   BaskTreatment, BaskIntakeForm, BaskClient, BaskQuestion,
   BaskColorKey, BaskBillingCycle, BaskOption, BaskCheckboxOption,
@@ -361,7 +361,7 @@ function TreatmentsList({ onEdit, onOpenForm }: {
                   </div>
                 </div>
                 <div>{t.active ? <span className="pill pill-green"><span className="dot" />Active</span> : <span className="pill pill-muted">Inactive</span>}</div>
-                <div className="tx-list-price">{t.price}</div>
+                <div className="tx-list-price">{t.price}{monthlyEquivalent(t.price, t.duration) && <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-ink-muted)" }}>≈ {monthlyEquivalent(t.price, t.duration)}</div>}</div>
                 <div className="tx-list-dim">{BILLING_LABEL[t.billing] || t.billing}</div>
                 <div className="tx-list-dim">{t.subscribers}</div>
                 <div className="tx-list-dim tx-list-form">{linkedForm ? linkedForm.name : "—"}</div>
