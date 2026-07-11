@@ -177,11 +177,15 @@ export default function TreatmentsIntakePage() {
               </span>
               <button
                 onClick={async () => {
-                  if (!confirm("Reset all treatments, forms, and clients to the latest defaults? This replaces the saved copy (on all devices) and reloads the page.")) return;
-                  await resetTreatmentsStoreToDefaults();
+                  const scope = tab === "treatments" ? "treatments" : "forms";
+                  const msg = scope === "treatments"
+                    ? "Reset the TREATMENTS catalog to the latest defaults?\n\n⚠️ This replaces treatment names, prices, and descriptions with the defaults and removes custom treatments you created (uploaded pictures are kept). Intake FORMS are NOT touched.\n\nThis updates the saved copy on all devices and reloads the page."
+                    : "Reset the INTAKE FORMS to the latest defaults?\n\nThis replaces form questions with the defaults (pulls in any new questions). Your TREATMENTS — prices, custom treatments, pictures — are NOT touched.\n\nThis updates the saved copy on all devices and reloads the page.";
+                  if (!confirm(msg)) return;
+                  await resetTreatmentsStoreToDefaults(scope);
                   window.location.reload();
                 }}
-                title="Wipe localStorage and reload with seed data"
+                title={tab === "treatments" ? "Reset only the treatments catalog to defaults" : "Reset only the intake forms to defaults (treatments untouched)"}
                 style={{
                   background: "#fff7ed",
                   border: "2px solid #fb923c",

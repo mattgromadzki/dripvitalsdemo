@@ -273,27 +273,30 @@ export function useHydrateTreatmentsStore() {
   return hydrated;
 }
 
-// Reset the store to seed defaults, clear localStorage, AND overwrite the
-// server-persisted copies. serverPersist pulls "intake-forms" / "treatments"
-// from the server on every load and applies them over the seed, so resetting
-// locally is not enough — we must replace the saved server copy too, and wait
-// for that write to finish before the caller reloads the page.
-export async function resetTreatmentsStoreToDefaults() {
+// Reset to seed defaults, clear localStorage, AND overwrite the server-persisted
+// copy — scoped. serverPersist pulls "intake-forms" / "treatments" from the
+// server on every load and applies them over the seed, so resetting locally is
+// not enough; the saved server copy must be replaced too.
+//
+// SCOPE MATTERS: resetting FORMS must never touch the treatments catalog (price
+// edits, custom treatments an operator created), and vice versa. A combined
+// reset once wiped an operator's price changes and a custom treatment — never
+// again. Default scope is "forms" (the common case: pulling in new questions).
+export async function resetTreatmentsStoreToDefaults(scope: "forms" | "treatments" | "both" = "forms") {
   if (typeof window !== "undefined") {
     try { window.localStorage.removeItem(LS_KEY); } catch { /* ignore */ }
   }
-  nextTreatmentId = SEED_TREATMENTS.length + 1;
-  nextFormId      = SEED_FORMS.length + 1;
-  nextClientId    = SEED_CLIENTS.length + 1;
-  nextQId         = 1000;
+  nextFormId = SEED_FORMS.length + 1;
+  nextQId    = 1000;
+  nextClientId = SEED_CLIENTS.length + 1;
+  const doTreatments = scope === "treatments" || scope === "both";
+  const doForms      = scope === "forms" || scope === "both";
+  if (doTreatments) nextTreatmentId = SEED_TREATMENTS.length + 1;
 
-  // Preserve uploaded treatment thumbnails. A "reset" restores the default
-  // catalog *content*, but must NOT wipe pictures an operator uploaded via the
-  // treatment editor. We read the current server copy, map id -> thumbnail, and
-  // re-apply those thumbnails onto matching seed treatments before pushing, so
-  // future content updates never delete existing pictures.
+  // When resetting treatments, preserve uploaded thumbnails: the reset restores
+  // default catalog *content* but must NOT wipe pictures an operator uploaded.
   let treatments: typeof SEED_TREATMENTS = SEED_TREATMENTS;
-  if (typeof window !== "undefined") {
+  if (doTreatments && typeof window !== "undefined") {
     try {
       const r = await fetch(`/api/store/treatments`, { cache: "no-store" });
       const d = await r.json();
@@ -309,17 +312,17 @@ export async function resetTreatmentsStoreToDefaults() {
   }
 
   useTreatmentsIntake.setState({
-    treatments,
-    forms:      SEED_FORMS,
-    clients:    SEED_CLIENTS,
+    ...(doTreatments ? { treatments } : {}),
+    ...(doForms ? { forms: SEED_FORMS } : {}),
+    clients: SEED_CLIENTS,
   });
   if (typeof window !== "undefined") {
     const put = (domain: string, data: unknown) =>
       fetch(`/api/store/${domain}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
     try {
       await Promise.all([
-        put("intake-forms", SEED_FORMS),
-        put("treatments", treatments),
+        ...(doForms ? [put("intake-forms", SEED_FORMS)] : []),
+        ...(doTreatments ? [put("treatments", treatments)] : []),
       ]);
     } catch { /* ignore — local reset still applied */ }
   }
