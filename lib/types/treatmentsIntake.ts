@@ -94,6 +94,10 @@ export interface BaskIntakeForm {
   reviewRules?: BaskRule[];
   settings?: BaskFormSettings;
   notifications?: BaskFormNotifications;
+  /** Optional custom heading/note for the treatment-selection step — used by
+   *  brand-bridge forms (e.g. Ozempic®) to introduce the compounded equivalent. */
+  txScreenTitle?: string;
+  txScreenNote?: string;
 }
 
 export type BaskClientStatus =

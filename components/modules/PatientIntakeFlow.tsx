@@ -1291,8 +1291,8 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     }
 
     return shell(<>
-        <div className="dv-question">Choose your treatment plan</div>
-        <div className="dv-helper">Based on your answers, you&apos;re eligible for the plans below. All plans include physician oversight and prescription delivery.</div>
+        <div className="dv-question">{form?.txScreenTitle || "Choose your treatment plan"}</div>
+        <div className="dv-helper">{form?.txScreenNote || "Based on your answers, you're eligible for the plans below. All plans include physician oversight and prescription delivery."}</div>
         <div className="dv-tx-cards">
           {txs.map((t) => {
             const isSel = selectedTxId === t.id;

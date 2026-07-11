@@ -523,3 +523,41 @@ export const SEED_FORMS: BaskIntakeForm[] = [
 ];
 
 export const SEED_CLIENTS: BaskClient[] = [];
+
+
+/* ── Brand-bridge intake forms ──────────────────────────────────────────────
+   Landing forms for patients searching for brand-name GLP-1s. Each clones the
+   master GLP-1 questionnaire (same screening, state-first, ID step) with its
+   own question-id block, and its treatment selection offers the compounded
+   equivalent (semaglutide for Ozempic/Wegovy, tirzepatide for Mounjaro/
+   Zepbound). Patient-facing copy makes NO equivalence claims about brand
+   products (FDA rules): the selection screen presents the compounded plans on
+   their own, with the not-FDA-approved and no-affiliation disclosures. Public URLs: /intake-form/<slug>. */
+const GLP1_MASTER = SEED_FORMS[0];
+const SEMA_TX_IDS = SEED_TREATMENTS.filter((t) => /semaglutide/i.test(t.med) && t.active).map((t) => t.id);
+const TIRZ_TX_IDS = SEED_TREATMENTS.filter((t) => /tirzepatide/i.test(t.med) && t.active).map((t) => t.id);
+
+const BRAND_BRIDGES = [
+  { id: 31, slug: "ozempic",  brand: "Ozempic\u00AE",  maker: "Novo Nordisk", generic: "semaglutide", genericCap: "Semaglutide", txIds: SEMA_TX_IDS, offset: 31000 },
+  { id: 32, slug: "wegovy",   brand: "Wegovy\u00AE",   maker: "Novo Nordisk", generic: "semaglutide", genericCap: "Semaglutide", txIds: SEMA_TX_IDS, offset: 32000 },
+  { id: 33, slug: "mounjaro", brand: "Mounjaro\u00AE", maker: "Eli Lilly",    generic: "tirzepatide", genericCap: "Tirzepatide", txIds: TIRZ_TX_IDS, offset: 33000 },
+  { id: 34, slug: "zepbound", brand: "Zepbound\u00AE", maker: "Eli Lilly",    generic: "tirzepatide", genericCap: "Tirzepatide", txIds: TIRZ_TX_IDS, offset: 34000 },
+] as const;
+
+for (const b of BRAND_BRIDGES) {
+  SEED_FORMS.push({
+    ...GLP1_MASTER,
+    id: b.id,
+    name: `${b.brand} Alternative \u2014 Compounded ${b.genericCap}`,
+    slug: b.slug,
+    desc: `Intake for patients searching for ${b.brand}. Runs the standard GLP-1 questionnaire and offers compounded ${b.generic} plans at treatment selection.`,
+    treatmentIds: [...b.txIds],
+    submissions: 0,
+    qualified: 0,
+    // Deep-copy questions into this form's own id block so editor changes to
+    // one form never mutate another.
+    questions: GLP1_MASTER.questions.map((q) => ({ ...q, id: q.id + b.offset, ...(q.options ? { options: [...q.options] } : {}) })),
+    txScreenTitle: `Compounded ${b.genericCap} \u2014 physician-prescribed weight loss`,
+    txScreenNote: `Based on your answers, you\u2019re eligible for the compounded ${b.generic} plans below \u2014 prescribed by a US-licensed provider and prepared by a licensed US pharmacy. Compounded medications are not FDA-approved and are not the same as brand-name products. DripVitals is not affiliated with ${b.maker}.`,
+  });
+}
