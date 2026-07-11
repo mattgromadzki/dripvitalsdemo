@@ -114,11 +114,16 @@ export async function GET(req: Request) {
   const q = (searchParams.get("q") || "").trim();
   const state = searchParams.get("state") || undefined;
   const live = !!(SMARTY_ID && SMARTY_TOKEN);
+  // In production with no address provider configured, NEVER invent
+  // suggestions — wrong-but-plausible addresses are worse than none. The field
+  // then behaves as plain manual entry. The mock stays available in demo mode.
+  const prod = process.env.NEXT_PUBLIC_SEED_DEMO_DATA === "false";
+  if (!live && prod) return Response.json({ suggestions: [], source: "disabled" });
   if (q.length < 3) return Response.json({ suggestions: [], source: live ? "smarty" : "mock" });
   try {
-    const suggestions = SMARTY_ID && SMARTY_TOKEN ? await realSuggest(q, state) : mockSuggest(q, state);
-    return Response.json({ suggestions, source: SMARTY_ID && SMARTY_TOKEN ? "smarty" : "mock" });
+    const suggestions = live ? await realSuggest(q, state) : mockSuggest(q, state);
+    return Response.json({ suggestions, source: live ? "smarty" : "mock" });
   } catch {
-    return Response.json({ suggestions: [], source: "mock" });
+    return Response.json({ suggestions: [], source: live ? "smarty" : "mock" });
   }
 }

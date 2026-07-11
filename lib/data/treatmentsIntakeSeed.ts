@@ -85,6 +85,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     hardRules: SEED_HARD_RULES, drugRules: SEED_DRUG_RULES, reviewRules: SEED_REVIEW_RULES,
     settings: DEFAULT_SETTINGS, notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9011, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9012, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       // Engagement first — matches the Figma flow ("What's your weight loss goal?")
       { id:110, type:"section",  text:"Goals", helper:"", sectionIcon:"💪", impact:"none", required:false },
       { id:111, type:"multiple", text:"What's your weight loss goal?", helper:"This helps us match you with the right treatment", impact:"none", required:true, options:["Up to 20 lbs","21 to 50 lbs","50+ lbs","Not sure yet"] },
@@ -122,7 +125,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:100, type:"section",  text:"About you", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:101, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:102, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:119, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:120, type:"address",  text:"If prescribed, where should we ship your order?", helper:"", impact:"none", required:true },
       { id:121, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
@@ -151,6 +153,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"NAD+ Injection Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9021, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9022, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:230, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:203, type:"multiple", text:"What are your primary wellness goals?", helper:"This helps your provider tailor your protocol", impact:"none", required:true, options:["Energy & focus","Anti-aging","Athletic recovery","Cognitive performance","General wellness"] },
       { id:231, type:"yesno",    text:"Have you received NAD+ therapy (injection or IV) before?", helper:"", impact:"none", required:true },
@@ -178,7 +183,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:200, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:201, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:202, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:239, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:240, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
       { id:250, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
@@ -210,6 +214,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"Sermorelin Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9031, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9032, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:400, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:401, type:"multiple", text:"What are you hoping to improve with sermorelin?", helper:"", impact:"none", required:true, options:["Sleep quality","Energy & vitality","Muscle recovery & lean mass","Body composition","Anti-aging / general wellness"] },
       { id:402, type:"yesno",    text:"Have you used sermorelin or any growth hormone therapy before?", helper:"", impact:"review", required:true },
@@ -240,7 +247,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:420, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:421, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:422, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:423, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:424, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
       { id:425, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
@@ -269,6 +275,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"Glutathione Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9041, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9042, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:500, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:501, type:"multiple", text:"What are your main goals with glutathione?", helper:"", impact:"none", required:true, options:["Skin brightening & complexion","Antioxidant & detox support","Immune support","Anti-aging","General wellness"] },
       { id:502, type:"yesno",    text:"Are you comfortable giving yourself a subcutaneous injection?", helper:"We provide step-by-step training and support", impact:"none", required:true },
@@ -294,7 +303,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:520, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:521, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:522, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:523, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:524, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
       { id:525, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
 
@@ -322,6 +330,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"Lipotropic Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9051, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9052, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:600, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:601, type:"multiple", text:"What are you hoping to get from lipotropic injections?", helper:"", impact:"none", required:true, options:["Weight-loss support","Energy & metabolism","Athletic performance","General wellness"] },
       { id:602, type:"yesno",    text:"Are you comfortable giving yourself a subcutaneous or intramuscular injection?", helper:"We provide training and support", impact:"none", required:true },
@@ -343,7 +354,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:620, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:621, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:622, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:623, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:624, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
       { id:625, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:630, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
@@ -370,6 +380,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"NAD+ Topical & Nasal Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9061, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9062, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:700, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:701, type:"multiple", text:"What are your main goals?", helper:"", impact:"none", required:true, options:["Energy & focus","Anti-aging","Cognitive performance","Skin health","General wellness"] },
       { id:704, type:"section",  text:"Health Screening", helper:"", sectionIcon:"🏥", impact:"none", required:false },
@@ -382,7 +395,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:720, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:721, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:722, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:723, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:724, type:"address",  text:"If approved, where should we ship your order?", helper:"", impact:"none", required:true },
       { id:725, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:730, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
@@ -412,6 +424,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"Hair Loss Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9071, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9072, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:800, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:801, type:"multiple", text:"What's your main hair goal?", helper:"", impact:"none", required:true, options:["Regrow hair","Slow or stop hair loss","Thicken existing hair","Maintain current results"] },
       { id:802, type:"multiple", text:"What is your sex assigned at birth?", helper:"Some hair-loss medications are prescribed differently based on this", impact:"none", required:true, options:["Male","Female","Prefer not to say"] },
@@ -435,7 +450,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:820, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:821, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:822, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:823, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:824, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
       { id:825, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:830, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
@@ -467,6 +481,9 @@ export const SEED_FORMS: BaskIntakeForm[] = [
     settings: { applies:"Sexual Health Treatments", autoMode:"ai_review", submissionLimitPerPatient:"Unlimited", autoCloseAfter:"Off", strictValidation:true },
     notifications: DEFAULT_NOTIFICATIONS,
     questions: [
+      // State first — determines provider licensing eligibility before anything else.
+      { id:9081, type:"section",  text:"Your state", helper:"", sectionIcon:"📍", impact:"none", required:false },
+      { id:9082, type:"state",    text:"Which state do you live in?", helper:"Treatment availability depends on where our providers are licensed", impact:"none", required:true },
       { id:900, type:"section",  text:"Your Goals", helper:"", sectionIcon:"🎯", impact:"none", required:false },
       { id:901, type:"multiple", text:"What brings you in today?", helper:"", impact:"none", required:true, options:["Erectile dysfunction","Performance & confidence","Both"] },
       { id:902, type:"yesno",    text:"Have you used an ED medication (e.g., sildenafil/Viagra, tadalafil/Cialis) before?", helper:"", impact:"none", required:true },
@@ -492,7 +509,6 @@ export const SEED_FORMS: BaskIntakeForm[] = [
       { id:920, type:"section",  text:"About You", helper:"", sectionIcon:"👤", impact:"none", required:false },
       { id:921, type:"personal_info", text:"Personal Information", helper:"Your name and contact details", impact:"none", required:true },
       { id:922, type:"date",     text:"What is your date of birth?", helper:"You must be 18 or older to enroll", impact:"disqualifier", required:true },
-      { id:923, type:"text",     text:"What is your ZIP code?", helper:"For shipping and provider matching", impact:"none", required:true },
       { id:924, type:"address",  text:"If approved, where should we ship your treatment?", helper:"", impact:"none", required:true },
       { id:925, type:"file",     text:"Upload a photo of your government-issued ID", helper:"A clear photo of your driver's license, state ID, or passport. Required to verify your identity and age before a provider can prescribe.", impact:"none", required:true },
       { id:930, type:"section",  text:"Consent", helper:"", sectionIcon:"✍", impact:"none", required:false },
