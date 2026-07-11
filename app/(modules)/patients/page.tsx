@@ -298,10 +298,20 @@ export default function PatientsPage() {
       <PatientFormModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onSave={(data) => {
-          const created = add(data as Omit<Patient, "id">);
+        onSave={async (data) => {
+          // Server-issued id (atomic) so two staff browsers adding at the same
+          // time can never mint the same patient number.
+          let id: string | null = null;
+          try {
+            const r = await fetch("/api/crm/patients/allocate-id", { method: "POST" });
+            const d = await r.json().catch(() => null);
+            if (r.ok && d?.ok && typeof d.id === "string") id = d.id;
+          } catch { /* fall back below */ }
+          let created: Patient;
+          if (id) { created = { ...(data as Omit<Patient, "id">), id } as Patient; usePatients.getState().upsert(created); }
+          else created = add(data as Omit<Patient, "id">);
           setAddOpen(false);
-          toast(`✓ ${created.name} added`);
+          toast(`✓ ${created.name} added (${created.id})`);
         }}
       />
       <Toast />

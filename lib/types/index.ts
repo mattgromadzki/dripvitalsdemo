@@ -29,6 +29,9 @@ export interface Patient {
 
   // Demographics / contact captured at intake (optional)
   dob?: string;
+  /** Affiliate / referral partner code the patient came through, if any
+   *  (captured from ?aff= on the intake link, or set by staff on the chart). */
+  affiliate?: string;
   address?: string;
   apt?: string;
   city?: string;

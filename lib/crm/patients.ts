@@ -10,6 +10,42 @@ import { dbSavePatient, dbListPatients } from "@/lib/db/store";
  * only intake-created patients live here.
  */
 const KEY = "crm:patients:v1";
+
+/**
+ * Atomically allocate the next patient number (PT-1001, PT-1002, …).
+ *
+ * IDs must be issued HERE, on the server — never computed in the browser. The
+ * public intake page starts with an empty local roster, so client-side "max+1"
+ * math hands every visitor the same number and the CRM upsert then overwrites
+ * the earlier patient (real data loss). Redis INCR is atomic, so two intakes
+ * completing in the same second still get distinct ids. The counter is seeded
+ * once from the highest existing id (never below the 1001 floor).
+ */
+const SEQ_KEY = "crm:patient-seq:v1";
+export async function allocatePatientId(): Promise<string> {
+  const highestExisting = async (): Promise<number> => {
+    let max = 1000; // numbering floor: first allocated id is PT-1001
+    try {
+      const all = await listPatients();
+      for (const p of all) {
+        const m = /^PT-(\d+)$/.exec(p.id || "");
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+    } catch { /* fall back to the floor */ }
+    return max;
+  };
+  const r = redis();
+  if (r) {
+    if (!(await r.exists(SEQ_KEY))) {
+      // NX so a concurrent initializer can't reset an already-seeded counter.
+      await r.set(SEQ_KEY, await highestExisting(), { nx: true });
+    }
+    const n = await r.incr(SEQ_KEY);
+    return `PT-${String(n).padStart(4, "0")}`;
+  }
+  // No Redis configured (dev/demo): best-effort sequential from the roster.
+  return `PT-${String((await highestExisting()) + 1).padStart(4, "0")}`;
+}
 const mem = new Map<string, Patient>();
 
 function redis(): Redis | null {

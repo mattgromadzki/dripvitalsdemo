@@ -103,7 +103,7 @@ export default function PatientDetailPage() {
     { kind: "Email", intent: "blue", title: "Intake received", sub: "Sent · Opened" },
     { kind: "SMS", intent: "purple", title: "Portal login link", sub: "Delivered" },
   ]);
-  const [profile, setProfile] = useState({ first: "", last: "", email: "", phone: "", dob: "", sex: "M" as "M" | "F" | "Other", heightIn: "", allergies: "", street: "", line2: "", city: "", state: "", zip: "" });
+  const [profile, setProfile] = useState({ first: "", last: "", email: "", phone: "", dob: "", sex: "M" as "M" | "F" | "Other", heightIn: "", allergies: "", affiliate: "", street: "", line2: "", city: "", state: "", zip: "" });
 
   if (!patient || !extra) {
     return (
@@ -210,6 +210,7 @@ export default function PatientDetailPage() {
     dob: fmtDob(patient.dob || extra.dob) || "", sex: patient.gender || "M",
     heightIn: patient.heightIn ? String(patient.heightIn) : "",
     allergies: patient.allergies || "",
+    affiliate: patient.affiliate || "",
     street: addr?.street || patient.address || "",
     line2: addr?.line2 || patient.apt || "",
     city: addr?.city || patient.city || "",
@@ -269,6 +270,7 @@ export default function PatientDetailPage() {
       dob: profile.dob, gender: profile.sex,
       ...(Number.isFinite(heightIn) && heightIn > 0 ? { heightIn } : {}),
       allergies: profile.allergies,
+      affiliate: profile.affiliate.trim() || undefined,
       address: profile.street, apt: profile.line2, city: profile.city, state: profile.state, zip: profile.zip,
     });
     logAudit("Edited patient profile", "Profile"); toast("Profile saved"); setModal(null);
@@ -356,6 +358,7 @@ export default function PatientDetailPage() {
                     ["City", addr?.city || patient.city || "—"],
                     ["State", addr?.state || patient.state || "—"],
                     ["Zip code", addr?.zip || patient.zip || "—"],
+                    ["Affiliate", patient.affiliate || "—"],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex items-baseline gap-3 px-5 py-[9px] border-b border-surface-3 last:border-none">
                       <div className="w-[122px] flex-shrink-0 text-[10px] uppercase tracking-wide text-ink-muted font-semibold">{k}</div>
@@ -639,6 +642,7 @@ export default function PatientDetailPage() {
             <PField label="Email"><input className={INP} value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} /></PField>
             <PField label="Height (inches)"><input className={INP} type="number" value={profile.heightIn} placeholder="71" onChange={(e) => setProfile({ ...profile, heightIn: e.target.value })} /></PField>
             <PField label="Allergies"><input className={INP} value={profile.allergies} placeholder="None reported" onChange={(e) => setProfile({ ...profile, allergies: e.target.value })} /></PField>
+            <PField label="Affiliate / referral code" full><input className={INP} value={profile.affiliate} placeholder="e.g. FITCLUB10 (leave blank if none)" onChange={(e) => setProfile({ ...profile, affiliate: e.target.value })} /></PField>
             <PField label="Address" full><input className={INP} value={profile.street} placeholder="123 Main St" onChange={(e) => setProfile({ ...profile, street: e.target.value })} /></PField>
             <PField label="Address 2 (Apt / Suite / Unit)" full><input className={INP} value={profile.line2} placeholder="Apt 4B" onChange={(e) => setProfile({ ...profile, line2: e.target.value })} /></PField>
             <PField label="City"><input className={INP} value={profile.city} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></PField>

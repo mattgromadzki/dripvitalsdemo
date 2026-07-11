@@ -28,12 +28,21 @@ export default function IntakeFormPage() {
   const slug = useParams<{ slug: string }>().slug;
   const router = useRouter();
   const forms = useTreatmentsIntake((s) => s.forms);
-  const addPatient = usePatients((s) => s.add);
   const updatePatient = usePatients((s) => s.update);
   const addRequest = useTreatmentRequests((s) => s.add);
   const createdPatientId = useRef<string | null>(null);
   const linkedPidRef = useRef<string | null>(null);
   const visitIdRef = useRef<string | null>(null);
+  // Affiliate attribution: intake links can carry ?aff=CODE (also accepts ?ref=
+  // or ?affiliate=). Captured once on load and stamped onto the patient record.
+  const affiliateRef = useRef<string>("");
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const code = (p.get("aff") || p.get("affiliate") || p.get("ref") || "").trim().slice(0, 64);
+      if (code) affiliateRef.current = code;
+    } catch { /* ignore */ }
+  }, []);
 
   const form = useMemo(() => forms.find((f) => f.slug === slug), [forms, slug]);
 
@@ -77,7 +86,7 @@ export default function IntakeFormPage() {
 
   // On successful payment, mirror the paid client into the doctor-side flow:
   // create a patient + a treatment request → chart → Approve → Prescribe → e-Prescribe.
-  function handleComplete(clientId: number, treatmentId: number | null) {
+  async function handleComplete(clientId: number, treatmentId: number | null) {
     if (!form) return;
     const st = useTreatmentsIntake.getState();
     const client = st.clients.find((c) => c.id === clientId);
@@ -126,6 +135,7 @@ export default function IntakeFormPage() {
       since: nowParts().today, startDate: nowParts().today, lastVisit: "—", lastOrder: nowParts().today, nextRefill: "—", _refillDays: 30,
       sub: tx.price, allergies: "None", tags: ["New intake"], notes: "", color: COLORS[name.length % COLORS.length],
       intakeProgress: "Completed",
+      ...(affiliateRef.current ? { affiliate: affiliateRef.current } : {}),
       consents: consentsFor({ treatmentName: tx.name, medication: tx.med, formName: form.name }).map((d) => ({ docId: d.id, title: d.title, version: d.version, acceptedAt: new Date().toISOString() })),
       ...(reviewFlags.length ? { clinicalFlags: reviewFlags } : {}),
     };
@@ -138,7 +148,7 @@ export default function IntakeFormPage() {
       const patient = { id: pid, ...fields } as Patient;
       usePatients.getState().upsert(patient);
     } else if (pid) updatePatient(pid, fields);
-    else { const created = addPatient(fields); pid = created.id; createdPatientId.current = pid; }
+    else { pid = await allocateId(); usePatients.getState().upsert({ id: pid, ...fields } as Patient); createdPatientId.current = pid; }
     syncCrm(pid);
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "complete", id: pid }) }).catch(() => {});
     // Flip the Visit to Paid — overwrites the displayed EST timestamp with the
@@ -236,6 +246,18 @@ export default function IntakeFormPage() {
 
   // Push the full patient profile to the server so it lands in the CRM roster
   // immediately, across devices.
+  // Get a unique patient number from the server (atomic — safe across many
+  // simultaneous intakes). If the endpoint is unreachable, fall back to a random
+  // high number (PT-9xxxx) that cannot collide with the real 1001+ sequence.
+  async function allocateId(): Promise<string> {
+    try {
+      const r = await fetch("/api/crm/patients/allocate-id", { method: "POST" });
+      const d = await r.json().catch(() => null);
+      if (r.ok && d?.ok && typeof d.id === "string") return d.id;
+    } catch { /* fall through */ }
+    return `PT-9${String(Math.floor(10000 + Math.random() * 89999))}`;
+  }
+
   function syncCrm(id: string | null) {
     if (!id) return;
     const p = usePatients.getState().patients.find((x) => x.id === id);
@@ -244,7 +266,7 @@ export default function IntakeFormPage() {
 
   // Fired as soon as the patient enters name + email (and phone). Pre-creates
   // the CRM patient profile, then keeps it updated as more is captured.
-  function handleLead(info: { first: string; last: string; phone: string; email: string }) {
+  async function handleLead(info: { first: string; last: string; phone: string; email: string }) {
     const name = `${info.first} ${info.last}`.trim() || info.email || "New Lead";
     if (createdPatientId.current) {
       updatePatient(createdPatientId.current, {
@@ -259,7 +281,12 @@ export default function IntakeFormPage() {
       return;
     }
     const np = nowParts();
-    const created = addPatient({
+    // Server-issued id (atomic) so simultaneous intakes can never collide.
+    const newId = await allocateId();
+    if (createdPatientId.current) return; // a parallel call won the race while we awaited
+    const created = { id: newId } as { id: string };
+    usePatients.getState().upsert({
+      id: newId,
       first: info.first || name, last: info.last || "—", name, email: info.email, phone: info.phone,
       age: 0, gender: "Other", state: "—", status: "pending", lifecycle: "intake_pending",
       dob: undefined, goalWt: undefined, zip: undefined,
@@ -268,7 +295,8 @@ export default function IntakeFormPage() {
       since: np.today, startDate: np.today, lastVisit: "—", lastOrder: "—", nextRefill: "—", _refillDays: 30,
       sub: "—", allergies: "None", tags: ["New intake"], notes: "Created from intake form.",
       color: COLORS[name.length % COLORS.length], intakeProgress: "Contact captured",
-    });
+      ...(affiliateRef.current ? { affiliate: affiliateRef.current } : {}),
+    } as Patient);
     createdPatientId.current = created.id;
     // Register the started intake server-side so the 24h reminder can fire if abandoned.
     fetch("/api/intake/pending", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start", id: created.id, name, email: info.email, phone: info.phone }) }).catch(() => {});
