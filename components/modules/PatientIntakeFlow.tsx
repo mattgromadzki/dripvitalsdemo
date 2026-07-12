@@ -59,7 +59,9 @@ function renderShell(opts: {
           </button>
         )}
         <div style={{ textAlign: "center" }}>
-          <div className="dv-logo">DripVitals</div>
+          {/* Uploaded brand logo (public/logo.png) instead of the text wordmark. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="DripVitals" style={{ height: 34, width: 34, borderRadius: 9, display: "inline-block", verticalAlign: "middle" }} />
           {/* Form name intentionally NOT shown to patients — internal names like
               "Zepbound® Alternative — Compounded Tirzepatide" are for the EMR
               only. The name still flows into visit records and consents. */}
