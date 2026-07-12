@@ -356,7 +356,45 @@ export default function IntakeFormPage() {
             .filter((it) => it.answer !== undefined && it.answer !== "")
             .slice(0, 150)
             .map((it) => ({ q: String(it.question).slice(0, 300), a: String(it.answer).slice(0, 600) }));
-          if (qa.length) { updatePatient(createdPatientId.current, { intakeQa: qa }); syncCrm(createdPatientId.current); }
+          // Vitals land on the profile as soon as they're answered — not only at
+          // payment. Same parsing as completion (imperial + metric, plain
+          // weight/height questions, BMI recompute).
+          let w = 0, hIn = 0, bmiV = 0, dobV = "", sexV: "" | "M" | "F" = "";
+          for (const q of form.questions) {
+            const raw = cl.answers[q.id];
+            if (raw == null) continue;
+            if (q.type === "bmi" && typeof raw === "string" && raw.startsWith("{")) {
+              try {
+                const o = JSON.parse(raw);
+                bmiV = +o.bmi || 0;
+                if (o.unit === "metric") { w = Math.round((parseFloat(o.weightKg) || 0) * 2.20462); hIn = Math.round((parseFloat(o.heightCm) || 0) / 2.54); }
+                else { w = Math.round(parseFloat(o.weightLbs) || 0); hIn = (parseFloat(o.heightFt) || 0) * 12 + (parseFloat(o.heightIn) || 0); }
+              } catch { /* ignore */ }
+            } else if ((q.type === "number" || q.type === "text") && /\bweight\b/i.test(q.text) && !/goal/i.test(q.text)) {
+              const n = parseFloat(String(raw).replace(/[^0-9.]/g, "")); if (!w && n > 0) w = Math.round(n);
+            } else if ((q.type === "number" || q.type === "text") && /\bheight\b/i.test(q.text)) {
+              const str = String(raw).trim();
+              const ftIn = str.match(/(\d)\s*(?:'|ft|feet|-)\s*(\d{1,2})/i);
+              if (ftIn) hIn = hIn || parseInt(ftIn[1], 10) * 12 + parseInt(ftIn[2], 10);
+              else { const n = parseFloat(str.replace(/[^0-9.]/g, "")); if (!hIn && n >= 36 && n <= 96) hIn = Math.round(n); }
+            } else if (q.type === "date" && /birth|dob/i.test(q.text) && typeof raw === "string") {
+              dobV = raw;
+            } else if (/gender|sex\b/i.test(q.text) && typeof raw === "string") {
+              sexV = /^m/i.test(raw) ? "M" : /^f/i.test(raw) ? "F" : "";
+            }
+          }
+          if (!bmiV && w > 0 && hIn > 0) bmiV = Math.round(((703 * w) / (hIn * hIn)) * 10) / 10;
+          const curP = usePatients.getState().patients.find((x) => x.id === createdPatientId.current);
+          const vitals: Record<string, unknown> = {};
+          if (w > 0) { vitals.wt = w; if (!curP?.wtStart) vitals.wtStart = w; }
+          if (hIn > 0) vitals.heightIn = Math.round(hIn);
+          if (bmiV > 0) vitals.bmi = bmiV;
+          if (dobV) vitals.dob = dobV;
+          if (sexV) vitals.gender = sexV;
+          if (qa.length || Object.keys(vitals).length) {
+            updatePatient(createdPatientId.current, { ...(qa.length ? { intakeQa: qa } : {}), ...vitals });
+            syncCrm(createdPatientId.current);
+          }
         }
       }
     } catch { /* mirroring must never break the intake */ }

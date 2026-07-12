@@ -59,9 +59,10 @@ function renderShell(opts: {
           </button>
         )}
         <div style={{ textAlign: "center" }}>
-          {/* Uploaded brand logo (public/logo.png) instead of the text wordmark. */}
+          {/* Uploaded brand logo (public/logo.png). Height-constrained with
+              natural width so the wordmark isn't squashed into a square. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="DripVitals" style={{ height: 34, width: 34, borderRadius: 9, display: "inline-block", verticalAlign: "middle" }} />
+          <img src="/logo.png" alt="DripVitals" style={{ height: 30, width: "auto", maxWidth: 170, display: "inline-block", verticalAlign: "middle", objectFit: "contain" }} />
           {/* Form name intentionally NOT shown to patients — internal names like
               "Zepbound® Alternative — Compounded Tirzepatide" are for the EMR
               only. The name still flows into visit records and consents. */}
