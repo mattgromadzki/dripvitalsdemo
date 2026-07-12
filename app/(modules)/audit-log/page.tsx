@@ -15,6 +15,7 @@ import type { AuditCategory, AuditEvent } from "@/lib/types";
 const SERVER_ACTION_META: Record<string, { category: AuditCategory; action: string; resourceType?: string }> = {
   "chart.view": { category: "patient", action: "Viewed patient chart", resourceType: "chart" },
   "auth.login": { category: "auth", action: "Signed in", resourceType: "session" },
+  "patient.login": { category: "auth", action: "Patient signed in (portal)", resourceType: "session" },
   "auth.idle_logout": { category: "security", action: "Auto sign-out (inactivity)", resourceType: "session" },
 };
 interface ServerAuditEvent { id: string; at: string; action: string; actorEmail: string; actorName?: string; actorRole?: string; patientId?: string; detail?: string; ip?: string; }

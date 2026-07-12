@@ -1,6 +1,7 @@
 import { rateLimit } from "@/lib/security/ratelimit";
 import { findPatientByEmail, verifyPatientPassword, patientAuthPersistent } from "@/lib/auth/patientAccounts";
-import { getPatientById } from "@/lib/crm/patients";
+import { getPatientById, savePatient } from "@/lib/crm/patients";
+import { appendAuditEvent } from "@/lib/audit/store";
 import { signPatientToken, PATIENT_COOKIE } from "@/lib/auth/patientSession";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,14 @@ export async function POST(req: Request) {
   const token = signPatientToken({ pid, email, name, exp });
   const maxAge = Math.floor((exp - Date.now()) / 1000);
   let full = null; try { full = await getPatientById(pid); } catch { /* ignore */ }
+  // Record the sign-in: stamp the patient record (shown on the chart) and write
+  // an audit event. Best-effort — must never block a login.
+  const loginAt = new Date().toISOString();
+  try { if (full) { full = { ...full, lastPortalLogin: loginAt }; await savePatient(full); } } catch { /* ignore */ }
+  try {
+    const xff = req.headers.get("x-forwarded-for");
+    await appendAuditEvent({ action: "patient.login", actorEmail: email, actorName: name, actorRole: "patient", patientId: pid, ip: xff ? xff.split(",")[0].trim() : (req.headers.get("x-real-ip") || undefined) || undefined });
+  } catch { /* ignore */ }
   const res = json({ ok: true, patient: full || { id: pid, name, email } });
   res.headers.append("Set-Cookie", `${PATIENT_COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`);
   return res;

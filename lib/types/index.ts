@@ -35,6 +35,8 @@ export interface Patient {
   /** Intake questionnaire answers, mirrored live as the patient progresses —
    *  visible to staff even if the patient never reaches payment. */
   intakeQa?: { q: string; a: string }[];
+  /** Last successful patient-portal sign-in (ISO timestamp). */
+  lastPortalLogin?: string;
   address?: string;
   apt?: string;
   city?: string;
