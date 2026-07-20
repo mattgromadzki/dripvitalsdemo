@@ -2,7 +2,7 @@ import { rateLimit } from "@/lib/security/ratelimit";
 import { findPatientByEmail, verifyPatientPassword, patientAuthPersistent } from "@/lib/auth/patientAccounts";
 import { getPatientById, savePatient } from "@/lib/crm/patients";
 import { appendAuditEvent } from "@/lib/audit/store";
-import { signPatientToken, PATIENT_COOKIE } from "@/lib/auth/patientSession";
+import { signPatientToken, getPatientSessionVersion, PATIENT_COOKIE } from "@/lib/auth/patientSession";
 
 export const dynamic = "force-dynamic";
 function json(obj: unknown, status = 200): Response {
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   console.info("[patient-login] success for", email, "→ pid", pid);
 
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30;
-  const token = signPatientToken({ pid, email, name, exp });
+  const token = signPatientToken({ pid, email, name, exp, v: await getPatientSessionVersion(pid) });
   const maxAge = Math.floor((exp - Date.now()) / 1000);
   let full = null; try { full = await getPatientById(pid); } catch { /* ignore */ }
   // Record the sign-in: stamp the patient record (shown on the chart) and write

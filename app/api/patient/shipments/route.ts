@@ -1,4 +1,4 @@
-import { getPatientSession } from "@/lib/auth/patientSession";
+import { getVerifiedPatientSession } from "@/lib/auth/patientSession";
 import { hasDb } from "@/lib/db/client";
 import { dbGetDomain } from "@/lib/db/store";
 import { STATUS_LABEL } from "@/lib/shipments/types";
@@ -43,7 +43,7 @@ function trackingUrl(carrier?: string, num?: string): string | undefined {
 
 // Returns ONLY the signed-in patient's shipments, with a public tracking link.
 export async function GET(req: Request) {
-  const s = getPatientSession(req);
+  const s = await getVerifiedPatientSession(req);
   if (!s) return new Response(JSON.stringify({ ok: false }), { status: 401, headers: { "Content-Type": "application/json" } });
 
   const all = await readShipments();

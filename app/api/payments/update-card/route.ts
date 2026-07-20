@@ -2,7 +2,7 @@ import { corepayConfigured, corepayCreateHppOrder, corepayGetOrder } from "@/lib
 import { savePendingOrder, getPendingOrder, updateSubscriptionCard, subscriptionOwnedBy } from "@/lib/payments/hppStore";
 import { record } from "@/lib/payments/stripeLedger";
 import { appUrl } from "@/lib/payments/stripe";
-import { getPatientSession } from "@/lib/auth/patientSession";
+import { getVerifiedPatientSession } from "@/lib/auth/patientSession";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ function json(obj: unknown, status = 200): Response {
  *              card, and repoints the subscription's billing token.
  */
 export async function POST(req: Request) {
-  const sess = getPatientSession(req);
+  const sess = await getVerifiedPatientSession(req);
   if (!sess) return json({ ok: false, error: "Please sign in to update your card." }, 401);
   if (!corepayConfigured()) return json({ ok: false, error: "Card updates aren't available right now." }, 400);
 

@@ -1,4 +1,4 @@
-import { getPatientSession } from "@/lib/auth/patientSession";
+import { getVerifiedPatientSession } from "@/lib/auth/patientSession";
 import { listPharmacyEvents } from "@/lib/pharmacy/events";
 
 export const dynamic = "force-dynamic";
@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 // Returns ONLY the signed-in patient's pharmacy fulfillment events, identified
 // by the patient session cookie. Used by the patient portal's Shipments tab.
 export async function GET(req: Request) {
-  const s = getPatientSession(req);
+  const s = await getVerifiedPatientSession(req);
   if (!s) return new Response(JSON.stringify({ ok: false }), { status: 401, headers: { "Content-Type": "application/json" } });
 
   const all = await listPharmacyEvents();
