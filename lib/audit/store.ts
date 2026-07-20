@@ -22,6 +22,19 @@ export interface AuditEvent {
   patientId?: string;     // subject patient, when applicable
   detail?: string;        // free-text context
   ip?: string;
+  geo?: string;           // "City, Region, Country" from the edge, when known
+}
+
+/** Approximate location from Vercel's edge geo headers (city-level, based on
+ *  the connecting IP). Absent when running locally or behind other proxies. */
+export function requestGeo(req: Request): string | undefined {
+  try {
+    const city = req.headers.get("x-vercel-ip-city");
+    const region = req.headers.get("x-vercel-ip-country-region");
+    const country = req.headers.get("x-vercel-ip-country");
+    const parts = [city ? decodeURIComponent(city) : null, region, country].filter(Boolean);
+    return parts.length ? parts.join(", ") : undefined;
+  } catch { return undefined; }
 }
 
 const DOMAIN = "audit-log";

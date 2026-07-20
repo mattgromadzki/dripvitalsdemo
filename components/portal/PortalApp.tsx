@@ -518,10 +518,10 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
 
       {/* Mobile tabbar */}
       <div className="mob-tabbar">
-        {(["home", "chat", "treatments", "shots", "reminders"] as Page[]).map((p) => (
+        {(["home", "chat", "treatments", "shots", "reminders", "account"] as Page[]).map((p) => (
           <button key={p} className={`mob-tab ${page === p ? "active" : ""}`} onClick={() => nav(p)}>
-            <div className="mob-tab-ico">{p === "home" ? "🏠" : p === "chat" ? "💬" : p === "treatments" ? "💊" : p === "shots" ? "💉" : "🔔"}</div>
-            {p === "treatments" ? "Plan" : p === "reminders" ? "Reminders" : p[0].toUpperCase() + p.slice(1)}
+            <div className="mob-tab-ico">{p === "home" ? "🏠" : p === "chat" ? "💬" : p === "treatments" ? "💊" : p === "shots" ? "💉" : p === "reminders" ? "🔔" : "👤"}</div>
+            {p === "treatments" ? "Plan" : p === "account" ? "Account" : p === "reminders" ? "Alerts" : p[0].toUpperCase() + p.slice(1)}
           </button>
         ))}
       </div>
@@ -1543,6 +1543,14 @@ function AccountPage({ tab, setTab, theme, setTheme, openModal, toast, fullName,
           <HelpCard />
         </div>
       )}
+      {/* Sign out — always visible on the Account page. On mobile this is the
+          primary way out (the sidebar with its Sign out link is hidden). */}
+      <button
+        onClick={() => { usePatientAuth.getState().logout().finally(() => { window.location.assign("/"); }); }}
+        style={{ width: "100%", cursor: "pointer", padding: "15px 18px", marginTop: 26, background: "#fff", border: "1.5px solid #f3c4c4", borderRadius: 14, color: "var(--red, #c0392b)", fontSize: 14, fontWeight: 700, fontFamily: "inherit" }}
+      >
+        ↩ Sign out
+      </button>
     </section>
   );
 }

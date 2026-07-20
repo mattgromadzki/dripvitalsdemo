@@ -1,7 +1,7 @@
 import { rateLimit } from "@/lib/security/ratelimit";
 import { findPatientByEmail, verifyPatientPassword, patientAuthPersistent } from "@/lib/auth/patientAccounts";
 import { getPatientById, savePatient } from "@/lib/crm/patients";
-import { appendAuditEvent } from "@/lib/audit/store";
+import { appendAuditEvent, requestGeo } from "@/lib/audit/store";
 import { signPatientToken, getPatientSessionVersion, PATIENT_COOKIE } from "@/lib/auth/patientSession";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   try { if (full) { full = { ...full, lastPortalLogin: loginAt }; await savePatient(full); } } catch { /* ignore */ }
   try {
     const xff = req.headers.get("x-forwarded-for");
-    await appendAuditEvent({ action: "patient.login", actorEmail: email, actorName: name, actorRole: "patient", patientId: pid, ip: xff ? xff.split(",")[0].trim() : (req.headers.get("x-real-ip") || undefined) || undefined });
+    await appendAuditEvent({ action: "patient.login", actorEmail: email, actorName: name, actorRole: "patient", patientId: pid, ip: xff ? xff.split(",")[0].trim() : (req.headers.get("x-real-ip") || undefined) || undefined, geo: requestGeo(req) });
   } catch { /* ignore */ }
   const res = json({ ok: true, patient: full || { id: pid, name, email } });
   res.headers.append("Set-Cookie", `${PATIENT_COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${maxAge}`);

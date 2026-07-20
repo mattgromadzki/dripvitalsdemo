@@ -316,7 +316,7 @@
 .treatments-intake-mod .page-actions { display: flex; gap: 8px; }
 
 /* KPI grid + cards */
-.treatments-intake-mod .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 11px; margin-bottom: 16px; }
+.treatments-intake-mod .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 11px; margin-bottom: 16px; }
 .treatments-intake-mod .kpi-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 14px 16px; transition: all .15s; }
 .treatments-intake-mod .kpi-card:hover { box-shadow: var(--shadow-sm); border-color: var(--color-border-2); }
 .treatments-intake-mod .kpi-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
@@ -2926,8 +2926,8 @@ input.dv-input[type="date"]::-webkit-calendar-picker-indicator {
     bottom: 0; left: 0; right: 0;
     background: #fff;
     border-top: 1px solid var(--border);
-    padding: 10px 8px max(22px, env(safe-area-inset-bottom));
-    grid-template-columns: repeat(5, 1fr);
+    padding: 10px 4px max(22px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(6, 1fr);
     gap: 4px;
     z-index: 100;
   }

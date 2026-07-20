@@ -18,7 +18,7 @@ const SERVER_ACTION_META: Record<string, { category: AuditCategory; action: stri
   "patient.login": { category: "auth", action: "Patient signed in (portal)", resourceType: "session" },
   "auth.idle_logout": { category: "security", action: "Auto sign-out (inactivity)", resourceType: "session" },
 };
-interface ServerAuditEvent { id: string; at: string; action: string; actorEmail: string; actorName?: string; actorRole?: string; patientId?: string; detail?: string; ip?: string; }
+interface ServerAuditEvent { id: string; at: string; action: string; actorEmail: string; actorName?: string; actorRole?: string; patientId?: string; detail?: string; ip?: string; geo?: string; }
 function mapServerAudit(e: ServerAuditEvent, patientName?: string): AuditEvent {
   const at = Date.parse(e.at) || Date.now();
   const meta = SERVER_ACTION_META[e.action] || { category: "emr" as AuditCategory, action: e.action };
@@ -32,7 +32,7 @@ function mapServerAudit(e: ServerAuditEvent, patientName?: string): AuditEvent {
     resourceType: meta.resourceType,
     patientId: e.patientId,
     patientName,
-    ipAddress: e.ip || "—",
+    ipAddress: e.ip ? `${e.ip}${e.geo ? ` \u00B7 ${e.geo}` : ""}` : "—",
     success: true,
   };
 }
