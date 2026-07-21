@@ -596,3 +596,34 @@ for (const b of BRAND_BRIDGES) {
     txScreenNote: `Based on your answers, you\u2019re eligible for the compounded ${b.generic} plans below \u2014 prescribed by a US-licensed provider and prepared by a licensed US pharmacy. Compounded medications are not FDA-approved and are not the same as brand-name products. DripVitals is not affiliated with ${b.maker}.`,
   });
 }
+
+/* ── Dedicated single-medication GLP-1 funnels ──────────────────────────────
+   One form per compounded medication, cloning the master GLP-1 questionnaire.
+   The treatment-selection step offers exactly that medication's term options
+   (1/3/6/12 months where available), sorted shortest → longest, so the patient
+   simply picks a plan length. Public URLs: /intake-form/semaglutide and
+   /intake-form/tirzepatide. */
+const MED_FORMS = [
+  { id: 35, slug: "semaglutide", med: "Semaglutide", cap: "Semaglutide", offset: 35000 },
+  { id: 36, slug: "tirzepatide", med: "Tirzepatide", cap: "Tirzepatide", offset: 36000 },
+] as const;
+
+for (const m of MED_FORMS) {
+  const txIds = SEED_TREATMENTS
+    .filter((t) => t.med === m.med && t.compounded && t.active)
+    .sort((a, b) => parseInt(a.duration, 10) - parseInt(b.duration, 10))
+    .map((t) => t.id);
+  SEED_FORMS.push({
+    ...GLP1_MASTER,
+    id: m.id,
+    name: `Compounded ${m.cap} Intake`,
+    slug: m.slug,
+    desc: `Dedicated ${m.cap} funnel \u2014 runs the standard GLP-1 questionnaire, then the patient chooses one of ${txIds.length} plan lengths.`,
+    treatmentIds: txIds,
+    submissions: 0,
+    qualified: 0,
+    questions: GLP1_MASTER.questions.map((q) => ({ ...q, id: q.id + m.offset, ...(q.options ? { options: [...q.options] } : {}) })),
+    txScreenTitle: `Choose your ${m.cap.toLowerCase()} plan`,
+    txScreenNote: `Based on your answers, you\u2019re eligible for compounded ${m.cap.toLowerCase()} \u2014 prescribed by a US-licensed provider and prepared by a licensed US pharmacy. Pick the plan length that works best for you; longer plans cost less per month. Compounded medications are not FDA-approved.`,
+  });
+}
