@@ -280,7 +280,10 @@ export function monthlyEquivalent(price: string, duration: string): string | nul
   const months = parseInt(duration, 10);
   const amount = parseFloat((price || "").replace(/[$,]/g, ""));
   if (!Number.isFinite(months) || months <= 1 || !Number.isFinite(amount) || amount <= 0) return null;
-  return `$${Math.round(amount / months)}/mo`;
+  const m = amount / months;
+  const rounded = Math.round(m);
+  // "$89.97 over 3 months" should read $29.99/mo, not $30/mo.
+  return Math.abs(m - rounded) < 0.005 ? `$${rounded}/mo` : `$${m.toFixed(2)}/mo`;
 }
 
 // Reset to seed defaults, clear localStorage, AND overwrite the server-persisted

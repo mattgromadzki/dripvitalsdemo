@@ -1304,7 +1304,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
               monthly:       "Billed monthly",
               quarterly:     `Billed every 3 months · $${perMonth}/mo`,
               "semi-annual": `Billed every 6 months · $${perMonth}/mo`,
-              annual:        durMonths === 12 ? "Billed monthly for 12 months" : `Billed annually · $${perMonth}/mo`,
+              annual:        `Billed annually · $${perMonth}/mo`,
               "one-time":    "One-time payment",
             } as Record<BaskBillingCycle, string>)[t.billing] || `Billed ${t.billing}`;
 
