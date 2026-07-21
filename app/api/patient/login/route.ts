@@ -39,7 +39,10 @@ export async function POST(req: Request) {
   // Record the sign-in: stamp the patient record (shown on the chart) and write
   // an audit event. Best-effort — must never block a login.
   const loginAt = new Date().toISOString();
-  try { if (full) { full = { ...full, lastPortalLogin: loginAt }; await savePatient(full); } } catch { /* ignore */ }
+  const xffStamp = req.headers.get("x-forwarded-for");
+  const ipStamp = xffStamp ? xffStamp.split(",")[0].trim() : (req.headers.get("x-real-ip") || "");
+  const geoStamp = requestGeo(req);
+  try { if (full) { full = { ...full, lastPortalLogin: loginAt, lastPortalLoginIp: ipStamp ? `${ipStamp}${geoStamp ? ` \u00B7 ${geoStamp}` : ""}` : undefined }; await savePatient(full); } } catch { /* ignore */ }
   try {
     const xff = req.headers.get("x-forwarded-for");
     await appendAuditEvent({ action: "patient.login", actorEmail: email, actorName: name, actorRole: "patient", patientId: pid, ip: xff ? xff.split(",")[0].trim() : (req.headers.get("x-real-ip") || undefined) || undefined, geo: requestGeo(req) });

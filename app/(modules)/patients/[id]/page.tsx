@@ -374,7 +374,7 @@ export default function PatientDetailPage() {
                 <Info k="Allergies" v={patient.allergies || "None reported"} /><Info k="Risk" v={extra.riskLabel} />
                 <Info k="Rx Status" v={hasRx ? "Active" : "Signature needed"} /><Info k="Payment" v={patient.sub} />
                 <Info k="Current Meds" v={(patient as { currentMeds?: string }).currentMeds || "None reported"} /><Info k="Member since" v={patient.since} />
-                <Info k="Portal last login" v={patient.lastPortalLogin ? new Date(patient.lastPortalLogin).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Never"} />
+                <Info k="Portal last login" v={patient.lastPortalLogin ? `${new Date(patient.lastPortalLogin).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${patient.lastPortalLoginIp ? ` \u00B7 ${patient.lastPortalLoginIp}` : ""}` : "Never"} />
               </div>
             </Card>
             <div className="grid md:grid-cols-2 gap-4">

@@ -37,6 +37,8 @@ export interface Patient {
   intakeQa?: { q: string; a: string }[];
   /** Last successful patient-portal sign-in (ISO timestamp). */
   lastPortalLogin?: string;
+  /** IP (and approximate location) of that last sign-in. */
+  lastPortalLoginIp?: string;
   address?: string;
   apt?: string;
   city?: string;
