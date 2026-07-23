@@ -1,4 +1,4 @@
-import type { BaskTreatment, BaskIntakeForm, BaskClient, BaskRule, BaskFormSettings, BaskFormNotifications, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
+import type { BaskTreatment, BaskIntakeForm, BaskClient, BaskRule, BaskFormSettings, BaskFormNotifications, BaskBillingCycle, BaskQuestion, BaskOption, BaskImpact } from "@/lib/types/treatmentsIntake";
 
 // Default rules — first applied to the GLP-1 form. Other forms can have empty
 // rule lists or admin can add via the Logic tab.
@@ -631,5 +631,72 @@ for (const m of MED_FORMS) {
     questions: GLP1_MASTER.questions.map((q) => ({ ...q, id: q.id + m.offset, ...(q.options ? { options: [...q.options] } : {}) })),
     txScreenTitle: `Choose your ${m.cap.toLowerCase()} plan`,
     txScreenNote: `Based on your answers, you\u2019re eligible for compounded ${m.cap.toLowerCase()} \u2014 prescribed by a US-licensed provider and prepared by a licensed US pharmacy. Pick the plan length that works best for you; longer plans cost less per month. Compounded medications are not FDA-approved.`,
+  });
+}
+
+/* ── Topical-product intake forms: Scream Cream & Stella Anti-Aging Cream ───
+   These reuse the master form's generic machinery (state gate, contact,
+   demographics, shipping address, ID upload, consent) but replace the
+   weight-loss questionnaire with screening appropriate to each topical. */
+const pickQ = (origId: number, offset: number) => {
+  const q = GLP1_MASTER.questions.find((x) => x.id === origId || x.id % 10000 === origId);
+  return q ? [{ ...q, id: offset + (q.id % 10000), ...(q.options ? { options: [...q.options] } : {}) }] : [];
+};
+const opt = (labels: string[]): BaskOption[] => labels; // options are plain strings
+
+const STELLA_TX_ID = 57;
+SEED_TREATMENTS.push({ id: STELLA_TX_ID, name: "1-Month Stella Anti-Aging Cream", med: "Stella Anti-Aging Cream (topical)", strength: "Compounded topical", duration: "1", billing: "monthly", price: "$99", compare: "", desc: "Compounded anti-aging facial cream, prescribed after provider review. PLACEHOLDER PRICE \u2014 set the real price in the Treatments tab.", icon: "\u2728", color: "purple", active: true, compounded: true, featured: false, subscribers: 0, includes: ["1-month supply", "Async provider review", "Discreet home delivery"], pharmacy: "GreenstoneRX FL", freq: "Nightly, as directed" });
+
+const TOPICAL_FORMS: { id: number; slug: string; name: string; txIds: number[]; offset: number; title: string; note: string; medical: BaskQuestion[] }[] = [
+  {
+    id: 39, slug: "scream-cream", name: "Scream Cream Intake", txIds: [52], offset: 39000,
+    title: "Your Scream Cream plan",
+    note: "Based on your answers, you\u2019re eligible for compounded Scream Cream \u2014 prescribed by a US-licensed provider and prepared by a licensed US pharmacy. Compounded medications are not FDA-approved.",
+    medical: [
+      { id: 39200, type: "section", text: "Your goals", helper: "", sectionIcon: "\uD83D\uDC97", impact: "none", required: false },
+      { id: 39201, type: "multiple", text: "What are you hoping to improve?", helper: "", impact: "none", required: true, options: opt(["Arousal and sensitivity", "Comfort during intimacy", "Overall satisfaction", "All of the above"]) },
+      { id: 39210, type: "section", text: "Medical History", helper: "", sectionIcon: "\uD83E\uDE7A", impact: "none", required: false },
+      { id: 39211, type: "yesno", text: "Are you currently pregnant, planning to become pregnant, or breastfeeding?", helper: "", impact: "review", required: true },
+      { id: 39212, type: "checkbox", text: "Do any of these apply to you?", helper: "Select all that apply", impact: "review", required: true, options: opt(["Heart disease or uncontrolled blood pressure", "Genital skin conditions (e.g. lichen sclerosus, active irritation)", "Allergy to sildenafil or similar medications", "None of these apply"]) },
+      { id: 39213, type: "yesno", text: "Do you take nitrates or blood-pressure medications?", helper: "", impact: "review", required: true },
+      { id: 39214, type: "text", text: "List any current medications and supplements", helper: "Optional \u2014 helps your provider check for interactions", impact: "none", required: false },
+    ],
+  },
+  {
+    id: 40, slug: "stella-anti-aging", name: "Stella Anti-Aging Cream Intake", txIds: [STELLA_TX_ID], offset: 40000,
+    title: "Your Stella Anti-Aging plan",
+    note: "Based on your answers, you\u2019re eligible for Stella Anti-Aging Cream \u2014 a compounded prescription topical from a licensed US pharmacy. Compounded medications are not FDA-approved.",
+    medical: [
+      { id: 40200, type: "section", text: "Your skin", helper: "", sectionIcon: "\u2728", impact: "none", required: false },
+      { id: 40201, type: "multiple", text: "How would you describe your skin?", helper: "", impact: "none", required: true, options: opt(["Dry", "Oily", "Combination", "Sensitive", "Normal"]) },
+      { id: 40202, type: "checkbox", text: "What are your main skin concerns?", helper: "Select all that apply", impact: "none", required: true, options: opt(["Fine lines and wrinkles", "Dark spots / uneven tone", "Texture and dullness", "Acne or breakouts", "Melasma"]) },
+      { id: 40203, type: "yesno", text: "Are you currently using a retinoid (tretinoin, retinol, adapalene)?", helper: "", impact: "none", required: true },
+      { id: 40210, type: "section", text: "Medical History", helper: "", sectionIcon: "\uD83E\uDE7A", impact: "none", required: false },
+      { id: 40211, type: "yesno", text: "Are you currently pregnant, planning to become pregnant, or breastfeeding?", helper: "Retinoid creams are not recommended during pregnancy or breastfeeding", impact: "review", required: true },
+      { id: 40212, type: "checkbox", text: "Do any of these apply to you?", helper: "Select all that apply", impact: "review", required: true, options: opt(["Eczema, rosacea, or psoriasis on the face", "Cosmetic procedure in the last 30 days (peel, laser, microneedling)", "Allergy to retinoids or vitamin A derivatives", "None of these apply"]) },
+      { id: 40213, type: "text", text: "What skincare products do you use today?", helper: "Optional", impact: "none", required: false },
+    ],
+  },
+];
+
+for (const f of TOPICAL_FORMS) {
+  SEED_FORMS.push({
+    ...GLP1_MASTER,
+    id: f.id,
+    name: f.name,
+    slug: f.slug,
+    desc: `${f.name} \u2014 topical-specific screening with the standard contact, shipping, ID, and consent steps.`,
+    treatmentIds: [...f.txIds],
+    submissions: 0,
+    qualified: 0,
+    questions: [
+      ...pickQ(9011, f.offset), ...pickQ(9012, f.offset),
+      ...pickQ(100, f.offset), ...pickQ(101, f.offset), ...pickQ(102, f.offset), ...pickQ(105, f.offset),
+      ...f.medical,
+      ...pickQ(120, f.offset), ...pickQ(121, f.offset),
+      ...pickQ(113, f.offset), ...pickQ(114, f.offset),
+    ],
+    txScreenTitle: f.title,
+    txScreenNote: f.note,
   });
 }

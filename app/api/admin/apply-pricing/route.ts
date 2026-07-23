@@ -47,6 +47,7 @@ const RULES: { med: string; months: number; price: string; billing: BaskBillingC
   { med: "Tirzepatide (oral)", months: 3,  price: "$717",   billing: "quarterly" },
   { med: "Tirzepatide (oral)", months: 6,  price: "$1,374", billing: "semi-annual", compare: "$1,494", name: "6-Month Oral Tirzepatide" },
   { med: "Tirzepatide (oral)", months: 12, price: "$2,388", billing: "annual",      compare: "$2,988", name: "12-Month Oral Tirzepatide" },
+  { med: "Stella Anti-Aging Cream (topical)", months: 1, price: "$99", billing: "monthly", name: "1-Month Stella Anti-Aging Cream" },
 ];
 
 /**
