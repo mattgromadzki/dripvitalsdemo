@@ -37,6 +37,7 @@ export default function IntakeFormPage() {
   // or ?affiliate=). Captured once on load and stamped onto the patient record.
   const affiliateRef = useRef<string>("");
   const leadEmailRef = useRef<string>("");
+  const startedRef = useRef(false);
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search);
@@ -60,6 +61,10 @@ export default function IntakeFormPage() {
           fetch("/api/store/treatments", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
         ]);
         if (!alive) return;
+        // Never swap the form under a patient who has already started answering
+        // — their session must stay internally consistent. (The built-in copy
+        // renders instantly; the server copy applies only if it arrives first.)
+        if (startedRef.current) return;
         const cur = useTreatmentsIntake.getState();
         useTreatmentsIntake.setState({
           forms: (f?.data ?? cur.forms) as typeof cur.forms,
@@ -81,7 +86,9 @@ export default function IntakeFormPage() {
     } catch { /* ignore */ }
   }, []);
 
-  if (!formsReady) return <Msg icon="⏳" title="Loading…" sub="Fetching the latest form." />;
+  // The built-in form renders instantly. Only an unknown slug waits (blank)
+  // for hydration before declaring "not found" — no loading screen.
+  if (!form && !formsReady) return null;
   if (!form) return <Msg icon="🔍" title="Form not found" sub={`No intake form for “${slug}”.`} />;
   if (!form.active) return <Msg icon="🚧" title="This form is not active" sub="Please check back later or contact the clinic." />;
 
@@ -295,6 +302,7 @@ export default function IntakeFormPage() {
   // Fired as soon as the patient enters name + email (and phone). Pre-creates
   // the CRM patient profile, then keeps it updated as more is captured.
   async function handleLead(info: { first: string; last: string; phone: string; email: string }) {
+    startedRef.current = true;
     const name = `${info.first} ${info.last}`.trim() || info.email || "New Lead";
     if (info.email) leadEmailRef.current = info.email;
     if (createdPatientId.current) {
@@ -337,6 +345,7 @@ export default function IntakeFormPage() {
 
   // Fired on each step so the profile reflects how far the patient has gotten.
   function handleProgress(info: { stage: string; step: number; total: number }) {
+    startedRef.current = true;
     if (!createdPatientId.current) return;
     const label =
       info.stage === "treatment" ? "Selecting treatment" :
