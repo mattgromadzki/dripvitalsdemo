@@ -39,6 +39,14 @@ const RULES: { med: string; months: number; price: string; billing: BaskBillingC
   { med: "Glutathione", months: 6,  price: "$594",   billing: "semi-annual", compare: "$834", name: "6-Month Glutathione Injections" },
   { med: "Glutathione", months: 12, price: "$1,068", billing: "annual", compare: "$1,668", name: "12-Month Glutathione Injections" },
   { med: "Scream Cream (topical)", months: 3, price: "$89.97", billing: "quarterly", name: "3-Month Scream Cream" },
+  { med: "Semaglutide (oral)", months: 1,  price: "$179",   billing: "monthly" },
+  { med: "Semaglutide (oral)", months: 3,  price: "$477",   billing: "quarterly" },
+  { med: "Semaglutide (oral)", months: 6,  price: "$894",   billing: "semi-annual", compare: "$1,074", name: "6-Month Oral Semaglutide" },
+  { med: "Semaglutide (oral)", months: 12, price: "$1,548", billing: "annual",      compare: "$2,148", name: "12-Month Oral Semaglutide" },
+  { med: "Tirzepatide (oral)", months: 1,  price: "$249",   billing: "monthly" },
+  { med: "Tirzepatide (oral)", months: 3,  price: "$717",   billing: "quarterly" },
+  { med: "Tirzepatide (oral)", months: 6,  price: "$1,374", billing: "semi-annual", compare: "$1,494", name: "6-Month Oral Tirzepatide" },
+  { med: "Tirzepatide (oral)", months: 12, price: "$2,388", billing: "annual",      compare: "$2,988", name: "12-Month Oral Tirzepatide" },
 ];
 
 /**
