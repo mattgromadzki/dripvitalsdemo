@@ -669,24 +669,17 @@ export default function PatientDetailPage() {
         </Modal>
       )}
       {modal === "id" && (
-        <Modal title="Patient ID" onClose={() => setModal(null)} onSave={() => { if (idImg) verifyId(); setModal(null); }} saveLabel={idImg ? (idIsVerified ? "Verified ✓" : "Mark Verified") : "Close"}>
-          <div className="flex gap-3">
-            {idImg ? (
-              <img src={idImg} alt="Government ID" className="w-[280px] max-h-[200px] rounded-xl border border-border object-contain bg-surface-3 shrink-0" />
-            ) : (
-              <div className="w-[200px] h-[126px] rounded-xl bg-surface-3 border border-border flex items-center justify-center text-[40px] shrink-0">🪪</div>
-            )}
-            <div className="text-[12px] text-ink-muted leading-relaxed">
-              <h3 className="text-[14px] text-ink mb-1">{idImg ? `${patient.state} Government ID` : "No ID on file"}</h3>
-              {idImg ? (
-                <>Status: {idIsVerified ? "Verified" : "Pending"}<br />Name: {patient.name}<br />State: {patient.state}<br />Uploaded: {idDoc?.createdDate}
-                <div className="flex gap-1.5 mt-2"><Pill intent={idIsVerified ? "green" : "amber"}>{idIsVerified ? "Verified" : "Pending"}</Pill><Pill intent="blue">Front image on file</Pill></div>
-                <div className="text-[11px] mt-2">Confirm the name, date of birth, and state on the ID match this patient&apos;s profile before marking verified.</div></>
-              ) : (
-                <>No government ID has been uploaded for this patient. Use the Upload ID button on the Documents tab to add one.</>
-              )}
+        <Modal wide title="Patient ID" onClose={() => setModal(null)} onSave={() => { if (idImg) verifyId(); setModal(null); }} saveLabel={idImg ? (idIsVerified ? "Verified ✓" : "Mark Verified") : "Close"}>
+          {idImg ? (
+            /* Image-first: the ID fills the window so details are legible. */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={idImg} alt="Government ID" className="w-full max-h-[72vh] rounded-xl border border-border object-contain bg-surface-3" />
+          ) : (
+            <div className="text-[12.5px] text-ink-muted leading-relaxed text-center py-10">
+              <div className="text-[44px] mb-2">🪪</div>
+              No government ID has been uploaded for this patient. Use the Upload ID button on the Documents tab to add one.
             </div>
-          </div>
+          )}
         </Modal>
       )}
 
@@ -737,11 +730,11 @@ function AlertBox({ tone, icon, title, body }: { tone: "green" | "amber" | "red"
 function SideRow({ k, v, ok }: { k: string; v: string; ok?: boolean }) {
   return <div className="flex items-center justify-between py-[5px] text-[12px] border-b border-surface-3 last:border-none"><span className="text-ink-muted">{k}</span><span className={`font-semibold ${ok === undefined ? "text-ink" : ok ? "text-green" : "text-amber"}`}>{v}</span></div>;
 }
-function Modal({ title, children, onClose, onSave, saveLabel }: { title: string; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel: string }) {
+function Modal({ title, children, onClose, onSave, saveLabel, wide }: { title: string; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel: string; wide?: boolean }) {
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-[rgba(28,40,60,.32)]" onClick={onClose} />
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] w-[460px] max-w-[calc(100vw-32px)] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col max-h-[88vh]">
+      <div className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[61] ${wide ? "w-[960px]" : "w-[460px]"} max-w-[calc(100vw-32px)] bg-surface border border-border rounded-2xl shadow-2xl flex flex-col max-h-[92vh]`}>
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border"><h3 className="text-[15px] font-extrabold">{title}</h3><button onClick={onClose} className="text-[18px] text-ink-muted hover:text-ink leading-none">✕</button></div>
         <div className="p-5 overflow-y-auto">{children}</div>
         <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-border"><button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button><button className="btn btn-primary btn-sm" onClick={onSave}>{saveLabel}</button></div>
