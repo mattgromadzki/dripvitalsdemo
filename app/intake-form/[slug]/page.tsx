@@ -38,6 +38,7 @@ export default function IntakeFormPage() {
   const affiliateRef = useRef<string>("");
   const leadEmailRef = useRef<string>("");
   const startedRef = useRef(false);
+  const idFiledRef = useRef(false);
   useEffect(() => {
     try {
       const p = new URLSearchParams(window.location.search);
@@ -160,7 +161,9 @@ export default function IntakeFormPage() {
       brandId,
       first, last, name, email: client.email, phone: client.phone,
       age: ageFrom(dob), gender: gender as "M" | "F" | "Other", state, status: "pending" as const, lifecycle: "awaiting_review" as const,
-      dob: dob || undefined, goalWt: undefined, zip: client.address?.zip || undefined,
+      dob: dob || undefined, goalWt: undefined,
+      address: client.address?.line1 || undefined, apt: client.address?.apt || undefined,
+      city: client.address?.city || undefined, zip: client.address?.zip || undefined,
       plan: tx.med, dose: "0.25mg", week: 0, provider: "Unassigned", doctorId: 1, pharmacyId: 1,
       wt: weight, wtStart: weight, bmi, bp: "—", hr: 0,
       ...(heightIn > 0 ? { heightIn: Math.round(heightIn) } : {}),
@@ -364,7 +367,12 @@ export default function IntakeFormPage() {
             .flatMap((sec) => sec.items)
             .filter((it) => it.answer !== undefined && it.answer !== "")
             .slice(0, 150)
-            .map((it) => ({ q: String(it.question).slice(0, 300), a: String(it.answer).slice(0, 600) }));
+            .map((it) => {
+              let a = String(it.answer);
+              if (a.startsWith("data:")) a = "📎 Uploaded";
+              else if (a === "__SUBMIT_LATER__") a = "Will submit later";
+              return { q: String(it.question).slice(0, 300), a: a.slice(0, 600) };
+            });
           // Vitals land on the profile as soon as they're answered — not only at
           // payment. Same parsing as completion (imperial + metric, plain
           // weight/height questions, BMI recompute).
@@ -387,7 +395,8 @@ export default function IntakeFormPage() {
               if (ftIn) hIn = hIn || parseInt(ftIn[1], 10) * 12 + parseInt(ftIn[2], 10);
               else { const n = parseFloat(str.replace(/[^0-9.]/g, "")); if (!hIn && n >= 36 && n <= 96) hIn = Math.round(n); }
             } else if (q.type === "date" && /birth|dob/i.test(q.text) && typeof raw === "string") {
-              dobV = raw;
+              if (raw.startsWith("{")) { try { const o = JSON.parse(raw); if (o.y && o.m && o.d) dobV = `${o.y}-${o.m}-${o.d}`; } catch { /* ignore */ } }
+              else dobV = raw;
             } else if (/gender|sex\b/i.test(q.text) && typeof raw === "string") {
               sexV = /^m/i.test(raw) ? "M" : /^f/i.test(raw) ? "F" : "";
             }
@@ -395,6 +404,32 @@ export default function IntakeFormPage() {
           if (!bmiV && w > 0 && hIn > 0) bmiV = Math.round(((703 * w) / (hIn * hIn)) * 10) / 10;
           const curP = usePatients.getState().patients.find((x) => x.id === createdPatientId.current);
           const vitals: Record<string, unknown> = {};
+          // Shipping address parts sync live too, so the chart matches the form.
+          const a = cl.address;
+          if (a?.line1) vitals.address = a.line1;
+          if (a?.apt) vitals.apt = a.apt;
+          if (a?.city) vitals.city = a.city;
+          if (a?.state) vitals.state = a.state;
+          if (a?.zip) vitals.zip = a.zip;
+          // File an uploaded government ID as a real document immediately (not
+          // only at payment), so staff can view it even for abandoned intakes.
+          if (!idFiledRef.current) {
+            for (const q of form.questions) {
+              if (q.type !== "file") continue;
+              const rawId = cl.answers[q.id];
+              if (typeof rawId !== "string" || !rawId.startsWith("data:image")) continue;
+              if (!/\b(id|identity|licen[sc]e|passport|government)\b/i.test(q.text)) continue;
+              idFiledRef.current = true;
+              const ts = nowParts();
+              fetch("/api/patient-documents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+                patientId: createdPatientId.current, category: "id",
+                title: `Government ID — ${cl.first || ""} ${cl.last || ""}`.trim(), icon: "🪪",
+                createdAt: ts.int, createdDate: `Today · ${ts.display}`,
+                idPayload: { dataUrl: rawId, mimeType: "image/jpeg", label: `${a?.state || "—"} ID`, side: "front", verified: false },
+              }) }).catch(() => { idFiledRef.current = false; });
+              break;
+            }
+          }
           if (w > 0) { vitals.wt = w; if (!curP?.wtStart) vitals.wtStart = w; }
           if (hIn > 0) vitals.heightIn = Math.round(hIn);
           if (bmiV > 0) vitals.bmi = bmiV;

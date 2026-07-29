@@ -38,9 +38,14 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   // demo seed patients that have no address on file.
   const STREETS = ["Ocean Drive", "Bayview Ave", "Sunset Blvd", "Park St", "Coral Way", "Magnolia Ln"];
   const CITIES: Record<string, string> = { FL: "Miami", GA: "Atlanta", TX: "Austin", CA: "Los Angeles", NY: "New York" };
-  const street = p.address || `${100 + (seed * 7) % 9900} ${STREETS[seed % STREETS.length]}`;
-  const city = p.city || CITIES[p.state] || "Miami";
-  const zip = p.zip || String(10000 + (seed * 131) % 89999).slice(0, 5);
+  // Fabricated address parts are for DEMO data only. A real patient's chart
+  // must never show an invented street/city/zip — a fabricated address on a
+  // medical record can end up on a pharmacy label. In production, blank means
+  // blank.
+  const FAB = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+  const street = p.address || (FAB ? `${100 + (seed * 7) % 9900} ${STREETS[seed % STREETS.length]}` : "");
+  const city = p.city || (FAB ? (CITIES[p.state] || "Miami") : "");
+  const zip = p.zip || (FAB ? String(10000 + (seed * 131) % 89999).slice(0, 5) : "");
 
   // Side effects — patients with "Urgent" tags get a moderate unresolved one
   const hasUrgent = (p.tags || []).some((t) => t.toLowerCase().startsWith("urgent"));
@@ -145,7 +150,13 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   // real weight exists — a brand-new intake with wt=0 must NOT get a fabricated
   // curve (the noise math was producing phantom entries like "0.8 lb").
   const startDate = new Date(p.startDate || "2026-01-01");
-  if (currentW > 0) {
+  const DEMO_CURVES = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+  if (currentW > 0 && !DEMO_CURVES) {
+    // Production: the log holds exactly what we know — the real weight. No
+    // synthetic curve, no noise (which was distorting 130 lb into "129.7 lb").
+    weightLog.push(currentW);
+    weightDates.push("Intake");
+  } else if (currentW > 0) {
     for (let w = 0; w <= weeks; w++) {
       const t = w / weeks;
       // Add slight noise so the curve isn't dead-straight
@@ -244,7 +255,7 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   }
 
   return {
-    dob: p.dob || deriveDOB(p.age),
+    dob: p.dob || (process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false" ? deriveDOB(p.age) : ""),
     gender: p.gender === "F" ? "Female" : p.gender === "M" ? "Male" : "Non-binary",
     careCoordinator: p.week === 0 ? "Unassigned" : ["Jordan Blake", "Taylor Nguyen", "Sam Rivera", "Casey Morgan", "Riley Chen"][seed % 5],
     lastLogin: p.week === 0 ? "Never" : ["Today, 9:14 AM", "Yesterday, 7:02 PM", "May 29, 2026", "May 27, 2026", "May 24, 2026"][seed % 5],

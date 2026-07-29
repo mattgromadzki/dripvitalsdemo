@@ -37,6 +37,9 @@ function fmtDob(raw?: string): string {
   if (!raw) return "";
   const s = raw.trim();
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+  if (s.startsWith("{")) {
+    try { const o = JSON.parse(s); if (o.m && o.d && o.y) return `${String(o.m).padStart(2, "0")}/${String(o.d).padStart(2, "0")}/${o.y}`; } catch { /* fall through */ }
+  }
   const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (iso) return `${iso[2].padStart(2, "0")}/${iso[3].padStart(2, "0")}/${iso[1]}`;
   const d = new Date(s);
@@ -353,11 +356,11 @@ export default function PatientDetailPage() {
                     ["Sex", fmtSex(patient.gender)],
                     ["Phone", patient.phone || "—"],
                     ["Email", patient.email || "—"],
-                    ["Address", addr?.street || patient.address || "—"],
-                    ["Address 2 (Apt)", addr?.line2 || patient.apt || "—"],
-                    ["City", addr?.city || patient.city || "—"],
-                    ["State", addr?.state || patient.state || "—"],
-                    ["Zip code", addr?.zip || patient.zip || "—"],
+                    ["Address", patient.address || addr?.street || "—"],
+                    ["Address 2 (Apt)", patient.apt || addr?.line2 || "—"],
+                    ["City", patient.city || addr?.city || "—"],
+                    ["State", patient.state || addr?.state || "—"],
+                    ["Zip code", patient.zip || addr?.zip || "—"],
                     ["Affiliate", patient.affiliate || "—"],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex items-baseline gap-3 px-5 py-[9px] border-b border-surface-3 last:border-none">
