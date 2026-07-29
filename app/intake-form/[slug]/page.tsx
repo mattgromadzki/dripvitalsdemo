@@ -62,14 +62,16 @@ export default function IntakeFormPage() {
           fetch("/api/store/treatments", { cache: "no-store" }).then((r) => r.json()).catch(() => null),
         ]);
         if (!alive) return;
-        // Never swap the form under a patient who has already started answering
-        // — their session must stay internally consistent. (The built-in copy
-        // renders instantly; the server copy applies only if it arrives first.)
-        if (startedRef.current) return;
         const cur = useTreatmentsIntake.getState();
+        // TREATMENTS always hydrate: the saved catalog carries the uploaded
+        // product pictures and any live price edits, and the selection screen
+        // is reached minutes after this fetch completes — without this, cards
+        // show the built-in catalog's generic art instead of real photos.
+        // FORM QUESTIONS hydrate only before the patient starts answering —
+        // their questionnaire must never change mid-session.
         useTreatmentsIntake.setState({
-          forms: (f?.data ?? cur.forms) as typeof cur.forms,
           treatments: (t?.data ?? cur.treatments) as typeof cur.treatments,
+          ...(startedRef.current ? {} : { forms: (f?.data ?? cur.forms) as typeof cur.forms }),
         });
       } catch { /* ignore — fall back to local */ }
       if (alive) setFormsReady(true);
