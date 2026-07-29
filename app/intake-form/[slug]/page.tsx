@@ -405,7 +405,16 @@ export default function IntakeFormPage() {
           const curP = usePatients.getState().patients.find((x) => x.id === createdPatientId.current);
           const vitals: Record<string, unknown> = {};
           // Shipping address parts sync live too, so the chart matches the form.
-          const a = cl.address;
+          // Primary source: the address QUESTION's answer (a JSON string with
+          // line1/line2/city/state/zip) — it exists as soon as the patient fills
+          // the step. client.address is only a fallback (it fills at payment).
+          let a: { line1?: string; apt?: string; line2?: string; city?: string; state?: string; zip?: string } | undefined = undefined;
+          try {
+            const addrQ = form.questions.find((q) => q.type === "address");
+            const rawA = addrQ ? cl.answers[addrQ.id] : undefined;
+            if (typeof rawA === "string" && rawA.startsWith("{")) { const o = JSON.parse(rawA); a = { line1: o.line1, apt: o.line2 || o.apt, city: o.city, state: o.state, zip: o.zip }; }
+          } catch { /* fall back below */ }
+          if (!a || !a.line1) a = cl.address;
           if (a?.line1) vitals.address = a.line1;
           if (a?.apt) vitals.apt = a.apt;
           if (a?.city) vitals.city = a.city;
@@ -413,6 +422,7 @@ export default function IntakeFormPage() {
           if (a?.zip) vitals.zip = a.zip;
           // File an uploaded government ID as a real document immediately (not
           // only at payment), so staff can view it even for abandoned intakes.
+          try {
           if (!idFiledRef.current) {
             for (const q of form.questions) {
               if (q.type !== "file") continue;
@@ -430,6 +440,7 @@ export default function IntakeFormPage() {
               break;
             }
           }
+          } catch { /* ID filing must never break the mirror */ }
           if (w > 0) { vitals.wt = w; if (!curP?.wtStart) vitals.wtStart = w; }
           if (hIn > 0) vitals.heightIn = Math.round(hIn);
           if (bmiV > 0) vitals.bmi = bmiV;

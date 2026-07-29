@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BUILD_TAG } from "@/lib/buildTag";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { usePortalRecords } from "@/lib/hooks/usePortalRecords";
@@ -270,6 +271,9 @@ function SidebarInner({ rail }: { rail?: boolean }) {
           </div>
         );
       })}
+      <div className="px-4 py-3 mt-2 text-[9.5px] text-ink-muted-2 select-none" title="Deployed build">
+        build {BUILD_TAG}
+      </div>
     </>
   );
 }
