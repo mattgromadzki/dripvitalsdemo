@@ -129,7 +129,11 @@ export default function PatientDetailPage() {
   const logAudit = (action: string, area = "Chart") => setAudit((a) => [{ time: `Now`, user: "Admin", action, area, device: "Browser" }, ...a]);
 
   // ── Government-ID photo (real capture, stored inline on a patient document) ──
-  const idDoc = patientDocs.find((d) => d.category === "id" && d.idPayload?.dataUrl);
+  // All uploaded IDs are kept as separate documents (history in Documents & ID);
+  // the viewer and rail thumbnail show the MOST RECENT one.
+  const idDoc = patientDocs
+    .filter((d) => d.category === "id" && d.idPayload?.dataUrl)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
   const idImg = idDoc?.idPayload?.dataUrl;
   const idIsVerified = idDoc ? !!idDoc.idPayload?.verified : extra.idVerified;
   async function handleIdUpload(file: File | undefined) {
@@ -346,6 +350,23 @@ export default function PatientDetailPage() {
                       <div className="text-[14px] font-bold text-ink-2">{fmtHeight(patient.heightIn)}</div>
                     </div>
                   </div>
+                  {/* Latest government ID — click to open large and verify. */}
+                  <button className="mt-3.5 w-full text-left cursor-pointer bg-transparent border-0 p-0" onClick={() => setModal("id")} title={idImg ? "Open ID to review and verify" : "No ID uploaded yet"}>
+                    {idImg ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={idImg} alt="Government ID" className="w-full max-h-[120px] rounded-[10px] border border-border object-cover bg-surface-3" />
+                        <div className="flex items-center justify-center gap-1.5 mt-1.5 text-[10.5px] font-semibold">
+                          <span className="text-ink-muted">Government ID</span>
+                          <span className={idIsVerified ? "text-[#2e9e6b]" : "text-[#b45309]"}>{idIsVerified ? "✓ Verified" : "· Pending review"}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full h-[86px] rounded-[10px] border border-dashed border-border-2 flex flex-col items-center justify-center text-ink-muted-2 text-[11px]">
+                        <span className="text-[22px] leading-none mb-1">🪪</span>No ID on file
+                      </div>
+                    )}
+                  </button>
                 </div>
                 {/* One field per line */}
                 <div className="flex-1 min-w-0">
