@@ -1,13 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Key, ReactNode } from "react";
 import { Pill } from "@/components/ui/Pill";
 import { Toast } from "@/components/ui/Toast";
 import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
 import { toast } from "@/lib/hooks/useToast";
 import { useNotifications } from "@/lib/hooks/useNotifications";
+import { getHealth, testConnector } from "@/lib/integrations/healthClient";
+import type { HealthItem } from "@/lib/integrations/health";
 import type { NotificationCategory, NotificationChannel, NotificationRule } from "@/lib/types";
+
+interface ChannelStatus { configured: boolean; provider: string; status: string; intent: "green" | "amber" | "muted"; }
+
+// Real provider health (email/SMS) is read from /api/integrations/health, which
+// reflects the actual configured env credentials. Push has no provider wired;
+// in-app is delivered natively and always available.
+function channelsFromHealth(health: HealthItem[]): Record<NotificationChannel, ChannelStatus> {
+  const email = health.find((h) => h.id === "email");
+  const sms = health.find((h) => h.id === "sms");
+  const live = (h?: HealthItem): ChannelStatus =>
+    h?.status === "connected"
+      ? { configured: true, provider: h.name, status: "Healthy", intent: "green" }
+      : { configured: false, provider: h?.name || "—", status: "Mock mode", intent: "amber" };
+  return {
+    email: live(email),
+    sms: live(sms),
+    push: { configured: false, provider: "None", status: "Not configured", intent: "muted" },
+    in_app: { configured: true, provider: "Native", status: "Healthy", intent: "green" },
+  };
+}
 
 type Tab = "clinical" | "patient" | "staff" | "log";
 
@@ -57,21 +79,19 @@ export default function NotificationsPage() {
 
   const [tab, setTab]     = useState<Tab>("clinical");
   const [search, setSearch] = useState("");
+  const [testing, setTesting] = useState(false);
 
-  // Channel availability — synthetic config
-  const channels = {
-    email:  { configured: true,  provider: "Resend",   status: "Healthy" },
-    sms:    { configured: true,  provider: "Twilio",   status: "Healthy" },
-    push:   { configured: true,  provider: "OneSignal", status: "Healthy" },
-    in_app: { configured: true,  provider: "Native",   status: "Healthy" },
-  };
+  // Live provider health for the channel strip (email/SMS reflect real creds).
+  const [health, setHealth] = useState<HealthItem[]>([]);
+  useEffect(() => { getHealth().then(setHealth).catch(() => {}); }, []);
+  const channels = useMemo(() => channelsFromHealth(health), [health]);
 
   // KPIs
   const counts = useMemo(() => {
     return {
       total: rules.length,
       activeRules: rules.filter((r) => Object.values(r.channels).some((v) => v)).length,
-      sentToday:   log.filter((l) => l.time.includes("AM") || l.time.includes("PM") && !l.time.toLowerCase().includes("yesterday") && !l.time.startsWith("May 2")).length,
+      delivered:   log.filter((l) => l.status === "delivered").length,
       failed:      log.filter((l) => l.status === "failed").length,
     };
   }, [rules, log]);
@@ -95,8 +115,27 @@ export default function NotificationsPage() {
     return [...list].sort((a, b) => b.orderedAt - a.orderedAt);
   }, [log, search]);
 
+  // Rules + quiet hours auto-persist to the server on every change (see
+  // PersistHydrator), so this is a confirmation rather than the save itself.
   function handleSaveAll() {
-    toast("💾 Notification settings saved · All staff will be notified of changes");
+    toast("✓ All notification settings are saved automatically");
+  }
+
+  // Live provider check: ping the real email + SMS endpoints and report back.
+  async function handleTestChannels() {
+    if (testing) return;
+    setTesting(true);
+    toast("🧪 Testing email + SMS providers…");
+    try {
+      const [email, sms] = await Promise.all([testConnector("email"), testConnector("sms")]);
+      const line = (label: string, r: { ok: boolean; message?: string; error?: string }) =>
+        `${r.ok ? "✓" : "✗"} ${label}: ${r.ok ? (r.message || "reachable") : (r.error || "failed")}`;
+      toast(`${line("Email", email)}\n${line("SMS", sms)}`);
+    } catch {
+      toast("⚠️ Couldn't reach the provider health check");
+    } finally {
+      setTesting(false);
+    }
   }
 
   return (
@@ -110,8 +149,8 @@ export default function NotificationsPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="btn btn-ghost btn-sm" onClick={() => toast("🧪 Test notification sent to your email + SMS")}>
-            🧪 Test Channels
+          <button className="btn btn-ghost btn-sm" onClick={handleTestChannels} disabled={testing}>
+            🧪 {testing ? "Testing…" : "Test Channels"}
           </button>
           <button className="btn btn-primary btn-sm" onClick={handleSaveAll}>
             💾 Save Changes
@@ -131,12 +170,12 @@ export default function NotificationsPage() {
           trendColor="var(--color-brand)"
         />
         <KpiCard
-          label="Sent Today"
-          value={6}
+          label="Delivered"
+          value={counts.delivered}
           icon="📤"
           iconBg="var(--color-green-soft)"
           iconColor="var(--color-green)"
-          trend="↑ +18% vs yesterday"
+          trend={`${log.length} logged`}
           trendColor="var(--color-green)"
         />
         <KpiCard
@@ -163,7 +202,7 @@ export default function NotificationsPage() {
       <div className="bg-surface border border-border rounded-lg p-4 mb-4">
         <div className="text-[10.5px] font-bold uppercase tracking-widest text-ink-muted mb-3">Delivery Channels · Provider Status</div>
         <div className="grid grid-cols-4 gap-2.5 max-[700px]:grid-cols-2">
-          {(Object.entries(channels) as [NotificationChannel, typeof channels.email][]).map(([ch, cfg]) => (
+          {(Object.entries(channels) as [NotificationChannel, ChannelStatus][]).map(([ch, cfg]) => (
             <div key={ch} className="flex items-center gap-3 bg-surface-2 border border-border rounded-md p-2.5">
               <div className="w-9 h-9 rounded-md flex items-center justify-center text-[16px] flex-shrink-0 bg-surface border border-border">
                 {CHANNEL_ICON[ch]}
@@ -172,7 +211,7 @@ export default function NotificationsPage() {
                 <div className="text-[12.5px] font-bold text-ink">{CHANNEL_LABEL[ch]}</div>
                 <div className="text-[10.5px] text-ink-muted">{cfg.provider}</div>
               </div>
-              <Pill intent="green" dot>{cfg.status}</Pill>
+              <Pill intent={cfg.intent} dot>{cfg.status}</Pill>
             </div>
           ))}
         </div>
