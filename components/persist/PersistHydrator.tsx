@@ -35,6 +35,7 @@ import { useEmails } from "@/lib/hooks/useEmails";
 import { useSms } from "@/lib/hooks/useSms";
 import { useIntake } from "@/lib/hooks/useIntake";
 import { useNotifications } from "@/lib/hooks/useNotifications";
+import { useMarketing } from "@/lib/hooks/useMarketing";
 
 const CATALOG_POLL = 30000; // config/reference data changes rarely
 
@@ -79,6 +80,11 @@ export function PersistHydrator() {
     // a runtime feed, not user config, so it isn't mirrored here).
     serverPersist(useNotifications, "notifications", "rules", CATALOG_POLL);
     serverPersist(useNotifications, "notification-prefs", "quietHours", CATALOG_POLL);
+    // Marketing planner: campaigns + automations carry real edits (create,
+    // pause/resume, duplicate, toggle). Templates/segments are static reference
+    // lists, so they stay seed-only.
+    serverPersist(useMarketing, "marketing-campaigns", "campaigns", CATALOG_POLL);
+    serverPersist(useMarketing, "marketing-automations", "automations", CATALOG_POLL);
     serverPersist(useReferrals, "referrals", "referrals", CATALOG_POLL);
     serverPersist(useAdverse, "adverse", "reports", CATALOG_POLL);
     serverPersist(useCampaigns, "campaigns", "campaigns", CATALOG_POLL);

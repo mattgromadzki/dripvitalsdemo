@@ -16,6 +16,7 @@ interface MarketingState {
   segments: AudienceSegment[];
   addCampaign: (c: Omit<Campaign, "id">) => Campaign;
   setCampaignStatus: (id: string, status: CampaignStatus) => void;
+  duplicateCampaign: (id: string) => Campaign | null;
   removeCampaign: (id: string) => void;
   toggleAutomation: (id: string) => void;
 }
@@ -39,6 +40,20 @@ export const useMarketing = create<MarketingState>((set) => ({
     set((s) => ({
       campaigns: s.campaigns.map((c) => (c.id === id ? { ...c, status } : c)),
     }));
+  },
+  duplicateCampaign: (id) => {
+    const src = useMarketing.getState().campaigns.find((c) => c.id === id);
+    if (!src) return null;
+    // Clone as a fresh draft with zeroed performance metrics.
+    const copy: Campaign = {
+      ...src,
+      id: nextCampaignId(),
+      name: `${src.name} (copy)`,
+      status: "draft",
+      sent: 0, delivered: 0, opens: 0, clicks: 0, conversions: 0, revenue: 0,
+    };
+    set((s) => ({ campaigns: [copy, ...s.campaigns] }));
+    return copy;
   },
   removeCampaign: (id) => {
     set((s) => ({ campaigns: s.campaigns.filter((c) => c.id !== id) }));

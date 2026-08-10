@@ -9,6 +9,8 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { NewCampaignModal } from "@/components/modules/NewCampaignModal";
 import { toast } from "@/lib/hooks/useToast";
 import { useMarketing } from "@/lib/hooks/useMarketing";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { sendEmail } from "@/lib/email/client";
 import type { Campaign, CampaignStatus, CampaignChannel } from "@/lib/types";
 
 type Tab = "campaigns" | "automations" | "templates" | "segments";
@@ -53,8 +55,35 @@ export default function MarketingPage() {
   const segments          = useMarketing((s) => s.segments);
   const addCampaign       = useMarketing((s) => s.addCampaign);
   const setCampaignStatus = useMarketing((s) => s.setCampaignStatus);
+  const duplicateCampaign = useMarketing((s) => s.duplicateCampaign);
   const removeCampaign    = useMarketing((s) => s.removeCampaign);
   const toggleAutomation  = useMarketing((s) => s.toggleAutomation);
+  const user              = useAuth((s) => s.user);
+
+  // Real send: fire an actual email of the campaign's subject/preview to the
+  // logged-in user via the provider (mock-echoes when no key is configured).
+  async function sendTest(c: Campaign) {
+    const to = user?.email;
+    if (!to) { toast("⚠️ Sign in to send a test"); return; }
+    toast(`🧪 Sending test of "${c.name}" to ${to}…`);
+    const res = await sendEmail({
+      to,
+      toName: user?.name,
+      subject: `[Test] ${c.subject || c.name}`,
+      html: `<div style="font-family:system-ui,Arial,sans-serif;font-size:15px;line-height:1.5">
+        <p>This is a test send of the <b>${c.name}</b> campaign.</p>
+        <p>Audience: ${c.audience} · Channel: ${CHANNEL_LABEL[c.channel]}</p>
+      </div>`,
+    });
+    toast(res.ok
+      ? `✓ Test sent to ${to}${res.provider === "mock" ? " (mock — no email provider configured)" : ` via ${res.provider}`}`
+      : `⚠️ Test failed: ${res.error || "unknown error"}`);
+  }
+
+  function duplicate(c: Campaign) {
+    const copy = duplicateCampaign(c.id);
+    if (copy) toast(`📋 Duplicated as "${copy.name}" (draft)`);
+  }
 
   const [tab, setTab]                 = useState<Tab>("campaigns");
   const [filter, setFilter]           = useState<"all" | CampaignStatus>("all");
@@ -271,6 +300,8 @@ export default function MarketingPage() {
                           setCampaignStatus(c.id, "active");
                           toast(`🚀 ${c.name} launched`);
                         }}
+                        onDuplicate={() => duplicate(c)}
+                        onSendTest={() => sendTest(c)}
                         onRemove={() => setRemoveTarget(c)}
                         delay={i * 20}
                       />
@@ -332,10 +363,10 @@ export default function MarketingPage() {
                     </div>
                   </div>
                   <div className="flex gap-1.5 mt-3 pt-3 border-t border-border">
-                    <button className="btn btn-ghost btn-sm" onClick={() => toast(`📋 ${a.name} flow editor opened`)}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => toast("🛠 The visual flow editor isn't available yet")}>
                       🛠 Edit Flow
                     </button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => toast(`📊 ${a.name} analytics opened`)}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => toast("📊 Automation analytics aren't available yet")}>
                       📊 Stats
                     </button>
                     <div className="flex-1" />
@@ -385,15 +416,12 @@ export default function MarketingPage() {
                     Used in <strong className="text-ink-2">{t.uses}</strong> campaign{t.uses === 1 ? "" : "s"}
                   </span>
                   <div className="flex-1" />
-                  <button className="btn btn-ghost btn-sm" onClick={() => toast(`✏ ${t.name} editor opened`)}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => toast("✏ Template editing isn't available yet")}>
                     ✏ Edit
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
-                    onClick={() => {
-                      setNewOpen(true);
-                      toast(`📋 Starting new campaign from ${t.name}`);
-                    }}
+                    onClick={() => setNewOpen(true)}
                   >
                     + Use
                   </button>
@@ -423,13 +451,10 @@ export default function MarketingPage() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <button className="btn btn-primary btn-sm" onClick={() => {
-                    setNewOpen(true);
-                    toast(`📋 Starting new campaign for "${s.name}"`);
-                  }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => setNewOpen(true)}>
                     📣 Campaign
                   </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => toast(`👥 Viewing ${s.count} members of ${s.name}`)}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => toast("👥 The member list view isn't available yet")}>
                     👥 View
                   </button>
                 </div>
@@ -475,11 +500,13 @@ interface CampaignRowProps {
   onPause: () => void;
   onResume: () => void;
   onLaunch: () => void;
+  onDuplicate: () => void;
+  onSendTest: () => void;
   onRemove: () => void;
   delay: number;
 }
 
-function CampaignRow({ campaign: c, expanded, onToggle, onPause, onResume, onLaunch, onRemove, delay }: CampaignRowProps) {
+function CampaignRow({ campaign: c, expanded, onToggle, onPause, onResume, onLaunch, onDuplicate, onSendTest, onRemove, delay }: CampaignRowProps) {
   const openRate  = c.delivered > 0 ? (c.opens / c.delivered) * 100 : 0;
   const clickRate = c.delivered > 0 ? (c.clicks / c.delivered) * 100 : 0;
   const convRate  = c.clicks > 0    ? (c.conversions / c.clicks) * 100 : 0;
@@ -609,16 +636,16 @@ function CampaignRow({ campaign: c, expanded, onToggle, onPause, onResume, onLau
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              <button className="btn btn-ghost btn-sm" onClick={() => toast(`✏ ${c.name} editor opened`)}>
+              <button className="btn btn-ghost btn-sm" onClick={() => toast("✏ Campaign editing isn't available yet")}>
                 ✏ Edit
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => toast(`📊 ${c.name} A/B test results`)}>
+              <button className="btn btn-ghost btn-sm" onClick={() => toast("📊 A/B test reporting isn't available yet")}>
                 📊 A/B Results
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => toast(`📋 ${c.name} duplicated`)}>
+              <button className="btn btn-ghost btn-sm" onClick={onDuplicate}>
                 📋 Duplicate
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => toast(`🧪 Sending test email to your inbox`)}>
+              <button className="btn btn-ghost btn-sm" onClick={onSendTest}>
                 🧪 Send Test
               </button>
               <div className="flex-1" />
