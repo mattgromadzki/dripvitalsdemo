@@ -108,7 +108,7 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
   const requestReset = usePatientAuth((s) => s.requestReset);
   const requestResetEmail = usePatientAuth((s) => s.requestResetEmail);
   const confirmReset = usePatientAuth((s) => s.confirmReset);
-  const resetPassword = usePatientAuth((s) => s.resetPassword);
+  const setupPassword = usePatientAuth((s) => s.setupPassword);
   const me = patients.find((p) => p.id === sessionPid) ?? authPatient ?? null;
   const pid = me?.id ?? "";
   const extra = useMemo(() => (me ? getPatientExtra(me) : null), [me]);
@@ -332,10 +332,12 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
       nav("home");
       return;
     }
-    const res = await resetPassword(authEmail, resetPw, patients);
-    if (!res.ok) { setAuthErr(res.error || "Could not reset password."); return; }
+    // No token → this is a welcome ?setpw= link: first-time setup only. The
+    // server rejects claimed accounts, steering the patient to the forgot flow.
+    const res = await setupPassword(authEmail, resetPw);
+    if (!res.ok) { setAuthErr(res.error || "Could not set password."); return; }
     setAuthErr(null); setResetPw(""); setResetSent(false); setAuthView("login");
-    toast("Password updated — sign in with your new password.");
+    toast("Password set — sign in with your new password.");
   }
 
   function sendMessage() {

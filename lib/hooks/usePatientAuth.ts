@@ -24,7 +24,7 @@ interface PatientAuthState {
   requestReset: () => { ok: boolean };
   requestResetEmail: (email: string) => Promise<{ ok: boolean }>;
   confirmReset: (token: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  resetPassword: (email: string, newPassword: string, patients: Patient[]) => Promise<{ ok: boolean; error?: string }>;
+  setupPassword: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 let hydrating = false;
@@ -80,14 +80,15 @@ export const usePatientAuth = create<PatientAuthState>((set) => ({
     } catch { return { ok: false, error: "Network error — please try again." }; }
   },
 
-  resetPassword: async (email, newPassword, patients) => {
-    const p = findByEmail(patients, email);
-    if (!p) return { ok: false, error: "No account found with that email." };
-    if (newPassword.length < 8) return { ok: false, error: "Password must be at least 8 characters." };
+  // First-time password setup for an unclaimed account (intake success screen,
+  // welcome ?setpw= links). The server refuses once a password exists — changing
+  // one always goes through requestResetEmail + confirmReset.
+  setupPassword: async (email, password) => {
+    if (password.length < 8) return { ok: false, error: "Password must be at least 8 characters." };
     try {
-      const r = await fetch("/api/patient/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, newPassword }) });
+      const r = await fetch("/api/patient/setup-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       const d = await r.json();
-      return d?.ok ? { ok: true } : { ok: false, error: d?.error || "Could not reset password." };
+      return d?.ok ? { ok: true } : { ok: false, error: d?.error || "Could not set password." };
     } catch { return { ok: false, error: "Network error — please try again." }; }
   },
 }));

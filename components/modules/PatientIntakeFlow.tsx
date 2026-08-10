@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 import { toast } from "@/lib/hooks/useToast";
 import { useTreatmentsIntake, monthlyEquivalent } from "@/lib/hooks/useTreatmentsIntake";
 import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
-import { usePatients } from "@/lib/hooks/usePatients";
 import type { BaskQuestion, BaskTreatment, BaskBillingCycle } from "@/lib/types/treatmentsIntake";
 import { disqualifierReason } from "@/lib/clinical/glp1Screening";
 import { consentsFor } from "@/lib/legal/documents";
@@ -196,7 +195,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
 
   // Success-screen password creation (option 1). Sets the patient's portal
   // password for the email captured during intake.
-  const setPortalPassword = usePatientAuth((s) => s.resetPassword);
+  const setPortalPassword = usePatientAuth((s) => s.setupPassword);
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [pwSaved, setPwSaved] = useState(false);
@@ -207,7 +206,7 @@ export function PatientIntakeFlow({ formId, onExit, live = false, onComplete, on
     if (pw !== pw2) { setPwErr("Passwords don't match."); return; }
     const email = (useTreatmentsIntake.getState().clients.find((c) => c.id === leadId)?.email || "").trim();
     if (!email) { setPwErr("We couldn't find your email — we'll send you a link to set it."); return; }
-    const res = await setPortalPassword(email, pw, usePatients.getState().patients);
+    const res = await setPortalPassword(email, pw);
     if (!res.ok) { setPwErr(res.error || "Couldn't set password here — check the link we emailed you."); return; }
     setPwSaved(true);
   }

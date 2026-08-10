@@ -61,6 +61,14 @@ export async function setPatientPassword(email: string, newPassword: string): Pr
   if (r) await r.hset(PW_KEY, { [email.trim().toLowerCase()]: hashPassword(newPassword) });
 }
 
+/** True if the patient has already set their own portal password (account is claimed). */
+export async function hasPatientPassword(email: string): Promise<boolean> {
+  const r = redis();
+  if (!r) return false;
+  const h = await r.hget(PW_KEY, email.trim().toLowerCase());
+  return !!h;
+}
+
 /**
  * Emails (lowercased) of patients who have set their own portal password — i.e.
  * activated their login via the welcome / reset flow. A patient is "activated"
