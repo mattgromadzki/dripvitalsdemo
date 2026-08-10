@@ -1,6 +1,8 @@
 import { getEmailCreds, getSmsCreds } from "@/lib/integrations/store";
+import { requirePerm } from "@/lib/auth/authorize";
 
 export async function POST(req: Request) {
+  const gate = await requirePerm(req, "integrations.manage"); if (gate) return gate;
   let which: string;
   try { which = (await req.json())?.which; } catch { return Response.json({ ok: false, error: "Invalid body." }, { status: 400 }); }
   try {
