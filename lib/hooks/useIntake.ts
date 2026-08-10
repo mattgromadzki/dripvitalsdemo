@@ -20,11 +20,11 @@ const SEED: IntakeSubmission[] = [
 
 interface State {
   submissions: IntakeSubmission[];
-  decide: (id: string, status: IntakeStatus, note: string) => void;
+  decide: (id: string, status: IntakeStatus, note: string, decidedBy?: string) => void;
 }
 export const useIntake = create<State>((set) => ({
   submissions: SEED,
-  decide: (id, status, note) => set((s) => ({
-    submissions: s.submissions.map((x) => x.id === id ? { ...x, status, providerNote: note, decidedBy: "Dr. Tancinco", decidedAt: new Date().toISOString() } : x),
+  decide: (id, status, note, decidedBy) => set((s) => ({
+    submissions: s.submissions.map((x) => x.id === id ? { ...x, status, providerNote: note, decidedBy: decidedBy || "Provider", decidedAt: new Date().toISOString() } : x),
   })),
 }));

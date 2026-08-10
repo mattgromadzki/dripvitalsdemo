@@ -20,6 +20,7 @@ const ALLOW = new Set([
   "integrations", "rbac", "knowledge-base", "reviews", "leads",
   "consent", "patient-documents", "titration",
   "referrals", "adverse", "campaigns", "affiliates", "billing",
+  "intake-review",
 ]);
 
 // Readable without a staff session — the PUBLIC patient intake form needs these
@@ -55,6 +56,7 @@ const WRITE_PERM: Record<string, string> = {
   "consent": "patients.edit",
   "patient-documents": "patients.edit",
   "titration": "titration.manage",
+  "intake-review": "intake.review",
   "referrals": "patients.edit",
   "adverse": "adverse.manage",
   "campaigns": "campaigns.send",

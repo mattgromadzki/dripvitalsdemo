@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Toast } from "@/components/ui/Toast";
 import { toast } from "@/lib/hooks/useToast";
 import { useIntake } from "@/lib/hooks/useIntake";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { computeFlags, recommendation, type Severity } from "@/lib/intake/screening";
 import type { IntakeSubmission, IntakeStatus } from "@/lib/intake/types";
 
@@ -17,6 +18,7 @@ const flagsFor = (s: IntakeSubmission) => computeFlags(s.answers);
 export default function IntakeReviewPage() {
   const submissions = useIntake((s) => s.submissions);
   const decide = useIntake((s) => s.decide);
+  const user = useAuth((s) => s.user);
   const [filter, setFilter] = useState<IntakeStatus | "all">("pending");
   const [openId, setOpenId] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -37,7 +39,7 @@ export default function IntakeReviewPage() {
   function act(status: IntakeStatus) {
     if (!sel) return;
     if (status === "denied" && !note.trim()) { toast("Add a reason before denying"); return; }
-    decide(sel.id, status, note);
+    decide(sel.id, status, note, user?.name);
     toast(status === "approved" ? "✓ Approved — ready to prescribe" : status === "denied" ? "Denied" : "Info requested");
     setOpenId(null);
   }

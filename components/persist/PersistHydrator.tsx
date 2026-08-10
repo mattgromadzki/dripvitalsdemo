@@ -33,6 +33,7 @@ import { useAffiliates } from "@/lib/hooks/useAffiliates";
 import { useBilling } from "@/lib/hooks/useBilling";
 import { useEmails } from "@/lib/hooks/useEmails";
 import { useSms } from "@/lib/hooks/useSms";
+import { useIntake } from "@/lib/hooks/useIntake";
 
 const CATALOG_POLL = 30000; // config/reference data changes rarely
 
@@ -72,6 +73,7 @@ export function PersistHydrator() {
     serverPersist(useConsent, "consent", "records", CATALOG_POLL);
     serverPersist(usePatientDocuments, "patient-documents", "documents", CATALOG_POLL);
     serverPersist(useTitration, "titration", "plans", CATALOG_POLL);
+    serverPersist(useIntake, "intake-review", "submissions", CATALOG_POLL);
     serverPersist(useReferrals, "referrals", "referrals", CATALOG_POLL);
     serverPersist(useAdverse, "adverse", "reports", CATALOG_POLL);
     serverPersist(useCampaigns, "campaigns", "campaigns", CATALOG_POLL);
