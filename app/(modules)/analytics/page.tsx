@@ -6,13 +6,18 @@ import { useLeads } from "@/lib/hooks/useLeads";
 import { useSubscriptions } from "@/lib/hooks/useSubscriptions";
 import { useIntake } from "@/lib/hooks/useIntake";
 import { monthlyValue } from "@/lib/subscriptions/util";
-import { MONTHS, MRR_SERIES, NEW_SUBS, CHURNED_SUBS, SPEND, money, pct } from "@/lib/analytics/data";
+import { deriveTrends } from "@/lib/analytics/derive";
+import { ASSUMED_MONTHLY_AD_SPEND, money, pct } from "@/lib/analytics/data";
 
 export default function AnalyticsPage() {
   const patients = usePatients((s) => s.patients);
   const leads = useLeads((s) => s.leads);
   const subs = useSubscriptions((s) => s.subscriptions);
   const intakes = useIntake((s) => s.submissions);
+
+  // Live trend series derived from the subscription records (revenue collected,
+  // new subs, failed payments per month) — replaces the old seeded arrays.
+  const trends = useMemo(() => deriveTrends(subs, 6), [subs]);
 
   const m = useMemo(() => {
     const mrr = subs.reduce((a, s) => a + monthlyValue(s), 0) / 100;
@@ -21,11 +26,13 @@ export default function AnalyticsPage() {
     const churn = subs.length ? canceled / subs.length : 0;
     const arpu = active ? mrr / active : 0;
     const ltv = churn > 0 ? arpu / churn : arpu * 24;
-    const newThisMonth = NEW_SUBS[NEW_SUBS.length - 1];
-    const cac = newThisMonth ? SPEND[SPEND.length - 1] / newThisMonth : 0;
+    // New subs this month is real; ad spend has no data source, so CAC is an
+    // estimate against an assumed monthly spend (see analytics/data.ts).
+    const newThisMonth = trends.newSubs[trends.newSubs.length - 1];
+    const cac = newThisMonth ? ASSUMED_MONTHLY_AD_SPEND / newThisMonth : 0;
     const conversion = (patients.length + leads.length) ? patients.length / (patients.length + leads.length) : 0;
     return { mrr, active, churn, arpu, ltv, cac, conversion };
-  }, [subs, patients, leads]);
+  }, [subs, patients, leads, trends]);
 
   // revenue by medication (live)
   const byMed = useMemo(() => {
@@ -56,15 +63,16 @@ export default function AnalyticsPage() {
   );
 
   const PALETTE = ["#2f6df6", "#0e9f6e", "#7c3aed", "#f59e0b", "#0ea5e9"];
-  const maxMrr = Math.max(...MRR_SERIES);
-  const maxBars = Math.max(...NEW_SUBS, ...CHURNED_SUBS);
+  const maxRev = Math.max(...trends.revenue, 1);
+  const maxBars = Math.max(...trends.newSubs, ...trends.failedPayments, 1);
   const funnelMax = Math.max(...funnel.map((f) => f.value), 1);
 
-  // line chart points for MRR
+  // line chart points for collected revenue
   const W = 520, H = 150, pad = 8;
-  const pts = MRR_SERIES.map((v, i) => {
-    const x = pad + (i * (W - pad * 2)) / (MRR_SERIES.length - 1);
-    const y = H - pad - (v / maxMrr) * (H - pad * 2);
+  const revLen = Math.max(trends.revenue.length - 1, 1);
+  const pts = trends.revenue.map((v, i) => {
+    const x = pad + (i * (W - pad * 2)) / revLen;
+    const y = H - pad - (v / maxRev) * (H - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
 
@@ -81,37 +89,37 @@ export default function AnalyticsPage() {
       </div>
       <div className="flex flex-wrap gap-2.5 mb-5">
         <KPI label="LTV" value={money(m.ltv)} sub="ARPU ÷ churn" />
-        <KPI label="CAC" value={money(m.cac)} sub="last month" />
-        <KPI label="LTV : CAC" value={(m.cac ? m.ltv / m.cac : 0).toFixed(1) + "x"} intent="text-green" />
+        <KPI label="CAC (est.)" value={m.cac ? money(m.cac) : "—"} sub={m.cac ? "assumed ad spend" : "no new subs this month"} />
+        <KPI label="LTV : CAC" value={m.cac ? (m.ltv / m.cac).toFixed(1) + "x" : "—"} intent={m.cac ? "text-green" : ""} />
         <KPI label="Lead → patient" value={pct(m.conversion)} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-3">
-        {/* MRR trend line */}
+        {/* Revenue collected trend */}
         <div className="bg-surface border border-border rounded-xl p-4">
-          <div className="font-bold text-[13px] mb-3">MRR trend</div>
+          <div className="font-bold text-[13px] mb-3">Revenue collected · last 6 months</div>
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[150px]">
             <polyline fill="none" stroke="#2f6df6" strokeWidth="2.5" points={pts} />
-            {MRR_SERIES.map((v, i) => { const x = pad + (i * (W - pad * 2)) / (MRR_SERIES.length - 1); const y = H - pad - (v / maxMrr) * (H - pad * 2); return <circle key={i} cx={x} cy={y} r="3" fill="#2f6df6" />; })}
+            {trends.revenue.map((v, i) => { const x = pad + (i * (W - pad * 2)) / revLen; const y = H - pad - (v / maxRev) * (H - pad * 2); return <circle key={i} cx={x} cy={y} r="3" fill="#2f6df6"><title>{`${trends.months[i]}: ${money(v)}`}</title></circle>; })}
           </svg>
-          <div className="flex justify-between text-[10px] text-ink-muted mt-1">{MONTHS.map((mo) => <span key={mo}>{mo}</span>)}</div>
+          <div className="flex justify-between text-[10px] text-ink-muted mt-1">{trends.months.map((mo, i) => <span key={i}>{mo}</span>)}</div>
         </div>
 
-        {/* New vs churned */}
+        {/* New subs vs failed payments */}
         <div className="bg-surface border border-border rounded-xl p-4">
-          <div className="font-bold text-[13px] mb-3">New vs. churned subscribers</div>
+          <div className="font-bold text-[13px] mb-3">New subscribers vs. failed payments</div>
           <div className="flex items-end justify-between gap-2 h-[150px]">
-            {MONTHS.map((mo, i) => (
-              <div key={mo} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+            {trends.months.map((mo, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 h-full">
                 <div className="flex items-end gap-0.5 h-full w-full justify-center">
-                  <div className="w-3 rounded-t bg-brand" style={{ height: `${(NEW_SUBS[i] / maxBars) * 100}%` }} title={`New ${NEW_SUBS[i]}`} />
-                  <div className="w-3 rounded-t bg-red/70" style={{ height: `${(CHURNED_SUBS[i] / maxBars) * 100}%` }} title={`Churned ${CHURNED_SUBS[i]}`} />
+                  <div className="w-3 rounded-t bg-brand" style={{ height: `${(trends.newSubs[i] / maxBars) * 100}%` }} title={`New ${trends.newSubs[i]}`} />
+                  <div className="w-3 rounded-t bg-red/70" style={{ height: `${(trends.failedPayments[i] / maxBars) * 100}%` }} title={`Failed ${trends.failedPayments[i]}`} />
                 </div>
                 <span className="text-[10px] text-ink-muted">{mo}</span>
               </div>
             ))}
           </div>
-          <div className="flex gap-4 text-[11px] text-ink-muted mt-2"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-brand inline-block" /> New</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red/70 inline-block" /> Churned</span></div>
+          <div className="flex gap-4 text-[11px] text-ink-muted mt-2"><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-brand inline-block" /> New subs</span><span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red/70 inline-block" /> Failed payments</span></div>
         </div>
       </div>
 
@@ -138,7 +146,7 @@ export default function AnalyticsPage() {
           ))}
         </div>
       </div>
-      <div className="text-[11px] text-ink-muted-2 mt-3">MRR, ARPU, churn, revenue mix, and the funnel are computed live from the Subscriptions, Patients, Leads, and Intake data; the trend series are seeded for the prototype.</div>
+      <div className="text-[11px] text-ink-muted-2 mt-3">All figures are computed live from Subscriptions, Patients, Leads, and Intake data — including the revenue, new-subscriber, and failed-payment trends (derived from billing history). CAC is the one estimate: it uses an assumed monthly ad spend, since the app has no marketing-cost source.</div>
     </div>
   );
 }
