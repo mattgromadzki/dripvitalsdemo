@@ -14,29 +14,63 @@ interface Props {
 
 const CHUNK = 5000; // rows per server insert
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-const HEADER_KEYS: Record<keyof RowMap, string[]> = {
+type ScalarField = "firstName" | "lastName" | "fullName" | "email" | "phone" | "company" | "title";
+const HEADER_KEYS: Record<ScalarField, string[]> = {
   firstName: ["first", "firstname", "fname", "givenname"],
   lastName: ["last", "lastname", "lname", "surname", "familyname"],
-  fullName: ["name", "fullname", "contact", "contactname"],
+  fullName: ["name", "fullname", "contact", "contactname", "licenseename", "licensee", "agentname"],
   email: ["email", "emailaddress", "mail", "e"],
   phone: ["phone", "mobile", "cell", "number", "phonenumber", "mobilephone", "tel", "telephone"],
-  company: ["company", "organization", "org", "business", "practice", "clinic"],
-  title: ["title", "role", "jobtitle", "position"],
+  company: ["company", "organization", "org", "business", "practice", "clinic", "dba", "brokerage", "office"],
+  title: ["title", "role", "jobtitle", "position", "profession"],
 };
-interface RowMap { firstName: number; lastName: number; fullName: number; email: number; phone: number; company: number; title: number }
+// Extra columns captured into the contact's `custom` map (usable as merge
+// fields and for geo-targeted farming). Key → header aliases.
+const CUSTOM_KEYS: Record<string, string[]> = {
+  address: ["address1", "address", "street", "addr", "mailingaddress"],
+  city: ["city", "town"],
+  state: ["state", "province"],
+  zip: ["zip", "zipcode", "postalcode", "postcode"],
+  county: ["county"],
+  licenseType: ["licensetype"],
+  licenseNumber: ["licensenumber", "licenseno", "license"],
+};
+interface RowMap { firstName: number; lastName: number; fullName: number; email: number; phone: number; company: number; title: number; custom: Record<string, number> }
+
+// Blank markers used by many government/CRM exports (this file uses "-").
+const clean = (v: string | undefined) => { const t = (v || "").trim(); return t === "-" || t === "—" || t.toLowerCase() === "n/a" ? "" : t; };
+// ALL-CAPS source data → readable case, preserving O'Brien / Smith-Jones / Mc.
+const titleCase = (s: string) => (s && s === s.toUpperCase() ? s.toLowerCase().replace(/(^|[\s'\-.])([a-z])/g, (_m, sep, c) => sep + c.toUpperCase()) : s);
 
 function mapHeader(header: string[]): RowMap {
   const idx = (keys: string[]) => header.findIndex((h) => keys.includes(norm(h)));
-  return { firstName: idx(HEADER_KEYS.firstName), lastName: idx(HEADER_KEYS.lastName), fullName: idx(HEADER_KEYS.fullName), email: idx(HEADER_KEYS.email), phone: idx(HEADER_KEYS.phone), company: idx(HEADER_KEYS.company), title: idx(HEADER_KEYS.title) };
+  const custom: Record<string, number> = {};
+  for (const [key, aliases] of Object.entries(CUSTOM_KEYS)) { const i = idx(aliases); if (i >= 0) custom[key] = i; }
+  return { firstName: idx(HEADER_KEYS.firstName), lastName: idx(HEADER_KEYS.lastName), fullName: idx(HEADER_KEYS.fullName), email: idx(HEADER_KEYS.email), phone: idx(HEADER_KEYS.phone), company: idx(HEADER_KEYS.company), title: idx(HEADER_KEYS.title), custom };
 }
 function toContact(cells: string[], m: RowMap): ContactInput | null {
-  const at = (i: number) => (i >= 0 ? (cells[i] || "").trim() : "");
+  const at = (i: number) => (i >= 0 ? clean(cells[i]) : "");
   let firstName = at(m.firstName), lastName = at(m.lastName);
   const full = at(m.fullName);
-  if (!firstName && !lastName && full) { const p = full.split(/\s+/); firstName = p[0]; lastName = p.slice(1).join(" "); }
+  if (!firstName && !lastName && full) {
+    if (full.includes(",")) {
+      // "LAST, FIRST MIDDLE" (agency/license exports) — last name comes first.
+      const ci = full.indexOf(",");
+      lastName = full.slice(0, ci).trim();
+      firstName = full.slice(ci + 1).trim().split(/\s+/)[0] || ""; // first token; drop middle initial
+    } else {
+      // "First Last" — first token is the given name, rest the surname.
+      const p = full.split(/\s+/);
+      firstName = p[0]; lastName = p.slice(1).join(" ");
+    }
+  }
+  firstName = titleCase(firstName); lastName = titleCase(lastName);
   const email = at(m.email), phone = at(m.phone);
   if (!email && !phone) return null;
-  return { firstName, lastName, email, phone, company: at(m.company) || undefined, title: at(m.title) || undefined, source: "Import" };
+  let custom: Record<string, string> | undefined;
+  for (const [key, i] of Object.entries(m.custom)) { const v = at(i); if (v) (custom ||= {})[key] = v; }
+  // Company/DBA kept verbatim — title-casing mangles brands (RE/MAX, eXp, etc.).
+  return { firstName, lastName, email, phone, company: at(m.company) || undefined, title: at(m.title) || undefined, custom, source: "Import" };
 }
 
 // Streaming CSV row reader — constant memory regardless of file size.
@@ -126,7 +160,7 @@ export function ImportContactsModal({ open, onClose, defaultGroupId, onDone }: P
     <Modal open={open} onClose={close} title="Import contacts" icon="📥" width={560}
       footer={<button className="btn btn-ghost" onClick={close}>{phase === "done" ? "Close" : "Cancel"}</button>}>
       <div className="text-[12.5px] text-ink-muted mb-3">
-        Upload a <b>CSV</b> or <b>XLSX</b>. Columns are matched fuzzily (name/first/last, email, phone, company, title). Duplicate emails are skipped server-side. CSV streams in constant memory — best for very large lists (millions); XLSX is loaded fully, so keep those under a few hundred thousand rows.
+        Upload a <b>CSV</b> or <b>XLSX</b>. Columns are matched automatically (name/first/last, email, phone, company/DBA, title; city/state/zip/county are captured too). A single <b>&ldquo;Last, First&rdquo;</b> name column is split into first + last, and ALL-CAPS names are cleaned to normal case. Duplicate emails are skipped server-side. CSV streams in constant memory — best for very large lists (millions); XLSX is loaded fully, so keep those under a few hundred thousand rows.
       </div>
       {phase === "idle" && (
         <label className="block border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-brand transition-colors">
