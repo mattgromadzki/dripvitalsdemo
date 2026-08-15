@@ -202,7 +202,7 @@ export default function FarmingPage() {
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <div className="flex items-center gap-2 bg-surface border border-border rounded-pill px-3 py-1.5 flex-1 min-w-[200px]">
               <span className="text-ink-muted text-[13px]">🔍</span>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email, company…" className="bg-transparent outline-none text-[12.5px] w-full" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email, city, county, state…" className="bg-transparent outline-none text-[12.5px] w-full" />
             </div>
             <select className="fsel !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as FarmStatus | "all")}>
               <option value="all">All statuses</option>

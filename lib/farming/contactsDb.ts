@@ -56,7 +56,9 @@ function whereFor(sql: any, f: ContactFilter) {
   if (f.group) conds.push(sql`${f.group} = any(group_ids)`);
   if (f.search && f.search.trim()) {
     const q = `%${f.search.trim().toLowerCase()}%`;
-    conds.push(sql`lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company','')) like ${q}`);
+    // Matches name/email/company AND location (city/county/state). The expression
+    // is kept identical to farming_contacts_search_idx so the trigram GIN index is used.
+    conds.push(sql`lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company','') || ' ' || coalesce(data->'custom'->>'city','') || ' ' || coalesce(data->'custom'->>'county','') || ' ' || coalesce(data->'custom'->>'state','')) like ${q}`);
   }
   if (!conds.length) return sql`true`;
   let frag = conds[0];
