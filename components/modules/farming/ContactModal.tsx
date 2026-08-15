@@ -13,7 +13,7 @@ interface Props {
   onSave: (input: ContactInput, id?: string) => void;
 }
 
-const BLANK = { firstName: "", lastName: "", email: "", phone: "", company: "", title: "", notes: "", status: "new" as FarmStatus, groupIds: [] as string[], optedOut: false };
+const BLANK = { firstName: "", lastName: "", email: "", phone: "", state: "", county: "", city: "", notes: "", status: "new" as FarmStatus, groupIds: [] as string[], optedOut: false };
 
 export function ContactModal({ open, onClose, contact, groups, onSave }: Props) {
   const [f, setF] = useState(BLANK);
@@ -23,7 +23,7 @@ export function ContactModal({ open, onClose, contact, groups, onSave }: Props) 
     if (!open) return;
     setErr("");
     setF(contact
-      ? { firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, company: contact.company || "", title: contact.title || "", notes: contact.notes || "", status: contact.status, groupIds: contact.groupIds, optedOut: contact.optedOut }
+      ? { firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, state: contact.custom?.state || "", county: contact.custom?.county || "", city: contact.custom?.city || "", notes: contact.notes || "", status: contact.status, groupIds: contact.groupIds, optedOut: contact.optedOut }
       : BLANK);
   }, [open, contact]);
 
@@ -33,9 +33,12 @@ export function ContactModal({ open, onClose, contact, groups, onSave }: Props) 
   function save() {
     if (!f.firstName.trim() && !f.lastName.trim()) { setErr("A first or last name is required."); return; }
     if (!f.email.trim() && !f.phone.trim()) { setErr("Enter an email or a phone — at least one is needed to reach the contact."); return; }
+    // Merge location edits into the existing custom map so other captured
+    // fields (address, zip, license #) are preserved.
+    const custom = { ...(contact?.custom || {}), state: f.state.trim(), county: f.county.trim(), city: f.city.trim() };
     onSave({
       firstName: f.firstName.trim(), lastName: f.lastName.trim(), email: f.email.trim(), phone: f.phone.trim(),
-      company: f.company.trim() || undefined, title: f.title.trim() || undefined, notes: f.notes.trim() || undefined,
+      custom, notes: f.notes.trim() || undefined,
       status: f.status, groupIds: f.groupIds, optedOut: f.optedOut, source: contact ? contact.source : "Manual",
     }, contact?.id);
     onClose();
@@ -50,8 +53,11 @@ export function ContactModal({ open, onClose, contact, groups, onSave }: Props) 
         <div><label className="fl">Last name</label><input className="fi" value={f.lastName} onChange={(e) => set("lastName", e.target.value)} placeholder="Doe" /></div>
         <div><label className="fl">Email</label><input className="fi" type="email" value={f.email} onChange={(e) => set("email", e.target.value)} placeholder="jane@company.com" /></div>
         <div><label className="fl">Phone</label><input className="fi" value={f.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+1 (305) 555-0100" /></div>
-        <div><label className="fl">Company</label><input className="fi" value={f.company} onChange={(e) => set("company", e.target.value)} placeholder="Acme Clinic" /></div>
-        <div><label className="fl">Title</label><input className="fi" value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="Owner" /></div>
+      </div>
+      <div className="grid grid-cols-3 gap-3 mt-1">
+        <div><label className="fl">State</label><input className="fi" value={f.state} onChange={(e) => set("state", e.target.value)} placeholder="FL" /></div>
+        <div><label className="fl">County</label><input className="fi" value={f.county} onChange={(e) => set("county", e.target.value)} placeholder="Broward" /></div>
+        <div><label className="fl">City</label><input className="fi" value={f.city} onChange={(e) => set("city", e.target.value)} placeholder="Miami" /></div>
       </div>
       <div className="grid grid-cols-2 gap-3 mt-1">
         <div>
