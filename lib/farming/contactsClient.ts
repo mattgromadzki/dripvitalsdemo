@@ -4,10 +4,10 @@ import type { FarmContact, ContactInput, FarmAudience, FarmChannel } from "@/lib
 // Client fetch wrappers for the server-paginated contacts API. The browser never
 // holds the full contact set — only the current page.
 
-export interface ListParams { search?: string; status?: string; group?: string; includeSuppressed?: boolean; cursor?: string | null; limit?: number; }
+export interface ListParams { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; cursor?: string | null; limit?: number; }
 export interface ContactPage { contacts: FarmContact[]; nextCursor: string | null; }
 export interface Counts { total: number; suppressed: number; reachableEmail: number; reachablePhone: number; byStatus: Record<string, number>; groups: Record<string, number>; filtered?: number; }
-export interface Filter { search?: string; status?: string; group?: string; includeSuppressed?: boolean; }
+export interface Filter { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; }
 export interface SendCounts { sent: number; delivered: number; opened: number; clicked: number; replied: number; }
 
 function qs(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -17,9 +17,13 @@ function qs(params: Record<string, string | number | boolean | null | undefined>
 }
 
 export async function listContacts(p: ListParams): Promise<ContactPage> {
-  const r = await fetch(`/api/farming/contacts?${qs({ search: p.search, status: p.status, group: p.group, includeSuppressed: p.includeSuppressed, cursor: p.cursor, limit: p.limit })}`, { cache: "no-store" });
+  const r = await fetch(`/api/farming/contacts?${qs({ search: p.search, status: p.status, group: p.group, state: p.state, county: p.county, city: p.city, includeSuppressed: p.includeSuppressed, cursor: p.cursor, limit: p.limit })}`, { cache: "no-store" });
   const d = await r.json();
   return { contacts: d.contacts || [], nextCursor: d.nextCursor ?? null };
+}
+export async function getFacet(field: "state" | "county" | "city", parent: { state?: string; county?: string } = {}): Promise<string[]> {
+  const r = await fetch(`/api/farming/contacts/facets?${qs({ field, state: parent.state, county: parent.county })}`, { cache: "no-store" });
+  const d = await r.json(); return d.ok ? (d.values || []) : [];
 }
 export async function getCounts(f: Filter): Promise<Counts> {
   const r = await fetch(`/api/farming/contacts/count?${qs({ ...f })}`, { cache: "no-store" });

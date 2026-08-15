@@ -54,6 +54,11 @@ create extension if not exists pg_trgm;
 create index if not exists farming_contacts_search_idx on farming_contacts using gin ((lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company',''))) gin_trgm_ops);
 -- Search including location (city/county/state) — matches the whereFor() expression.
 create index if not exists farming_contacts_search_loc_idx on farming_contacts using gin ((lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company','') || ' ' || coalesce(data->'custom'->>'city','') || ' ' || coalesce(data->'custom'->>'county','') || ' ' || coalesce(data->'custom'->>'state',''))) gin_trgm_ops);
+-- Location filter dropdowns (State/County/City) — btree on lowered expressions
+-- accelerates equality filtering + facet narrowing.
+create index if not exists farming_contacts_state_idx  on farming_contacts ((lower(data->'custom'->>'state')));
+create index if not exists farming_contacts_county_idx on farming_contacts ((lower(data->'custom'->>'county')));
+create index if not exists farming_contacts_city_idx   on farming_contacts ((lower(data->'custom'->>'city')));
 
 -- Farming sends: one row per (campaign, recipient). Replaces the per-recipient
 -- maps that used to live on the campaign blob, so campaigning to millions and

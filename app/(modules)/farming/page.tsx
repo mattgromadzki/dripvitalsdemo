@@ -41,6 +41,12 @@ export default function FarmingPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<FarmStatus | "all">("all");
   const [groupFilter, setGroupFilter] = useState<string>("all");
+  const [stateFilter, setStateFilter] = useState<string>("all");
+  const [countyFilter, setCountyFilter] = useState<string>("all");
+  const [cityFilter, setCityFilter] = useState<string>("all");
+  const [stateOpts, setStateOpts] = useState<string[]>([]);
+  const [countyOpts, setCountyOpts] = useState<string[]>([]);
+  const [cityOpts, setCityOpts] = useState<string[]>([]);
   const [showSuppressed, setShowSuppressed] = useState(false);
 
   const [rows, setRows] = useState<FarmContact[]>([]);
@@ -63,7 +69,7 @@ export default function FarmingPage() {
   const [resultsFor, setResultsFor] = useState<FarmCampaign | null>(null);
 
   const groupById = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g])) as Record<string, FarmGroup>, [groups]);
-  const filter = useMemo<api.Filter>(() => ({ search: search.trim() || undefined, status: statusFilter === "all" ? undefined : statusFilter, group: groupFilter === "all" ? undefined : groupFilter, includeSuppressed: showSuppressed }), [search, statusFilter, groupFilter, showSuppressed]);
+  const filter = useMemo<api.Filter>(() => ({ search: search.trim() || undefined, status: statusFilter === "all" ? undefined : statusFilter, group: groupFilter === "all" ? undefined : groupFilter, state: stateFilter === "all" ? undefined : stateFilter, county: countyFilter === "all" ? undefined : countyFilter, city: cityFilter === "all" ? undefined : cityFilter, includeSuppressed: showSuppressed }), [search, statusFilter, groupFilter, stateFilter, countyFilter, cityFilter, showSuppressed]);
   const filteredTotal = counts ? (counts.filtered ?? counts.total) : 0;
 
   const refreshCounts = useCallback(() => { api.getCounts(filter).then(setCounts).catch(() => {}); }, [filter]);
@@ -88,6 +94,18 @@ export default function FarmingPage() {
   }, [reload, refreshCounts]);
   // Campaign engagement counts (Overview + list progress).
   useEffect(() => { api.campaignAnalytics().then(setCampCounts).catch(() => {}); }, [campaigns.length]);
+
+  // Location filter facets — dependent dropdowns (state → county → city).
+  useEffect(() => { api.getFacet("state").then(setStateOpts).catch(() => {}); }, []);
+  useEffect(() => {
+    setCountyFilter("all"); setCityFilter("all"); setCityOpts([]);
+    api.getFacet("county", stateFilter === "all" ? {} : { state: stateFilter }).then(setCountyOpts).catch(() => {});
+  }, [stateFilter]);
+  useEffect(() => {
+    setCityFilter("all");
+    if (countyFilter === "all") { setCityOpts([]); return; }
+    api.getFacet("city", { state: stateFilter === "all" ? undefined : stateFilter, county: countyFilter }).then(setCityOpts).catch(() => {});
+  }, [countyFilter, stateFilter]);
 
   const afterMutation = useCallback(() => { reload(); refreshCounts(); }, [reload, refreshCounts]);
 
@@ -211,6 +229,18 @@ export default function FarmingPage() {
             <select className="fsel !w-auto" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
               <option value="all">All groups</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+            <select className="fsel !w-auto" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
+              <option value="all">All states</option>
+              {stateOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select className="fsel !w-auto" value={countyFilter} onChange={(e) => setCountyFilter(e.target.value)} disabled={countyOpts.length === 0}>
+              <option value="all">All counties</option>
+              {countyOpts.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="fsel !w-auto" value={cityFilter} onChange={(e) => setCityFilter(e.target.value)} disabled={cityOpts.length === 0} title={cityOpts.length === 0 ? "Pick a county first" : undefined}>
+              <option value="all">All cities</option>
+              {cityOpts.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             <label className="flex items-center gap-1.5 text-[12px] font-semibold text-ink-2 cursor-pointer"><input type="checkbox" checked={showSuppressed} onChange={(e) => setShowSuppressed(e.target.checked)} /> Show opted-out</label>
             <div className="flex-1" />

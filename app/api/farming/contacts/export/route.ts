@@ -5,9 +5,9 @@ import type { FarmContact } from "@/lib/types/farming";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const HEADER = ["First", "Last", "Email", "Phone", "Company", "Title", "Status", "Groups", "OptedOut", "Source", "Created"];
+const HEADER = ["First", "Last", "Email", "Phone", "State", "County", "City", "Status", "Groups", "OptedOut", "Source", "Created"];
 const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-const row = (c: FarmContact) => [c.firstName, c.lastName, c.email, c.phone, c.company || "", c.title || "", c.status, (c.groupIds || []).join("; "), c.optedOut ? "yes" : "no", c.source || "", c.createdAt].map(q).join(",");
+const row = (c: FarmContact) => [c.firstName, c.lastName, c.email, c.phone, c.custom?.state || "", c.custom?.county || "", c.custom?.city || "", c.status, (c.groupIds || []).join("; "), c.optedOut ? "yes" : "no", c.source || "", c.createdAt].map(q).join(",");
 
 // GET /api/farming/contacts/export?filters → streamed CSV (pages the DB by
 // keyset, so exporting millions never buffers the whole set in memory).
@@ -18,6 +18,9 @@ export async function GET(req: Request) {
     search: url.searchParams.get("search") || undefined,
     status: url.searchParams.get("status") || undefined,
     group: url.searchParams.get("group") || undefined,
+    state: url.searchParams.get("state") || undefined,
+    county: url.searchParams.get("county") || undefined,
+    city: url.searchParams.get("city") || undefined,
     includeSuppressed: url.searchParams.get("includeSuppressed") === "true",
   };
   const enc = new TextEncoder();

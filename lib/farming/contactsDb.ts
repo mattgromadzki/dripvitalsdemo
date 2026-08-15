@@ -30,7 +30,7 @@ export function buildContact(input: ContactInput): FarmContact {
 const DOMAIN = "farming-contacts";
 const digits10 = (p?: string) => (p || "").replace(/\D/g, "").slice(-10);
 
-export interface ContactFilter { search?: string; status?: string; group?: string; includeSuppressed?: boolean; }
+export interface ContactFilter { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; }
 export interface ContactPage { contacts: FarmContact[]; nextCursor: string | null; }
 export interface ContactCounts { total: number; suppressed: number; reachableEmail: number; reachablePhone: number; byStatus: Record<string, number>; }
 // A bulk target: an explicit id list, or a filter meaning "everything matching".
@@ -54,6 +54,9 @@ function whereFor(sql: any, f: ContactFilter) {
   if (!f.includeSuppressed) conds.push(sql`opted_out = false`);
   if (f.status) conds.push(sql`status = ${f.status}`);
   if (f.group) conds.push(sql`${f.group} = any(group_ids)`);
+  if (f.state) conds.push(sql`lower(coalesce(data->'custom'->>'state','')) = ${f.state.toLowerCase()}`);
+  if (f.county) conds.push(sql`lower(coalesce(data->'custom'->>'county','')) = ${f.county.toLowerCase()}`);
+  if (f.city) conds.push(sql`lower(coalesce(data->'custom'->>'city','')) = ${f.city.toLowerCase()}`);
   if (f.search && f.search.trim()) {
     const q = `%${f.search.trim().toLowerCase()}%`;
     // Matches name/email/company AND location (city/county/state). The expression
@@ -78,11 +81,41 @@ function blobMatch(c: FarmContact, f: ContactFilter): boolean {
   if (!f.includeSuppressed && c.optedOut) return false;
   if (f.status && c.status !== f.status) return false;
   if (f.group && !(c.groupIds || []).includes(f.group)) return false;
+  if (f.state && (c.custom?.state || "").toLowerCase() !== f.state.toLowerCase()) return false;
+  if (f.county && (c.custom?.county || "").toLowerCase() !== f.county.toLowerCase()) return false;
+  if (f.city && (c.custom?.city || "").toLowerCase() !== f.city.toLowerCase()) return false;
   if (f.search && f.search.trim()) {
     const q = f.search.trim().toLowerCase();
-    if (!`${c.firstName} ${c.lastName} ${c.email} ${c.phone} ${c.company || ""}`.toLowerCase().includes(q)) return false;
+    if (!`${c.firstName} ${c.lastName} ${c.email} ${c.phone} ${c.company || ""} ${c.custom?.city || ""} ${c.custom?.county || ""} ${c.custom?.state || ""}`.toLowerCase().includes(q)) return false;
   }
   return true;
+}
+
+// Distinct values for a location facet, honoring parent selections (county
+// options depend on the chosen state; city options on the chosen county).
+// Powers the State/County/City filter dropdowns.
+export async function distinctFacet(field: "state" | "county" | "city", parent: { state?: string; county?: string } = {}): Promise<string[]> {
+  if (contactsUseDb()) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sql: any = db()!;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const conds: any[] = [sql`nullif(trim(data->'custom'->>${field}), '') is not null`];
+    if (field !== "state" && parent.state) conds.push(sql`lower(data->'custom'->>'state') = ${parent.state.toLowerCase()}`);
+    if (field === "city" && parent.county) conds.push(sql`lower(data->'custom'->>'county') = ${parent.county.toLowerCase()}`);
+    let where = conds[0];
+    for (let i = 1; i < conds.length; i++) where = sql`${where} and ${conds[i]}`;
+    const rows: { v: string }[] = await sql`select distinct trim(data->'custom'->>${field}) v from farming_contacts where ${where} order by v limit 5000`;
+    return rows.map((r) => r.v);
+  }
+  const all = await blobAll();
+  const set = new Set<string>();
+  for (const c of all) {
+    const v = (c.custom?.[field] || "").trim(); if (!v) continue;
+    if (field !== "state" && parent.state && (c.custom?.state || "").toLowerCase() !== parent.state.toLowerCase()) continue;
+    if (field === "city" && parent.county && (c.custom?.county || "").toLowerCase() !== parent.county.toLowerCase()) continue;
+    set.add(v);
+  }
+  return [...set].sort();
 }
 const bySort = (a: FarmContact, b: FarmContact) => (b.createdAt || "").localeCompare(a.createdAt || "") || (b.id).localeCompare(a.id);
 

@@ -15,6 +15,9 @@ export async function GET(req: Request) {
     search: url.searchParams.get("search") || undefined,
     status: url.searchParams.get("status") || undefined,
     group: url.searchParams.get("group") || undefined,
+    state: url.searchParams.get("state") || undefined,
+    county: url.searchParams.get("county") || undefined,
+    city: url.searchParams.get("city") || undefined,
     includeSuppressed: url.searchParams.get("includeSuppressed") === "true",
   };
   // Always compute the filtered count — the default view excludes suppressed
