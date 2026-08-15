@@ -1,5 +1,5 @@
 import { getVerifiedPatientSession } from "@/lib/auth/patientSession";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbGetDomain } from "@/lib/db/store";
 import { STATUS_LABEL } from "@/lib/shipments/types";
 import type { Shipment } from "@/lib/shipments/types";
@@ -22,7 +22,7 @@ function normalize(d: unknown): Shipment[] {
 
 async function readShipments(): Promise<Shipment[]> {
   try {
-    if (hasDb()) return normalize(await dbGetDomain("shipments"));
+    if (emrUsesPostgres()) return normalize(await dbGetDomain("shipments"));
     const r = redis();
     if (r) { const v = await r.get("store:shipments"); return normalize(typeof v === "string" ? JSON.parse(v) : v); }
   } catch { /* ignore */ }

@@ -39,8 +39,16 @@ export function startPatientsSync(pollMs = 5000): void {
     for (const p of store.getState().patients) {
       const s = JSON.stringify(p);
       if (lastById.get(p.id) === s) continue;   // unchanged since last known server state
-      lastById.set(p.id, s);
-      fetch("/api/crm/patients", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ patient: p }) }).catch(() => {});
+      // SAFEGUARD: mark this record "synced" ONLY after the server confirms the
+      // save. Previously lastById was set before the request, so a failed/blocked
+      // save was never retried and the patient silently vanished on refresh. Now a
+      // failure is logged and left un-synced, so the next poll retries it.
+      fetch("/api/crm/patients", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ patient: p }) })
+        .then((r) => {
+          if (r.ok) lastById.set(p.id, s);
+          else console.error(`[patientsSync] save failed for ${p.id} (HTTP ${r.status}) — will retry`);
+        })
+        .catch((e) => console.error(`[patientsSync] network error saving ${p.id} — will retry`, e));
     }
   };
 

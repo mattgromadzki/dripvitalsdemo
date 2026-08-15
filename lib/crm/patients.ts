@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis";
 import type { Patient } from "@/lib/types";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbSavePatient, dbListPatients } from "@/lib/db/store";
 
 /**
@@ -62,14 +62,14 @@ function parse(v: unknown): Patient | null {
 
 export async function savePatient(p: Patient): Promise<void> {
   if (!p?.id) return;
-  if (hasDb()) { await dbSavePatient(p); return; }
+  if (emrUsesPostgres()) { await dbSavePatient(p); return; }
   const r = redis();
   if (r) await r.hset(KEY, { [p.id]: JSON.stringify(p) });
   else mem.set(p.id, p);
 }
 
 export async function listPatients(): Promise<Patient[]> {
-  if (hasDb()) return dbListPatients();
+  if (emrUsesPostgres()) return dbListPatients();
   const r = redis();
   if (r) {
     const all = await r.hgetall<Record<string, unknown>>(KEY);
@@ -85,5 +85,5 @@ export async function getPatientById(id: string): Promise<Patient | null> {
 }
 
 export function isPersistent(): boolean {
-  return hasDb() || !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
+  return emrUsesPostgres() || !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
 }

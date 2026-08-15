@@ -1,6 +1,6 @@
 import "server-only";
 import { Redis } from "@upstash/redis";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbGetDomain, dbSetDomain } from "@/lib/db/store";
 import { bumpVersion } from "@/lib/realtime/signal";
 import type { PatientDocument } from "@/lib/types";
@@ -20,14 +20,14 @@ function redis(): Redis | null {
 }
 
 async function readAll(): Promise<PatientDocument[]> {
-  if (hasDb()) { const d = await dbGetDomain(DOMAIN); return Array.isArray(d) ? (d as PatientDocument[]) : []; }
+  if (emrUsesPostgres()) { const d = await dbGetDomain(DOMAIN); return Array.isArray(d) ? (d as PatientDocument[]) : []; }
   const r = redis();
   if (r) { const v = await r.get(KEY); const d = typeof v === "string" ? JSON.parse(v) : v; return Array.isArray(d) ? (d as PatientDocument[]) : []; }
   return mem.v;
 }
 
 async function writeAll(list: PatientDocument[]): Promise<void> {
-  if (hasDb()) await dbSetDomain(DOMAIN, list);
+  if (emrUsesPostgres()) await dbSetDomain(DOMAIN, list);
   else { const r = redis(); if (r) await r.set(KEY, JSON.stringify(list)); else mem.v = list; }
   await bumpVersion(DOMAIN);
 }

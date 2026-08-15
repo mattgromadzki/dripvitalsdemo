@@ -1,6 +1,6 @@
 import "server-only";
 import { Redis } from "@upstash/redis";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbGetDomain, dbSetDomain } from "@/lib/db/store";
 
 /**
@@ -51,7 +51,7 @@ function redis(): Redis | null {
 
 async function readAll(): Promise<AuditEvent[]> {
   try {
-    if (hasDb()) { const d = await dbGetDomain(DOMAIN); return Array.isArray(d) ? (d as AuditEvent[]) : []; }
+    if (emrUsesPostgres()) { const d = await dbGetDomain(DOMAIN); return Array.isArray(d) ? (d as AuditEvent[]) : []; }
     const r = redis();
     if (r) { const v = await r.get(KEY); const d = typeof v === "string" ? JSON.parse(v) : v; return Array.isArray(d) ? (d as AuditEvent[]) : []; }
   } catch { /* ignore */ }
@@ -59,7 +59,7 @@ async function readAll(): Promise<AuditEvent[]> {
 }
 
 async function writeAll(list: AuditEvent[]): Promise<void> {
-  if (hasDb()) await dbSetDomain(DOMAIN, list);
+  if (emrUsesPostgres()) await dbSetDomain(DOMAIN, list);
   else { const r = redis(); if (r) await r.set(KEY, JSON.stringify(list)); else mem.v = list; }
 }
 

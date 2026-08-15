@@ -23,6 +23,21 @@ export function hasDb(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
+/**
+ * STORAGE ISOLATION (per owner requirement):
+ * ALL patient/EMR data — patients, visits, payments, patient records, uploaded
+ * documents, audit, pharmacy events, email, and every `store:*` collection —
+ * lives in Upstash Redis and MUST NOT be routed to Postgres. Only the Farming
+ * module's contacts + send records use Neon Postgres (see lib/farming/*Db.ts).
+ *
+ * EMR storage modules call emrUsesPostgres() instead of hasDb(); it is hard-wired
+ * to false so a database being connected for Farming can never again change where
+ * EMR data is stored. Do not make this depend on env — that is the whole point.
+ */
+export function emrUsesPostgres(): boolean {
+  return false;
+}
+
 export function db(): Sql | null {
   if (_init) return _sql;
   _init = true;

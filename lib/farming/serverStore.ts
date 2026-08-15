@@ -1,6 +1,6 @@
 import "server-only";
 import { Redis } from "@upstash/redis";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbGetDomain, dbSetDomain } from "@/lib/db/store";
 import { bumpVersion } from "@/lib/realtime/signal";
 
@@ -20,7 +20,7 @@ const mem = new Map<string, unknown>();
 
 export async function readDomain<T = unknown>(domain: string): Promise<T | null> {
   try {
-    if (hasDb()) return ((await dbGetDomain(domain)) as T) ?? null;
+    if (emrUsesPostgres()) return ((await dbGetDomain(domain)) as T) ?? null;
     const r = redis();
     if (r) { const v = await r.get(`store:${domain}`); return (typeof v === "string" ? JSON.parse(v) : (v ?? null)) as T | null; }
     return (mem.get(domain) as T) ?? null;
@@ -31,7 +31,7 @@ export async function readDomain<T = unknown>(domain: string): Promise<T | null>
 
 export async function writeDomain(domain: string, data: unknown): Promise<void> {
   try {
-    if (hasDb()) await dbSetDomain(domain, data);
+    if (emrUsesPostgres()) await dbSetDomain(domain, data);
     else {
       const r = redis();
       if (r) await r.set(`store:${domain}`, JSON.stringify(data));

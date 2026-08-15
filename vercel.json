@@ -3,6 +3,7 @@
     { "path": "/api/cron/intake-reminders",  "schedule": "0 15 * * *" },
     { "path": "/api/cron/license-reminders", "schedule": "30 15 * * *" },
     { "path": "/api/cron/recurring-billing", "schedule": "0 16 * * *" },
-    { "path": "/api/cron/farming-dispatch",  "schedule": "* * * * *" }
+    { "path": "/api/cron/farming-dispatch",  "schedule": "* * * * *" },
+    { "path": "/api/cron/redis-backup",      "schedule": "0 8 * * *" }
   ]
 }

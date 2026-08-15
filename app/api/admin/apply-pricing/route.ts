@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { requirePerm } from "@/lib/auth/authorize";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbGetDomain, dbSetDomain } from "@/lib/db/store";
 import { bumpVersion } from "@/lib/realtime/signal";
 import { SEED_TREATMENTS } from "@/lib/data/treatmentsIntakeSeed";
@@ -61,7 +61,7 @@ export async function GET(req: Request) {
   const gate = await requirePerm(req, "settings.manage");
   if (gate) return gate;
 
-  const useDb = hasDb();
+  const useDb = emrUsesPostgres();
   const r = useDb ? null : redis();
   let saved: BaskTreatment[] | null = null;
   try {

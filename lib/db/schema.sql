@@ -68,3 +68,15 @@ create table if not exists farming_sends (
   primary key (campaign_id, contact_id)
 );
 create index if not exists farming_sends_campaign_idx on farming_sends (campaign_id);
+
+-- Daily backups of the Upstash Redis store (all EMR/app data lives in Redis).
+-- A cron snapshots every Redis key into `data` (jsonb, auto-compressed by TOAST)
+-- so patient records, visits, documents, payments, etc. always have a restorable
+-- point-in-time copy in a second, durable database. Retention is pruned in the cron.
+create table if not exists redis_backups (
+  id          bigserial primary key,
+  created_at  timestamptz not null default now(),
+  key_count   int not null default 0,
+  data        jsonb not null
+);
+create index if not exists redis_backups_created_idx on redis_backups (created_at desc);

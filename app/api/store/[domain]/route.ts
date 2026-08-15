@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis";
 import { requireAuth, requirePerm } from "@/lib/auth/authorize";
-import { hasDb } from "@/lib/db/client";
+import { emrUsesPostgres } from "@/lib/db/client";
 import { dbGetDomain, dbSetDomain } from "@/lib/db/store";
 import { bumpVersion } from "@/lib/realtime/signal";
 
@@ -85,7 +85,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ domain: string 
   const { domain } = await ctx.params;
   if (!ALLOW.has(domain)) return Response.json({ ok: false, error: "Unknown domain." }, { status: 400 });
   if (!PUBLIC_READ.has(domain)) { const gate = requireAuth(req); if (gate) return gate; }
-  const useDb = hasDb();
+  const useDb = emrUsesPostgres();
   const r = useDb ? null : redis();
   let data: unknown = null;
   try {
@@ -102,7 +102,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ domain: string
   const gate = await requirePerm(req, WRITE_PERM[domain] || "users.manage"); if (gate) return gate;
   let body: { data?: unknown };
   try { body = await req.json(); } catch { return Response.json({ ok: false, error: "Invalid body." }, { status: 400 }); }
-  const useDb = hasDb();
+  const useDb = emrUsesPostgres();
   const r = useDb ? null : redis();
   try {
     if (useDb) await dbSetDomain(domain, body.data ?? null);
