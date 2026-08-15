@@ -285,11 +285,17 @@ export async function bulkInsert(rows: FarmContact[]): Promise<{ inserted: numbe
   if (contactsUseDb()) {
     const sql = db()!;
     // postgres.js serializes plain objects → jsonb and JS arrays → text[] through
-    // the multi-row helper, so pass the values as-is.
-    const values: Record<string, unknown>[] = batch.map((c) => cols(c) as unknown as Record<string, unknown>);
-    const ins = await sql`insert into farming_contacts ${sql(values, "id", "email", "phone", "status", "opted_out", "group_ids", "last_campaign_id", "data")}
-      on conflict (lower(email)) where email is not null and email <> '' do nothing returning id`;
-    return { inserted: ins.length, duplicates: dupes + (batch.length - ins.length) };
+    // the multi-row helper. Sub-batch to stay under Postgres's 65,534-parameter
+    // cap (8 cols × 4,000 rows = 32k params).
+    const SUB = 4000;
+    let inserted = 0;
+    for (let i = 0; i < batch.length; i += SUB) {
+      const values: Record<string, unknown>[] = batch.slice(i, i + SUB).map((c) => cols(c) as unknown as Record<string, unknown>);
+      const ins = await sql`insert into farming_contacts ${sql(values, "id", "email", "phone", "status", "opted_out", "group_ids", "last_campaign_id", "data")}
+        on conflict (lower(email)) where email is not null and email <> '' do nothing returning id`;
+      inserted += ins.length;
+    }
+    return { inserted, duplicates: dupes + (batch.length - inserted) };
   }
   const all = await blobAll();
   const existing = new Set(all.map((c) => (c.email || "").trim().toLowerCase()).filter(Boolean));

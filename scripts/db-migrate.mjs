@@ -24,13 +24,18 @@ const sql = postgres(DATABASE_URL, {
 });
 
 // Keep in sync with the ALLOW list in app/api/store/[domain]/route.ts
+// (plus server-only blob domains like farming-sends).
 const DOMAINS = [
   "treatment-requests", "soap-notes", "prescriptions", "labs", "orders",
   "shipments", "tasks", "subscriptions", "visit-queue", "treatments",
-  "intake-forms", "emails", "sms", "medications", "pharmacies", "doctors",
-  "providers", "staff", "integrations", "rbac", "knowledge-base", "reviews",
+  "intake-forms", "shop", "emails", "sms", "pharmacy-events",
+  "medications", "pharmacies", "doctors", "providers", "staff",
+  "integrations", "rbac", "knowledge-base", "reviews",
   "leads", "consent", "inventory", "patient-documents", "titration",
   "referrals", "adverse", "campaigns", "affiliates", "billing",
+  "intake-review", "notifications", "notification-prefs",
+  "marketing-campaigns", "marketing-automations",
+  "farming-groups", "farming-campaigns", "farming-sends",
 ];
 
 const kvUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
@@ -59,6 +64,7 @@ async function main() {
       const raw = await kv(`get/${encodeURIComponent("store:" + d)}`);
       if (raw == null) continue;
       let data; try { data = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { data = raw; }
+      if (data == null) continue; // cleared-to-null blobs: nothing to copy
       await sql`
         insert into store_domains (domain, data, updated_at)
         values (${d}, ${sql.json(data)}, now())
