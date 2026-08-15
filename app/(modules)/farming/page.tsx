@@ -49,6 +49,10 @@ export default function FarmingPage() {
   const [cityOpts, setCityOpts] = useState<string[]>([]);
   const [showSuppressed, setShowSuppressed] = useState(false);
 
+  // Cold-outreach sender (dripvitals.net) — persisted to the farming-settings store.
+  const [senderName, setSenderName] = useState("DripVitals");
+  const [senderEmail, setSenderEmail] = useState("");
+
   const [rows, setRows] = useState<FarmContact[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -94,6 +98,20 @@ export default function FarmingPage() {
   }, [reload, refreshCounts]);
   // Campaign engagement counts (Overview + list progress).
   useEffect(() => { api.campaignAnalytics().then(setCampCounts).catch(() => {}); }, [campaigns.length]);
+
+  // Load the saved outreach sender.
+  useEffect(() => {
+    fetch("/api/store/farming-settings", { cache: "no-store" }).then((r) => r.json()).then((d) => {
+      const s = d?.data || {};
+      if (s.fromName) setSenderName(s.fromName);
+      if (s.fromEmail) setSenderEmail(s.fromEmail);
+    }).catch(() => {});
+  }, []);
+  async function saveSender() {
+    if (senderEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(senderEmail.trim())) { toast("⚠️ Enter a valid from email"); return; }
+    const r = await fetch("/api/store/farming-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: { fromName: senderName.trim(), fromEmail: senderEmail.trim() } }) });
+    if ((await r.json()).ok) toast("✓ Outreach sender saved"); else toast("⚠️ Couldn't save sender");
+  }
 
   // Location filter facets — dependent dropdowns (state → county → city).
   useEffect(() => { api.getFacet("state").then(setStateOpts).catch(() => {}); }, []);
@@ -178,6 +196,19 @@ export default function FarmingPage() {
 
       {tab === "overview" && (
         <>
+          <div className="bg-surface border border-border rounded-xl p-4 mb-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-[13px] font-bold">📧 Outreach sender</div>
+              <span className="text-[11px] text-ink-muted">Separate from your clinical email</span>
+            </div>
+            <div className="text-[11.5px] text-ink-muted mb-3">Cold campaigns send from this address on <b>dripvitals.net</b>, isolated from patient/clinical email. Authenticate this domain in SendGrid (SPF/DKIM) before sending, or messages won&rsquo;t deliver.</div>
+            <div className="flex gap-3 items-end flex-wrap">
+              <div><label className="fl">Sender name</label><input className="fi !w-[180px]" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="DripVitals" /></div>
+              <div><label className="fl">From email</label><input className="fi !w-[280px]" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="outreach@dripvitals.net" /></div>
+              <button className="btn btn-primary btn-sm" onClick={saveSender}>Save sender</button>
+            </div>
+            <div className="text-[11px] text-ink-muted mt-2">Sends as <b>{(senderName || "DripVitals")} &lt;{senderEmail || "outreach@dripvitals.net"}&gt;</b></div>
+          </div>
           <div className="grid grid-cols-4 gap-2.5 mb-3 max-[900px]:grid-cols-2">
             <Metric label="Reachable" value={`${((counts?.reachableEmail ?? 0) + (counts?.reachablePhone ?? 0)).toLocaleString()}`} sub={`${(counts?.reachableEmail ?? 0).toLocaleString()} email · ${(counts?.reachablePhone ?? 0).toLocaleString()} SMS`} />
             <Metric label="Opt-out rate" value={pctStr(rate(counts?.suppressed ?? 0, counts?.total ?? 0))} sub={`${(counts?.suppressed ?? 0).toLocaleString()} suppressed`} intent={rate(counts?.suppressed ?? 0, counts?.total ?? 0) > 0.05 ? "text-red" : ""} />

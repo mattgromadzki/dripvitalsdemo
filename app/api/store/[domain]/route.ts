@@ -22,7 +22,7 @@ const ALLOW = new Set([
   "referrals", "adverse", "campaigns", "affiliates", "billing",
   "intake-review", "notifications", "notification-prefs",
   "marketing-campaigns", "marketing-automations",
-  "farming-groups", "farming-campaigns",
+  "farming-groups", "farming-campaigns", "farming-settings",
 ]);
 
 // Readable without a staff session — the PUBLIC patient intake form needs these
@@ -65,6 +65,7 @@ const WRITE_PERM: Record<string, string> = {
   "marketing-automations": "campaigns.send",
   "farming-groups": "farming.manage",
   "farming-campaigns": "farming.manage",
+  "farming-settings": "farming.manage",
   "referrals": "patients.edit",
   "adverse": "adverse.manage",
   "campaigns": "campaigns.send",

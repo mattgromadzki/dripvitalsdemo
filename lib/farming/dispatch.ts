@@ -4,6 +4,7 @@ import { personalize } from "./personalize";
 import { signOptOut, signTrack } from "./optout";
 import { pageAudience, audienceCount, updateContactFields } from "./contactsDb";
 import { recordSent } from "./sendsDb";
+import { getFarmingFrom } from "./settings";
 import { sendEmail } from "@/lib/email/provider";
 import { sendSms } from "@/lib/sms/provider";
 import type { FarmCampaign } from "@/lib/types/farming";
@@ -68,6 +69,9 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
 
   const summary: DispatchSummary = { processedCampaigns: 0, sent: 0, failed: 0, skipped: 0, details: [] };
 
+  // Dedicated cold-outreach sender (dripvitals.net) — isolated from the clinical domain.
+  const farmingFrom = await getFarmingFrom();
+
   const due = campaigns.filter((c) =>
     (opts.campaignId ? c.id === opts.campaignId : true) &&
     (c.status === "scheduled" || c.status === "sending") &&
@@ -93,7 +97,7 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
       const body = personalize(camp.body || "", c);
       let ok = false;
       if (camp.channel === "email") {
-        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: subject || camp.name, html: emailHtml(body, c.id, camp.id) });
+        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: subject || camp.name, html: emailHtml(body, c.id, camp.id), from: farmingFrom });
         ok = res.ok;
       } else {
         const statusCallback = `${appBase()}/api/farming/webhook/sms-status?m=${camp.id}&c=${encodeURIComponent(c.id)}`;
