@@ -52,6 +52,7 @@ export default function FarmingPage() {
   // Cold-outreach sender (dripvitals.net) — persisted to the farming-settings store.
   const [senderName, setSenderName] = useState("DripVitals");
   const [senderEmail, setSenderEmail] = useState("");
+  const [dailyCap, setDailyCap] = useState("");
 
   const [rows, setRows] = useState<FarmContact[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -105,12 +106,14 @@ export default function FarmingPage() {
       const s = d?.data || {};
       if (s.fromName) setSenderName(s.fromName);
       if (s.fromEmail) setSenderEmail(s.fromEmail);
+      if (s.dailyCap) setDailyCap(String(s.dailyCap));
     }).catch(() => {});
   }, []);
   async function saveSender() {
     if (senderEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(senderEmail.trim())) { toast("⚠️ Enter a valid from email"); return; }
-    const r = await fetch("/api/store/farming-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: { fromName: senderName.trim(), fromEmail: senderEmail.trim() } }) });
-    if ((await r.json()).ok) toast("✓ Outreach sender saved"); else toast("⚠️ Couldn't save sender");
+    const cap = Math.max(0, Math.floor(Number(dailyCap) || 0));
+    const r = await fetch("/api/store/farming-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: { fromName: senderName.trim(), fromEmail: senderEmail.trim(), dailyCap: cap } }) });
+    if ((await r.json()).ok) toast("✓ Outreach settings saved"); else toast("⚠️ Couldn't save settings");
   }
 
   // Location filter facets — dependent dropdowns (state → county → city).
@@ -203,11 +206,12 @@ export default function FarmingPage() {
             </div>
             <div className="text-[11.5px] text-ink-muted mb-3">Cold campaigns send from this address on <b>dripvitals.net</b>, isolated from patient/clinical email. Authenticate this domain in SendGrid (SPF/DKIM) before sending, or messages won&rsquo;t deliver.</div>
             <div className="flex gap-3 items-end flex-wrap">
-              <div><label className="fl">Sender name</label><input className="fi !w-[180px]" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="DripVitals" /></div>
-              <div><label className="fl">From email</label><input className="fi !w-[280px]" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="outreach@dripvitals.net" /></div>
-              <button className="btn btn-primary btn-sm" onClick={saveSender}>Save sender</button>
+              <div><label className="fl">Sender name</label><input className="fi !w-[160px]" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="DripVitals" /></div>
+              <div><label className="fl">From email</label><input className="fi !w-[260px]" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="outreach@dripvitals.net" /></div>
+              <div><label className="fl">Daily send cap</label><input className="fi !w-[120px]" type="number" min={0} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} placeholder="0 = no cap" /></div>
+              <button className="btn btn-primary btn-sm" onClick={saveSender}>Save</button>
             </div>
-            <div className="text-[11px] text-ink-muted mt-2">Sends as <b>{(senderName || "DripVitals")} &lt;{senderEmail || "outreach@dripvitals.net"}&gt;</b></div>
+            <div className="text-[11px] text-ink-muted mt-2">Sends as <b>{(senderName || "DripVitals")} &lt;{senderEmail || "outreach@dripvitals.net"}&gt;</b>{Number(dailyCap) > 0 ? <> · max <b>{Number(dailyCap).toLocaleString()}</b> emails/day (≈ {(Number(dailyCap) * 30).toLocaleString()}/mo) — paced across days, resumes automatically.</> : <> · no daily cap set.</>}</div>
           </div>
           <div className="grid grid-cols-4 gap-2.5 mb-3 max-[900px]:grid-cols-2">
             <Metric label="Reachable" value={`${((counts?.reachableEmail ?? 0) + (counts?.reachablePhone ?? 0)).toLocaleString()}`} sub={`${(counts?.reachableEmail ?? 0).toLocaleString()} email · ${(counts?.reachablePhone ?? 0).toLocaleString()} SMS`} />

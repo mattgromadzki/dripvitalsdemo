@@ -4,7 +4,8 @@ import { personalize } from "./personalize";
 import { signOptOut, signTrack } from "./optout";
 import { pageAudience, audienceCount, updateContactFields } from "./contactsDb";
 import { recordSent } from "./sendsDb";
-import { getFarmingFrom } from "./settings";
+import { getFarmingSettings, resolveFrom, dailyCapOf } from "./settings";
+import { sentToday, addSentToday } from "./quota";
 import { sendEmail } from "@/lib/email/provider";
 import { sendSms } from "@/lib/sms/provider";
 import type { FarmCampaign } from "@/lib/types/farming";
@@ -70,7 +71,14 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
   const summary: DispatchSummary = { processedCampaigns: 0, sent: 0, failed: 0, skipped: 0, details: [] };
 
   // Dedicated cold-outreach sender (dripvitals.net) — isolated from the clinical domain.
-  const farmingFrom = await getFarmingFrom();
+  const settings = await getFarmingSettings();
+  const farmingFrom = resolveFrom(settings);
+
+  // Daily email cap (warm-up + plan-volume protection). Remaining budget for
+  // THIS run = cap − already-sent-today; Infinity when no cap is configured.
+  const dailyCap = dailyCapOf(settings);
+  let emailBudget = dailyCap > 0 ? Math.max(0, dailyCap - (await sentToday())) : Infinity;
+  let emailsSentThisRun = 0;
 
   const due = campaigns.filter((c) =>
     (opts.campaignId ? c.id === opts.campaignId : true) &&
@@ -79,13 +87,17 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
   );
 
   for (const camp of due) {
+    // Daily email cap reached — leave the campaign "sending" and resume tomorrow.
+    if (camp.channel === "email" && dailyCap > 0 && emailBudget <= 0) continue;
     if (!camp.startedAt) {
       camp.totalRecipients = await audienceCount(camp.audience || { kind: "all" }, camp.channel);
       camp.cursor = 0; // reused as an opaque audience cursor (string) below
       camp.startedAt = new Date(now).toISOString();
     }
     camp.status = "sending";
-    const limit = Math.max(1, Math.min(MAX_BATCH, camp.throttlePerMin || MAX_BATCH));
+    let limit = Math.max(1, Math.min(MAX_BATCH, camp.throttlePerMin || MAX_BATCH));
+    // Never fetch more email recipients than the remaining daily budget allows.
+    if (camp.channel === "email" && dailyCap > 0) limit = Math.min(limit, emailBudget);
     // `cursor` is stored as a string keyset token (or 0 on first run).
     const cursor: string | null = typeof camp.cursor === "string" ? camp.cursor : null;
     const page = await pageAudience(camp.audience || { kind: "all" }, camp.channel, cursor, limit);
@@ -115,6 +127,9 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
       else failed++;
     }
 
+    // Spend the daily email budget by the number of emails attempted this batch.
+    if (camp.channel === "email" && dailyCap > 0) { const used = sent + failed; emailBudget -= used; emailsSentThisRun += used; }
+
     // Advance the keyset cursor. A null next cursor means the audience is
     // exhausted → campaign complete.
     camp.cursor = page.nextCursor;
@@ -129,6 +144,7 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
     summary.details.push({ id: camp.id, sent, failed, done });
   }
 
+  if (emailsSentThisRun > 0) await addSentToday(emailsSentThisRun);
   if (summary.processedCampaigns) await writeDomain(CAMPAIGNS, campaigns);
   return summary;
 }
