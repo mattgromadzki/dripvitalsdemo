@@ -20,6 +20,7 @@ async function sendgrid(key: string, from: string, input: SendEmailInput): Promi
       personalizations: [{ to: [{ email: input.to, name: input.toName }] }],
       from: parseFrom(from), subject: input.subject,
       content: [{ type: "text/html", value: input.html }],
+      ...(input.headers && Object.keys(input.headers).length ? { headers: input.headers } : {}),
     }),
   });
   if (r.status === 202 || r.ok) return { ok: true, id: r.headers.get("x-message-id") || undefined, provider: "sendgrid" };
@@ -31,7 +32,7 @@ async function sendgrid(key: string, from: string, input: SendEmailInput): Promi
 async function resend(key: string, from: string, input: SendEmailInput): Promise<SendEmailResult> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [input.to], subject: input.subject, html: input.html }),
+    body: JSON.stringify({ from, to: [input.to], subject: input.subject, html: input.html, ...(input.headers && Object.keys(input.headers).length ? { headers: input.headers } : {}) }),
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) return { ok: false, error: j?.message || `Resend error (HTTP ${r.status}).`, provider: "resend" };

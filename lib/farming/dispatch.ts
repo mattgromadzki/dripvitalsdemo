@@ -97,7 +97,13 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
       const body = personalize(camp.body || "", c);
       let ok = false;
       if (camp.channel === "email") {
-        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: subject || camp.name, html: emailHtml(body, c.id, camp.id), from: farmingFrom });
+        // RFC 8058 one-click unsubscribe — required by Gmail/Yahoo for bulk senders.
+        const unsub = unsubUrl(c.id);
+        const res = await sendEmail({
+          to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "),
+          subject: subject || camp.name, html: emailHtml(body, c.id, camp.id), from: farmingFrom,
+          headers: { "List-Unsubscribe": `<${unsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        });
         ok = res.ok;
       } else {
         const statusCallback = `${appBase()}/api/farming/webhook/sms-status?m=${camp.id}&c=${encodeURIComponent(c.id)}`;

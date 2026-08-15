@@ -36,3 +36,19 @@ export async function GET(req: Request) {
   if (!c.optedOut) await setOptedOutById(contactId, true, "email");
   return page("You're unsubscribed", "You've been removed from our outreach list and won't receive further emails.", true);
 }
+
+// RFC 8058 one-click unsubscribe: Gmail/Yahoo POST here (body
+// "List-Unsubscribe=One-Click") straight from the inbox, with no page render.
+// Same signed token as the GET link; respond 200 on success.
+export async function POST(req: Request) {
+  const limited = await rateLimit(req, "farming"); if (limited) return limited;
+  const url = new URL(req.url);
+  const contactId = url.searchParams.get("c") || "";
+  const token = url.searchParams.get("t") || "";
+  if (!contactId || !token || !verifyOptOut(contactId, token)) {
+    return new Response("Invalid link", { status: 400 });
+  }
+  const c = await getContact(contactId);
+  if (c && !c.optedOut) await setOptedOutById(contactId, true, "email");
+  return new Response("Unsubscribed", { status: 200 });
+}
