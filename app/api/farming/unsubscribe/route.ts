@@ -1,11 +1,8 @@
 import { rateLimit } from "@/lib/security/ratelimit";
 import { verifyOptOut } from "@/lib/farming/optout";
-import { readDomain, writeDomain } from "@/lib/farming/serverStore";
-import type { FarmContact } from "@/lib/types/farming";
+import { getContact, setOptedOutById } from "@/lib/farming/contactsDb";
 
 export const dynamic = "force-dynamic";
-
-const CONTACTS = "farming-contacts";
 
 function page(title: string, message: string, ok: boolean): Response {
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
@@ -31,18 +28,11 @@ export async function GET(req: Request) {
     return page("Invalid link", "This unsubscribe link is invalid or has expired. If you keep receiving messages, reply STOP or contact support.", false);
   }
 
-  const contacts = (await readDomain<FarmContact[]>(CONTACTS)) || [];
-  const c = contacts.find((x) => x.id === contactId);
+  const c = await getContact(contactId);
   if (!c) {
     // Token was valid but the record is gone — treat as already removed.
     return page("You're unsubscribed", "You will no longer receive outreach messages from us.", true);
   }
-  if (!c.optedOut) {
-    c.optedOut = true;
-    c.status = "unsubscribed";
-    c.optOutAt = new Date().toISOString();
-    c.optOutChannel = "email";
-    await writeDomain(CONTACTS, contacts);
-  }
+  if (!c.optedOut) await setOptedOutById(contactId, true, "email");
   return page("You're unsubscribed", "You've been removed from our outreach list and won't receive further emails.", true);
 }

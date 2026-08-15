@@ -2,11 +2,12 @@ import "server-only";
 import { readDomain, writeDomain } from "./serverStore";
 import { personalize } from "./personalize";
 import { signOptOut, signTrack } from "./optout";
+import { pageAudience, audienceCount, updateContactFields } from "./contactsDb";
+import { recordSent } from "./sendsDb";
 import { sendEmail } from "@/lib/email/provider";
 import { sendSms } from "@/lib/sms/provider";
-import type { FarmCampaign, FarmContact, SendResult } from "@/lib/types/farming";
+import type { FarmCampaign } from "@/lib/types/farming";
 
-const CONTACTS = "farming-contacts";
 const CAMPAIGNS = "farming-campaigns";
 const MAX_BATCH = 40; // hard cap per invocation (keeps a run well under maxDuration)
 
@@ -50,33 +51,22 @@ function smsBody(body: string): string {
   return /stop/i.test(body) ? body : `${body}\n\nTxt STOP to opt out`;
 }
 
-function resolveAudience(camp: FarmCampaign, contacts: FarmContact[]): FarmContact[] {
-  const a = camp.audience || { kind: "all" };
-  let list = contacts;
-  if (a.kind === "group") { const g = new Set(a.groupIds || []); list = contacts.filter((c) => c.groupIds.some((x) => g.has(x))); }
-  else if (a.kind === "status") { const st = new Set(a.statuses || []); list = contacts.filter((c) => st.has(c.status)); }
-  else if (a.kind === "selection") { const ids = new Set(a.contactIds || []); list = contacts.filter((c) => ids.has(c.id)); }
-  // Channel viability + suppression at resolution time.
-  return list.filter((c) => !c.optedOut && (camp.channel === "email" ? !!c.email : !!c.phone));
-}
-
 export interface DispatchSummary { processedCampaigns: number; sent: number; failed: number; skipped: number; details: { id: string; sent: number; failed: number; done: boolean }[] }
 
 /**
  * Processes due scheduled campaigns server-side. Called by the cron every minute
- * and inline by "Send now" (pass campaignId). Resumable + throttled: each call
- * sends at most min(MAX_BATCH, throttlePerMin) recipients per campaign and advances
- * a cursor, so a large list drains across successive cron runs and survives restarts.
+ * and inline by "Send now" (pass campaignId). Recipients are PAGED from the
+ * contacts DB by keyset (no in-memory snapshot), each send is recorded one-row in
+ * farming_sends, and per-contact fields update one row at a time — so a campaign
+ * to millions drains across cron runs with flat memory. Resumable via the
+ * campaign's keyset `cursor`; throttled to min(MAX_BATCH, throttlePerMin) per run.
  */
 export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: number } = {}): Promise<DispatchSummary> {
   const now = opts.now ?? Date.now();
   const campaigns = (await readDomain<FarmCampaign[]>(CAMPAIGNS)) || [];
-  const contacts = (await readDomain<FarmContact[]>(CONTACTS)) || [];
   if (!Array.isArray(campaigns) || !campaigns.length) return { processedCampaigns: 0, sent: 0, failed: 0, skipped: 0, details: [] };
 
-  const contactById = new Map(contacts.map((c) => [c.id, c]));
   const summary: DispatchSummary = { processedCampaigns: 0, sent: 0, failed: 0, skipped: 0, details: [] };
-  let contactsDirty = false;
 
   const due = campaigns.filter((c) =>
     (opts.campaignId ? c.id === opts.campaignId : true) &&
@@ -85,51 +75,42 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
   );
 
   for (const camp of due) {
-    // First touch: resolve + snapshot the recipient set so later edits to groups
-    // don't change who a running campaign targets.
-    if (!camp.recipientSnapshot) {
-      const recips = resolveAudience(camp, contacts);
-      camp.recipientSnapshot = recips.map((c) => c.id);
-      camp.totalRecipients = recips.length;
-      camp.cursor = 0;
-      camp.results = camp.results || {};
+    if (!camp.startedAt) {
+      camp.totalRecipients = await audienceCount(camp.audience || { kind: "all" }, camp.channel);
+      camp.cursor = 0; // reused as an opaque audience cursor (string) below
       camp.startedAt = new Date(now).toISOString();
     }
     camp.status = "sending";
-    const snapshot = camp.recipientSnapshot;
     const limit = Math.max(1, Math.min(MAX_BATCH, camp.throttlePerMin || MAX_BATCH));
-    let processed = 0, sent = 0, failed = 0;
-    let i = camp.cursor || 0;
+    // `cursor` is stored as a string keyset token (or 0 on first run).
+    const cursor: string | null = typeof camp.cursor === "string" ? camp.cursor : null;
+    const page = await pageAudience(camp.audience || { kind: "all" }, camp.channel, cursor, limit);
 
-    for (; i < snapshot.length && processed < limit; i++) {
-      const c = contactById.get(snapshot[i]);
-      if (!c) { camp.results![snapshot[i]] = "failed"; continue; }
-      if (c.optedOut) { camp.results![c.id] = "opted_out"; summary.skipped++; continue; } // live suppression re-check
-
-      const personalizedSubject = personalize(camp.subject || "", c);
-      const personalizedBody = personalize(camp.body || "", c);
+    let sent = 0, failed = 0;
+    for (const c of page.contacts) {
+      if (c.optedOut) { summary.skipped++; continue; } // live suppression re-check
+      const subject = personalize(camp.subject || "", c);
+      const body = personalize(camp.body || "", c);
       let ok = false;
       if (camp.channel === "email") {
-        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: personalizedSubject || camp.name, html: emailHtml(personalizedBody, c.id, camp.id) });
+        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: subject || camp.name, html: emailHtml(body, c.id, camp.id) });
         ok = res.ok;
       } else {
         const statusCallback = `${appBase()}/api/farming/webhook/sms-status?m=${camp.id}&c=${encodeURIComponent(c.id)}`;
-        const res = await sendSms({ to: c.phone, body: smsBody(personalizedBody), statusCallback });
+        const res = await sendSms({ to: c.phone, body: smsBody(body), statusCallback });
         ok = res.ok;
       }
-      camp.results![c.id] = ok ? "sent" : "failed";
-      if (ok) { sent++; c.lastContactedAt = new Date().toISOString(); c.lastCampaignId = camp.id; if (c.status === "new") c.status = "contacted"; contactsDirty = true; }
+      await recordSent(camp.id, c.id, ok ? "sent" : "failed");
+      if (ok) { sent++; await updateContactFields(c.id, { lastContactedAt: new Date().toISOString(), lastCampaignId: camp.id, ...(c.status === "new" ? { status: "contacted" } : {}) }); }
       else failed++;
-      processed++;
     }
 
-    camp.cursor = i;
+    // Advance the keyset cursor. A null next cursor means the audience is
+    // exhausted → campaign complete.
+    camp.cursor = page.nextCursor;
     camp.sent = (camp.sent || 0) + sent;
     camp.failed = (camp.failed || 0) + failed;
-    // delivered/opened/clicked/replied are populated by the tracking endpoints &
-    // provider callbacks; keep the count in sync with the log at write time.
-    camp.delivered = Object.keys(camp.deliveredLog || {}).length;
-    const done = i >= snapshot.length;
+    const done = !page.nextCursor;
     if (done) { camp.status = "sent"; camp.completedAt = new Date(now).toISOString(); }
 
     summary.processedCampaigns++;
@@ -139,6 +120,5 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
   }
 
   if (summary.processedCampaigns) await writeDomain(CAMPAIGNS, campaigns);
-  if (contactsDirty) await writeDomain(CONTACTS, contacts);
   return summary;
 }

@@ -26,3 +26,45 @@ create table if not exists patients (
 
 create index if not exists patients_brand_idx on patients (brand_id);
 create index if not exists patients_email_idx on patients (lower(email));
+
+-- Farming (cold outreach) contacts: one row each, built to hold millions.
+-- Denormalized columns (email/phone/status/opted_out/group_ids/last_campaign_id)
+-- drive indexed queries; the full FarmContact lives in `data`.
+create table if not exists farming_contacts (
+  id               text primary key,
+  email            text,
+  phone            text,               -- normalized last-10 digits (for STOP/reply matching)
+  status           text not null default 'new',
+  opted_out        boolean not null default false,
+  group_ids        text[] not null default '{}',
+  last_campaign_id text,
+  data             jsonb not null,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+-- Dedupe key: at most one contact per email (partial — SMS-only rows have no email).
+create unique index if not exists farming_contacts_email_uk on farming_contacts (lower(email)) where email is not null and email <> '';
+create index if not exists farming_contacts_phone_idx  on farming_contacts (phone);
+create index if not exists farming_contacts_status_idx on farming_contacts (status);
+create index if not exists farming_contacts_opt_idx    on farming_contacts (opted_out);
+create index if not exists farming_contacts_groups_idx on farming_contacts using gin (group_ids);
+create index if not exists farming_contacts_keyset_idx on farming_contacts (created_at desc, id desc);
+-- Fast substring search at scale (name/email/company).
+create extension if not exists pg_trgm;
+create index if not exists farming_contacts_search_idx on farming_contacts using gin ((lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company',''))) gin_trgm_ops);
+
+-- Farming sends: one row per (campaign, recipient). Replaces the per-recipient
+-- maps that used to live on the campaign blob, so campaigning to millions and
+-- its open/click/delivery/reply tracking stay row-scoped and idempotent.
+create table if not exists farming_sends (
+  campaign_id   text not null,
+  contact_id    text not null,
+  status        text not null default 'sent',
+  sent_at       timestamptz,
+  delivered_at  timestamptz,
+  opened_at     timestamptz,
+  clicked_at    timestamptz,
+  replied_at    timestamptz,
+  primary key (campaign_id, contact_id)
+);
+create index if not exists farming_sends_campaign_idx on farming_sends (campaign_id);

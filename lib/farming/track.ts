@@ -1,53 +1,28 @@
 import "server-only";
-import { readDomain, writeDomain } from "./serverStore";
-import type { FarmCampaign, FarmContact } from "@/lib/types/farming";
+import * as sends from "./sendsDb";
+import { findByEmail, markReplied as contactReplied } from "./contactsDb";
 
-const CAMPAIGNS = "farming-campaigns";
-const CONTACTS = "farming-contacts";
-const digits = (p: string) => (p || "").replace(/[^\d]/g, "").slice(-10);
+// Engagement tracking — thin delegators over the per-recipient farming_sends
+// table. Counts for analytics are aggregated from that table (sendsDb), never by
+// per-event writes to the campaign blob, so this stays cheap at scale.
 
-// Read-modify-write a single campaign in the persisted blob.
-export async function mutateCampaign(campaignId: string, fn: (c: FarmCampaign) => void): Promise<boolean> {
-  const camps = (await readDomain<FarmCampaign[]>(CAMPAIGNS)) || [];
-  const camp = camps.find((c) => c.id === campaignId);
-  if (!camp) return false;
-  fn(camp);
-  await writeDomain(CAMPAIGNS, camps);
-  return true;
-}
+export const recordOpen = (campaignId: string, contactId: string) => sends.markOpened(campaignId, contactId);
+export const recordClick = (campaignId: string, contactId: string) => sends.markClicked(campaignId, contactId);
+export const recordDelivered = (campaignId: string, contactId: string) => sends.markDelivered(campaignId, contactId);
+export const recordFailure = (campaignId: string, contactId: string) => sends.markFailed(campaignId, contactId);
 
-// Idempotent first-event stamp into one of the engagement logs + count sync.
-function stamp(camp: FarmCampaign, log: "openLog" | "clickLog" | "deliveredLog" | "replyLog", count: "opened" | "clicked" | "delivered" | "replied", contactId: string) {
-  const m = (camp[log] = camp[log] || {});
-  if (!m[contactId]) { m[contactId] = new Date().toISOString(); camp[count] = Object.keys(m).length; }
-}
-
-export function recordOpen(camp: FarmCampaign, contactId: string) { stamp(camp, "openLog", "opened", contactId); }
-export function recordClick(camp: FarmCampaign, contactId: string) { stamp(camp, "clickLog", "clicked", contactId); stamp(camp, "openLog", "opened", contactId); /* a click implies an open */ }
-export function recordDelivered(camp: FarmCampaign, contactId: string) { stamp(camp, "deliveredLog", "delivered", contactId); }
-export function recordFailure(camp: FarmCampaign, contactId: string) { camp.results = camp.results || {}; camp.results[contactId] = "failed"; }
-
-// Correlate a provider email event (SendGrid) to a campaign by recipient address
-// → the contact's most recent campaign. Used for delivery/bounce (opens & clicks
-// come from our own pixel/redirect instead).
+// SendGrid delivery/bounce → correlate by recipient email → their last campaign.
 export async function recordEmailEvent(email: string, kind: "delivered" | "failed"): Promise<void> {
-  const em = (email || "").trim().toLowerCase();
-  if (!em) return;
-  const contacts = (await readDomain<FarmContact[]>(CONTACTS)) || [];
-  const c = contacts.find((x) => x.email.toLowerCase() === em);
+  const c = await findByEmail(email);
   if (!c || !c.lastCampaignId) return;
-  await mutateCampaign(c.lastCampaignId, (camp) => { if (kind === "delivered") recordDelivered(camp, c.id); else recordFailure(camp, c.id); });
+  if (kind === "delivered") await sends.markDelivered(c.lastCampaignId, c.id);
+  else await sends.markFailed(c.lastCampaignId, c.id);
 }
 
-// Attribute an inbound reply to the contact's most recent campaign + mark them.
+// Inbound reply (SMS/email) → mark the contact replied + stamp their last campaign.
 export async function recordReply(match: { phone?: string; email?: string }): Promise<boolean> {
-  const contacts = (await readDomain<FarmContact[]>(CONTACTS)) || [];
-  const ph = match.phone ? digits(match.phone) : "";
-  const em = (match.email || "").trim().toLowerCase();
-  const c = contacts.find((x) => (ph && digits(x.phone) === ph) || (em && x.email.toLowerCase() === em));
-  if (!c) return false;
-  if (c.status !== "unsubscribed") c.status = "replied";
-  await writeDomain(CONTACTS, contacts);
-  if (c.lastCampaignId) await mutateCampaign(c.lastCampaignId, (camp) => stamp(camp, "replyLog", "replied", c.id));
+  const hit = await contactReplied(match);
+  if (!hit) return false;
+  if (hit.lastCampaignId) await sends.markReplied(hit.lastCampaignId, hit.contactId);
   return true;
 }

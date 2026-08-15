@@ -1,5 +1,5 @@
 import { verifyTwilioRequest } from "@/lib/sms/verifyTwilio";
-import { mutateCampaign, recordDelivered, recordFailure } from "@/lib/farming/track";
+import { recordDelivered, recordFailure } from "@/lib/farming/track";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +23,8 @@ export async function POST(req: Request) {
   const c = url.searchParams.get("c") || "";
   if (m && c) {
     try {
-      if (status === "delivered") await mutateCampaign(m, (camp) => recordDelivered(camp, c));
-      else if (status === "undelivered" || status === "failed") await mutateCampaign(m, (camp) => recordFailure(camp, c));
+      if (status === "delivered") await recordDelivered(m, c);
+      else if (status === "undelivered" || status === "failed") await recordFailure(m, c);
     } catch { /* ignore */ }
   }
   return new Response("ok", { status: 200 });

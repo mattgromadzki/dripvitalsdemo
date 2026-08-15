@@ -1,5 +1,5 @@
 import { verifyTrack } from "@/lib/farming/optout";
-import { mutateCampaign, recordClick } from "@/lib/farming/track";
+import { recordClick } from "@/lib/farming/track";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
   try { const u = new URL(target); if (u.protocol === "http:" || u.protocol === "https:") dest = u.toString(); } catch { /* keep fallback */ }
 
   if (m && c && verifyTrack(m, c, t)) {
-    try { await mutateCampaign(m, (camp) => recordClick(camp, c)); } catch { /* ignore */ }
+    try { await recordClick(m, c); } catch { /* ignore */ }
   }
   return Response.redirect(dest, 302);
 }

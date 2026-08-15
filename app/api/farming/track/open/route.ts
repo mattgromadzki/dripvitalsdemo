@@ -1,5 +1,5 @@
 import { verifyTrack } from "@/lib/farming/optout";
-import { mutateCampaign, recordOpen } from "@/lib/farming/track";
+import { recordOpen } from "@/lib/farming/track";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const c = url.searchParams.get("c") || "";
   const t = url.searchParams.get("t") || "";
   if (m && c && verifyTrack(m, c, t)) {
-    try { await mutateCampaign(m, (camp) => recordOpen(camp, c)); } catch { /* ignore */ }
+    try { await recordOpen(m, c); } catch { /* ignore */ }
   }
   return pixel();
 }

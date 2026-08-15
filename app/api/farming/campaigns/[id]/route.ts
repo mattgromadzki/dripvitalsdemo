@@ -13,7 +13,7 @@ function json(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json" } });
 }
 function resetProgress(c: FarmCampaign) {
-  c.recipientSnapshot = undefined; c.cursor = 0; c.results = {};
+  c.cursor = null;
   c.sent = 0; c.delivered = 0; c.failed = 0; c.totalRecipients = 0;
   c.startedAt = undefined; c.completedAt = undefined;
 }

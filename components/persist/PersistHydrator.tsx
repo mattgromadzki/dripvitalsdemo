@@ -86,8 +86,9 @@ export function PersistHydrator() {
     // lists, so they stay seed-only.
     serverPersist(useMarketing, "marketing-campaigns", "campaigns", CATALOG_POLL);
     serverPersist(useMarketing, "marketing-automations", "automations", CATALOG_POLL);
-    // Farming (cold outreach): separate contact base, groups, and campaigns.
-    serverPersist(useFarming, "farming-contacts", "contacts", CATALOG_POLL);
+    // Farming (cold outreach): groups + campaign definitions stay small blobs.
+    // Contacts are NOT mirrored here — they live in a paginated DB table
+    // (lib/farming/contactsDb) and are fetched by page, never held in memory.
     serverPersist(useFarming, "farming-groups", "groups", CATALOG_POLL);
     serverPersist(useFarming, "farming-campaigns", "campaigns", CATALOG_POLL);
     serverPersist(useReferrals, "referrals", "referrals", CATALOG_POLL);

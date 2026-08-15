@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { personalize, MERGE_TOKENS } from "@/lib/farming/personalize";
 import { FARM_STATUSES } from "@/lib/types/farming";
-import type { FarmContact, FarmGroup, FarmChannel, FarmAudience, FarmStatus, AudienceKind } from "@/lib/types/farming";
+import { audienceCount } from "@/lib/farming/contactsClient";
+import type { FarmGroup, FarmChannel, FarmAudience, FarmStatus, AudienceKind } from "@/lib/types/farming";
 
 export interface ComposerSubmit {
   name: string; channel: FarmChannel; subject?: string; body: string;
@@ -16,21 +17,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   groups: FarmGroup[];
-  contacts: FarmContact[];
   initialSelectionIds?: string[];   // pre-fill audience = current bulk selection
   onSubmit: (data: ComposerSubmit) => void;
 }
 
-// Client mirror of the server audience resolver (for the live recipient count).
-function resolveAudience(contacts: FarmContact[], channel: FarmChannel, a: FarmAudience): FarmContact[] {
-  let list = contacts;
-  if (a.kind === "group") { const g = new Set(a.groupIds || []); list = contacts.filter((c) => c.groupIds.some((x) => g.has(x))); }
-  else if (a.kind === "status") { const st = new Set(a.statuses || []); list = contacts.filter((c) => st.has(c.status)); }
-  else if (a.kind === "selection") { const ids = new Set(a.contactIds || []); list = contacts.filter((c) => ids.has(c.id)); }
-  return list.filter((c) => !c.optedOut && (channel === "email" ? !!c.email : !!c.phone));
-}
-
-export function CampaignComposer({ open, onClose, groups, contacts, initialSelectionIds, onSubmit }: Props) {
+export function CampaignComposer({ open, onClose, groups, initialSelectionIds, onSubmit }: Props) {
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<FarmChannel>("email");
   const [subject, setSubject] = useState("");
@@ -58,8 +49,18 @@ export function CampaignComposer({ open, onClose, groups, contacts, initialSelec
     return { kind: "all" };
   }, [kind, groupIds, statuses, initialSelectionIds]);
 
-  const recipients = useMemo(() => resolveAudience(contacts, channel, audience), [contacts, channel, audience]);
-  const preview = useMemo(() => (recipients[0] ? personalize(body, recipients[0]) : personalize(body, { firstName: "Jane", lastName: "Doe", company: "Acme" })), [body, recipients]);
+  // Reachable-recipient count comes from the server (contacts aren't in memory).
+  const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    if (kind === "group" && !groupIds.length) { setRecipientCount(0); return; }
+    if (kind === "status" && !statuses.length) { setRecipientCount(0); return; }
+    let alive = true; setRecipientCount(null);
+    const t = setTimeout(() => { audienceCount(audience, channel).then((n) => { if (alive) setRecipientCount(n); }).catch(() => { if (alive) setRecipientCount(0); }); }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [open, audience, channel, kind, groupIds.length, statuses.length]);
+
+  const preview = useMemo(() => personalize(body, { firstName: "Jane", lastName: "Doe", company: "Acme", email: "jane@acme.com", phone: "+1 (305) 555-0100" }), [body]);
 
   const toggleGroup = (id: string) => setGroupIds((g) => g.includes(id) ? g.filter((x) => x !== id) : [...g, id]);
   const toggleStatus = (s: FarmStatus) => setStatuses((st) => st.includes(s) ? st.filter((x) => x !== s) : [...st, s]);
@@ -71,7 +72,7 @@ export function CampaignComposer({ open, onClose, groups, contacts, initialSelec
     if (channel === "email" && !subject.trim()) { setErr("Email campaigns need a subject line."); return; }
     if (kind === "group" && !groupIds.length) { setErr("Pick at least one group."); return; }
     if (kind === "status" && !statuses.length) { setErr("Pick at least one status."); return; }
-    if (!recipients.length) { setErr("This audience resolves to 0 reachable contacts (after opt-outs and missing " + (channel === "email" ? "emails" : "phones") + ")."); return; }
+    if (recipientCount === 0) { setErr("This audience resolves to 0 reachable contacts (after opt-outs and missing " + (channel === "email" ? "emails" : "phones") + ")."); return; }
     let scheduledAt: string | undefined;
     if (mode === "schedule") {
       if (!scheduledLocal) { setErr("Pick a date & time to schedule."); return; }
@@ -138,7 +139,7 @@ export function CampaignComposer({ open, onClose, groups, contacts, initialSelec
           ))}
         </div>
       )}
-      <div className="text-[12px] mb-3"><span className="font-bold text-brand-dk">{recipients.length}</span> <span className="text-ink-muted">reachable {channel === "email" ? "email" : "SMS"} recipient{recipients.length === 1 ? "" : "s"} (opt-outs &amp; missing {channel === "email" ? "emails" : "phones"} excluded)</span></div>
+      <div className="text-[12px] mb-3"><span className="font-bold text-brand-dk">{recipientCount === null ? "…" : recipientCount.toLocaleString()}</span> <span className="text-ink-muted">reachable {channel === "email" ? "email" : "SMS"} recipient{recipientCount === 1 ? "" : "s"} (opt-outs &amp; missing {channel === "email" ? "emails" : "phones"} excluded)</span></div>
 
       {channel === "email" && (
         <div className="mb-3"><label className="fl">Subject</label><input className="fi" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Partnership idea for {{company}}" /></div>
@@ -154,7 +155,7 @@ export function CampaignComposer({ open, onClose, groups, contacts, initialSelec
 
       {body.trim() && (
         <div className="mt-2 p-3 rounded-md bg-surface-2 border border-border">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1">Preview {recipients[0] ? `· ${[recipients[0].firstName, recipients[0].lastName].filter(Boolean).join(" ")}` : "· sample"}</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1">Preview · sample contact</div>
           <div className="text-[12.5px] whitespace-pre-wrap text-ink-2">{preview}</div>
           {channel === "sms" && <div className="text-[10.5px] text-ink-muted mt-1.5">+ "Txt STOP to opt out" appended automatically</div>}
           {channel === "email" && <div className="text-[10.5px] text-ink-muted mt-1.5">+ an unsubscribe link is appended to every email</div>}

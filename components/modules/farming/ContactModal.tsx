@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { FARM_STATUSES } from "@/lib/types/farming";
-import type { FarmContact, FarmGroup, FarmStatus } from "@/lib/types/farming";
-import type { ContactInput } from "@/lib/hooks/useFarming";
+import type { FarmContact, FarmGroup, FarmStatus, ContactInput } from "@/lib/types/farming";
 
 interface Props {
   open: boolean;

@@ -35,6 +35,10 @@ export interface FarmContact {
   custom?: Record<string, string>;
 }
 
+// Input shape for creating a contact (server assigns id/createdAt/defaults).
+export type ContactInput = Omit<FarmContact, "id" | "createdAt" | "optedOut" | "groupIds" | "status"> &
+  Partial<Pick<FarmContact, "groupIds" | "status" | "optedOut">>;
+
 export interface FarmGroup {
   id: string;                 // "FG-###"
   name: string;
@@ -77,12 +81,5 @@ export interface FarmCampaign {
   opened?: number;            // unique email opens (our tracking pixel)
   clicked?: number;           // unique email link clicks (our redirect)
   replied?: number;           // inbound replies attributed to this campaign
-  cursor?: number;            // resume index into the resolved recipient list
-  recipientSnapshot?: string[]; // contact ids resolved at send/schedule time
-  results?: Record<string, SendResult>; // contactId -> send outcome
-  // Per-recipient engagement logs (contactId -> ISO timestamp of first event).
-  deliveredLog?: Record<string, string>;
-  openLog?: Record<string, string>;
-  clickLog?: Record<string, string>;
-  replyLog?: Record<string, string>;
+  cursor?: string | number | null; // opaque keyset resume token for the dispatcher
 }
