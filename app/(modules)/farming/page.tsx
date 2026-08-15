@@ -221,27 +221,29 @@ export default function FarmingPage() {
 
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[820px] text-[13px]">
+              <table className="w-full border-collapse min-w-[960px] text-[13px]">
                 <thead className="bg-surface-2">
                   <tr>
                     <th className="px-3 py-2.5 w-8"><input type="checkbox" checked={rows.length > 0 && rows.every((c) => sel.has(c.id))} onChange={(e) => { setSelectAllMatching(false); setSel(e.target.checked ? new Set(rows.map((c) => c.id)) : new Set()); }} /></th>
-                    {["Name", "Email", "Phone", "Company", "Groups", "Status"].map((h) => <th key={h} className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}
+                    {["Name", "Email", "Phone", "State", "County", "City", "Groups", "Status"].map((h) => <th key={h} className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((c) => (
                     <tr key={c.id} className={`border-t border-border hover:bg-surface-2 cursor-pointer ${sel.has(c.id) ? "bg-brand-soft/40" : ""}`} onClick={() => setContactModal({ open: true, editing: c })}>
                       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(c.id)} onChange={() => setSel((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })} /></td>
-                      <td className="px-3 py-2.5"><div className="font-semibold flex items-center gap-1.5">{[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}{c.optedOut && <Pill intent="red">opted out</Pill>}</div>{c.title && <div className="text-[11px] text-ink-muted">{c.title}</div>}</td>
+                      <td className="px-3 py-2.5"><div className="font-semibold flex items-center gap-1.5">{[c.firstName, c.lastName].filter(Boolean).join(" ") || "—"}{c.optedOut && <Pill intent="red">opted out</Pill>}</div></td>
                       <td className="px-3 py-2.5 text-ink-muted">{c.email || "—"}</td>
                       <td className="px-3 py-2.5 text-ink-muted">{c.phone || "—"}</td>
-                      <td className="px-3 py-2.5">{c.company || "—"}</td>
+                      <td className="px-3 py-2.5 text-ink-muted">{c.custom?.state || "—"}</td>
+                      <td className="px-3 py-2.5 text-ink-muted">{c.custom?.county || "—"}</td>
+                      <td className="px-3 py-2.5 text-ink-muted">{c.custom?.city || "—"}</td>
                       <td className="px-3 py-2.5"><div className="flex flex-wrap gap-1">{c.groupIds.map((g) => groupById[g] ? <span key={g} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded-full text-white" style={{ background: groupById[g].color }}>{groupById[g].name}</span> : null)}</div></td>
                       <td className="px-3 py-2.5"><Pill intent={STATUS_META[c.status].intent as never} dot>{STATUS_META[c.status].label}</Pill></td>
                     </tr>
                   ))}
-                  {rows.length === 0 && !loading && <tr><td colSpan={7} className="px-3 py-12 text-center text-ink-muted text-[12px]">No contacts match. Add one or import a list.</td></tr>}
-                  {loading && rows.length === 0 && <tr><td colSpan={7} className="px-3 py-12 text-center text-ink-muted text-[12px]">Loading…</td></tr>}
+                  {rows.length === 0 && !loading && <tr><td colSpan={9} className="px-3 py-12 text-center text-ink-muted text-[12px]">No contacts match. Add one or import a list.</td></tr>}
+                  {loading && rows.length === 0 && <tr><td colSpan={9} className="px-3 py-12 text-center text-ink-muted text-[12px]">Loading…</td></tr>}
                 </tbody>
               </table>
             </div>
