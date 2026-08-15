@@ -1,5 +1,6 @@
 import { appendInbound } from "@/lib/email/inbound";
 import { htmlToPreview } from "@/lib/email/types";
+import { recordReply } from "@/lib/farming/track";
 import type { EmailMessage } from "@/lib/email/types";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,8 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
     };
     await appendInbound(msg);
+    // If the sender matches a farming contact, count it as a campaign reply.
+    try { await recordReply({ email: from.email }); } catch { /* non-fatal */ }
   } catch { /* ack anyway so SendGrid doesn't retry forever */ }
 
   return new Response("ok", { status: 200 });

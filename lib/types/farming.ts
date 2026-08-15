@@ -31,6 +31,7 @@ export interface FarmContact {
   optOutChannel?: "email" | "sms" | "both";
   createdAt: string;
   lastContactedAt?: string;
+  lastCampaignId?: string;    // most recent campaign sent to — for reply attribution
   custom?: Record<string, string>;
 }
 
@@ -71,9 +72,17 @@ export interface FarmCampaign {
   // progress (server-authoritative once sending starts)
   totalRecipients: number;
   sent: number;
-  delivered: number;
+  delivered: number;          // provider-confirmed deliveries (SMS callback / email webhook)
   failed: number;
+  opened?: number;            // unique email opens (our tracking pixel)
+  clicked?: number;           // unique email link clicks (our redirect)
+  replied?: number;           // inbound replies attributed to this campaign
   cursor?: number;            // resume index into the resolved recipient list
   recipientSnapshot?: string[]; // contact ids resolved at send/schedule time
-  results?: Record<string, SendResult>; // contactId -> outcome
+  results?: Record<string, SendResult>; // contactId -> send outcome
+  // Per-recipient engagement logs (contactId -> ISO timestamp of first event).
+  deliveredLog?: Record<string, string>;
+  openLog?: Record<string, string>;
+  clickLog?: Record<string, string>;
+  replyLog?: Record<string, string>;
 }

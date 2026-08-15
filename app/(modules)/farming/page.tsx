@@ -14,8 +14,10 @@ import { ContactModal } from "@/components/modules/farming/ContactModal";
 import { GroupModal } from "@/components/modules/farming/GroupModal";
 import { ImportContactsModal } from "@/components/modules/farming/ImportContactsModal";
 import { CampaignComposer, type ComposerSubmit } from "@/components/modules/farming/CampaignComposer";
+import { computeFarmAnalytics } from "@/lib/farming/analytics";
 
-type Tab = "contacts" | "groups" | "campaigns";
+type Tab = "overview" | "contacts" | "groups" | "campaigns";
+const pctStr = (n: number) => (n * 100).toFixed(1) + "%";
 const STATUS_META = Object.fromEntries(FARM_STATUSES.map((s) => [s.key, s])) as Record<FarmStatus, (typeof FARM_STATUSES)[number]>;
 const CAMPAIGN_INTENT: Record<CampaignStatus, string> = { draft: "muted", scheduled: "amber", sending: "blue", sent: "green", paused: "amber", canceled: "red" };
 
@@ -32,7 +34,8 @@ export default function FarmingPage() {
   const campaigns = useFarming((s) => s.campaigns);
   const f = useFarming();
 
-  const [tab, setTab] = useState<Tab>("contacts");
+  const [tab, setTab] = useState<Tab>("overview");
+  const analytics = useMemo(() => computeFarmAnalytics(contacts, campaigns), [contacts, campaigns]);
 
   // ── Contacts state ──────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -149,10 +152,52 @@ export default function FarmingPage() {
       </KpiGrid>
 
       <div className="flex border-b-[1.5px] border-border mb-4 gap-1 overflow-x-auto mt-1">
+        <TabBtn active={tab === "overview"} onClick={() => setTab("overview")}>Overview</TabBtn>
         <TabBtn active={tab === "contacts"} onClick={() => setTab("contacts")}>Contacts <Count n={contacts.length} /></TabBtn>
         <TabBtn active={tab === "groups"} onClick={() => setTab("groups")}>Groups <Count n={groups.length} /></TabBtn>
         <TabBtn active={tab === "campaigns"} onClick={() => setTab("campaigns")}>Campaigns <Count n={campaigns.length} /></TabBtn>
       </div>
+
+      {tab === "overview" && (
+        <>
+          <div className="grid grid-cols-4 gap-2.5 mb-3 max-[900px]:grid-cols-2">
+            <Metric label="Reachable" value={`${analytics.reachableEmail + analytics.reachablePhone}`} sub={`${analytics.reachableEmail} email · ${analytics.reachablePhone} SMS`} />
+            <Metric label="Opt-out rate" value={pctStr(analytics.optOutRate)} sub={`${analytics.optedOut} suppressed`} intent={analytics.optOutRate > 0.05 ? "text-red" : ""} />
+            <Metric label="Delivery rate" value={pctStr(analytics.deliveryRate)} sub={`${analytics.delivered}/${analytics.sent} delivered`} />
+            <Metric label="Reply rate" value={pctStr(analytics.replyRate)} sub={`${analytics.replied} replies`} intent="text-green" />
+          </div>
+          <div className="grid grid-cols-4 gap-2.5 mb-5 max-[900px]:grid-cols-2">
+            <Metric label="Open rate (email)" value={pctStr(analytics.openRate)} sub={`${analytics.opened} opens`} />
+            <Metric label="Click rate (email)" value={pctStr(analytics.clickRate)} sub={`${analytics.clicked} clicks`} />
+            <Metric label="Click-to-open" value={pctStr(analytics.clickToOpenRate)} sub="of opens clicked" />
+            <Metric label="Messages sent" value={`${analytics.sent}`} sub={`${analytics.emailSent} email · ${analytics.smsSent} SMS`} />
+          </div>
+
+          <div className="bg-surface border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-2.5 bg-surface-2 border-b border-border text-[12px] font-bold uppercase tracking-wider text-ink-2">Per-campaign funnel</div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse min-w-[720px] text-[12.5px]">
+                <thead className="bg-surface-2"><tr>{["Campaign", "Recipients", "Sent", "Delivered", "Opened", "Clicked", "Replied"].map((h) => <th key={h} className="text-left px-3 py-2 text-[10px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}</tr></thead>
+                <tbody>
+                  {analytics.perCampaign.map((c) => (
+                    <tr key={c.id} className="border-t border-border">
+                      <td className="px-3 py-2"><div className="font-semibold flex items-center gap-1.5">{c.channel === "email" ? "📧" : "📱"} {c.name}</div></td>
+                      <td className="px-3 py-2">{c.recipients}</td>
+                      <td className="px-3 py-2">{c.sent}</td>
+                      <td className="px-3 py-2">{c.delivered}{c.sent ? <span className="text-ink-muted"> · {pctStr(c.deliveryRate)}</span> : ""}</td>
+                      <td className="px-3 py-2">{c.channel === "email" ? <>{c.opened}<span className="text-ink-muted"> · {pctStr(c.openRate)}</span></> : "—"}</td>
+                      <td className="px-3 py-2">{c.channel === "email" ? <>{c.clicked}<span className="text-ink-muted"> · {pctStr(c.clickRate)}</span></> : "—"}</td>
+                      <td className="px-3 py-2">{c.replied}{c.sent ? <span className="text-ink-muted"> · {pctStr(c.replyRate)}</span> : ""}</td>
+                    </tr>
+                  ))}
+                  {analytics.perCampaign.length === 0 && <tr><td colSpan={7} className="px-3 py-10 text-center text-ink-muted text-[12px]">No campaigns have been sent yet. Metrics appear here once you send one.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="text-[11px] text-ink-muted-2 mt-3">Opens &amp; clicks are tracked by an embedded pixel and link-redirects (email). SMS delivery comes from Twilio status callbacks; email delivery/bounce from the SendGrid event webhook when configured. Replies are inbound SMS/email matched to a contact.</div>
+        </>
+      )}
 
       {tab === "contacts" && (
         <>
@@ -326,8 +371,13 @@ function CampaignDetails({ campaign: c, contacts, onClose }: { campaign: FarmCam
       <div className="bg-surface rounded-2xl border border-border w-[560px] max-w-[94vw] max-h-[86vh] overflow-hidden flex flex-col">
         <div className="px-5 py-3.5 border-b border-border flex items-center gap-2"><span className="text-[17px]">{c.channel === "email" ? "📧" : "📱"}</span><div className="font-bold flex-1">{c.name}</div><button onClick={onClose} className="text-ink-muted hover:text-ink">✕</button></div>
         <div className="p-5 overflow-y-auto">
+          <div className="grid grid-cols-4 gap-2 mb-2 text-center">
+            {[["Recipients", c.totalRecipients], ["Sent", c.sent], ["Delivered", c.delivered || 0], ["Failed", c.failed]].map(([l, v]) => (
+              <div key={l as string} className="bg-surface-2 rounded-lg py-2"><div className="text-[15px] font-extrabold">{String(v)}</div><div className="text-[10px] text-ink-muted">{l}</div></div>
+            ))}
+          </div>
           <div className="grid grid-cols-4 gap-2 mb-4 text-center">
-            {[["Recipients", c.totalRecipients], ["Sent", c.sent], ["Failed", c.failed], ["Status", c.status]].map(([l, v]) => (
+            {[["Opened", c.opened || 0], ["Clicked", c.clicked || 0], ["Replied", c.replied || 0], ["Status", c.status]].map(([l, v]) => (
               <div key={l as string} className="bg-surface-2 rounded-lg py-2"><div className="text-[15px] font-extrabold">{String(v)}</div><div className="text-[10px] text-ink-muted">{l}</div></div>
             ))}
           </div>
@@ -339,7 +389,13 @@ function CampaignDetails({ campaign: c, contacts, onClose }: { campaign: FarmCam
               {results.map(([id, r]) => (
                 <div key={id} className="flex items-center justify-between px-3 py-1.5 border-b border-border last:border-none text-[12px]">
                   <span>{byId[id] ? [byId[id].firstName, byId[id].lastName].filter(Boolean).join(" ") || byId[id].email : id}</span>
-                  <Pill intent={r === "sent" || r === "delivered" ? "green" : r === "opted_out" ? "muted" : "red"}>{r}</Pill>
+                  <div className="flex items-center gap-1">
+                    <Pill intent={r === "sent" || r === "delivered" ? "green" : r === "opted_out" ? "muted" : "red"}>{r}</Pill>
+                    {c.deliveredLog?.[id] && <Pill intent="teal">delivered</Pill>}
+                    {c.openLog?.[id] && <Pill intent="blue">opened</Pill>}
+                    {c.clickLog?.[id] && <Pill intent="purple">clicked</Pill>}
+                    {c.replyLog?.[id] && <Pill intent="green">replied</Pill>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -355,4 +411,13 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 }
 function Count({ n }: { n: number }) {
   return <span className="inline-flex items-center justify-center min-w-[18px] h-[17px] px-1.5 rounded-full text-[10px] font-bold bg-surface-3 text-ink-muted">{n}</span>;
+}
+function Metric({ label, value, sub, intent }: { label: string; value: string; sub?: string; intent?: string }) {
+  return (
+    <div className="bg-surface border border-border rounded-2xl px-4 py-3.5">
+      <div className="text-[11px] text-ink-muted mb-1">{label}</div>
+      <div className={`text-[22px] font-extrabold tracking-tight leading-none ${intent || ""}`}>{value}</div>
+      {sub && <div className="text-[11px] text-ink-muted mt-1">{sub}</div>}
+    </div>
+  );
 }

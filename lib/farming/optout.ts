@@ -24,3 +24,18 @@ export function verifyOptOut(contactId: string, token: string): boolean {
     return false;
   }
 }
+
+// Open/click tracking tokens — same HMAC scheme, scoped to a (campaign, contact)
+// pair so a leaked pixel URL can't be replayed against a different recipient.
+export function signTrack(campaignId: string, contactId: string): string {
+  return b64url(crypto.createHmac("sha256", SECRET).update(`track:${campaignId}:${contactId}`).digest());
+}
+
+export function verifyTrack(campaignId: string, contactId: string, token: string): boolean {
+  if (!campaignId || !contactId || !token) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(signTrack(campaignId, contactId)));
+  } catch {
+    return false;
+  }
+}

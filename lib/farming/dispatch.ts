@@ -1,7 +1,7 @@
 import "server-only";
 import { readDomain, writeDomain } from "./serverStore";
 import { personalize } from "./personalize";
-import { signOptOut } from "./optout";
+import { signOptOut, signTrack } from "./optout";
 import { sendEmail } from "@/lib/email/provider";
 import { sendSms } from "@/lib/sms/provider";
 import type { FarmCampaign, FarmContact, SendResult } from "@/lib/types/farming";
@@ -16,15 +16,32 @@ function appBase(): string {
 function unsubUrl(contactId: string): string {
   return `${appBase()}/api/farming/unsubscribe?c=${encodeURIComponent(contactId)}&t=${signOptOut(contactId)}`;
 }
+function clickUrl(campaignId: string, contactId: string, target: string): string {
+  return `${appBase()}/api/farming/track/click?m=${campaignId}&c=${encodeURIComponent(contactId)}&t=${signTrack(campaignId, contactId)}&u=${encodeURIComponent(target)}`;
+}
+function pixelUrl(campaignId: string, contactId: string): string {
+  return `${appBase()}/api/farming/track/open?m=${campaignId}&c=${encodeURIComponent(contactId)}&t=${signTrack(campaignId, contactId)}`;
+}
+// Route every link in the body through the click-tracking redirect. Existing
+// href="…" attributes and bare URLs are both handled; the two regexes don't
+// overlap (a URL inside href="…" is preceded by a quote, not whitespace/`>`).
+function trackLinks(html: string, campaignId: string, contactId: string): string {
+  return html
+    .replace(/href="(https?:\/\/[^"]+)"/g, (_m, u) => `href="${clickUrl(campaignId, contactId, u)}"`)
+    .replace(/(^|[\s>])(https?:\/\/[^\s<"]+)/g, (_m, pre, u) => `${pre}<a href="${clickUrl(campaignId, contactId, u)}">${u}</a>`);
+}
 
-// Wrap a personalized email body (plain text or HTML) with a compliant footer.
-function emailHtml(body: string, contactId: string): string {
+// Wrap a personalized email body (plain text or HTML) with click tracking, a
+// compliant unsubscribe footer, and an open-tracking pixel.
+function emailHtml(body: string, contactId: string, campaignId: string): string {
   const safe = /<[a-z][\s\S]*>/i.test(body) ? body : `<p>${body.replace(/\n/g, "<br>")}</p>`;
+  const tracked = trackLinks(safe, campaignId, contactId);
   const link = unsubUrl(contactId);
   return `<div style="font-family:system-ui,-apple-system,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a">
-${safe}
+${tracked}
 <hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px">
 <p style="font-size:11.5px;color:#8a8a8a">You received this because you were added to a DripVitals outreach list. <a href="${link}" style="color:#8a8a8a">Unsubscribe</a>.</p>
+<img src="${pixelUrl(campaignId, contactId)}" width="1" height="1" alt="" style="display:none">
 </div>`;
 }
 
@@ -93,14 +110,15 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
       const personalizedBody = personalize(camp.body || "", c);
       let ok = false;
       if (camp.channel === "email") {
-        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: personalizedSubject || camp.name, html: emailHtml(personalizedBody, c.id) });
+        const res = await sendEmail({ to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "), subject: personalizedSubject || camp.name, html: emailHtml(personalizedBody, c.id, camp.id) });
         ok = res.ok;
       } else {
-        const res = await sendSms({ to: c.phone, body: smsBody(personalizedBody) });
+        const statusCallback = `${appBase()}/api/farming/webhook/sms-status?m=${camp.id}&c=${encodeURIComponent(c.id)}`;
+        const res = await sendSms({ to: c.phone, body: smsBody(personalizedBody), statusCallback });
         ok = res.ok;
       }
       camp.results![c.id] = ok ? "sent" : "failed";
-      if (ok) { sent++; c.lastContactedAt = new Date().toISOString(); if (c.status === "new") c.status = "contacted"; contactsDirty = true; }
+      if (ok) { sent++; c.lastContactedAt = new Date().toISOString(); c.lastCampaignId = camp.id; if (c.status === "new") c.status = "contacted"; contactsDirty = true; }
       else failed++;
       processed++;
     }
@@ -108,7 +126,9 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
     camp.cursor = i;
     camp.sent = (camp.sent || 0) + sent;
     camp.failed = (camp.failed || 0) + failed;
-    camp.delivered = camp.sent; // provider delivery callbacks not wired for outreach; treat sent as delivered
+    // delivered/opened/clicked/replied are populated by the tracking endpoints &
+    // provider callbacks; keep the count in sync with the log at write time.
+    camp.delivered = Object.keys(camp.deliveredLog || {}).length;
     const done = i >= snapshot.length;
     if (done) { camp.status = "sent"; camp.completedAt = new Date(now).toISOString(); }
 

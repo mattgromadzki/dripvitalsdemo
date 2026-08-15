@@ -1,6 +1,7 @@
 import { addInbound } from "@/lib/sms/inboundStore";
 import { verifyTwilioRequest } from "@/lib/sms/verifyTwilio";
 import { readDomain, writeDomain } from "@/lib/farming/serverStore";
+import { recordReply } from "@/lib/farming/track";
 import type { FarmContact } from "@/lib/types/farming";
 
 const STOP_WORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
@@ -79,6 +80,8 @@ export async function POST(req: Request) {
       const reply = await applyOptOutKeyword(from, body);
       if (reply) return twiml(reply);
     } catch (e) { console.error("Failed to process opt-out keyword:", e); }
+    // Non-keyword inbound from a farming contact = a reply → attribute it.
+    try { await recordReply({ phone: from }); } catch (e) { console.error("Failed to record reply:", e); }
   }
 
   return twiml();
