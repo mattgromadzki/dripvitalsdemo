@@ -47,6 +47,7 @@ const NAV: NavSection[] = [
       { href: "/payments",         icon: "💸", label: "Payments" },
       { href: "/billing",          icon: "💳", label: "Billing" },
       { href: "/marketing",        icon: "📡", label: "Marketing" },
+      { href: "/farming",          icon: "🌱", label: "Farming" },
       { href: "/automations",      icon: "⚡", label: "Automations" },
       { href: "/pipeline",         icon: "🧲", label: "Lead Pipeline" },
       { href: "/reviews",          icon: "⭐", label: "Reviews" },

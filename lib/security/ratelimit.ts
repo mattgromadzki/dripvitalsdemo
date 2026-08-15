@@ -20,7 +20,7 @@ function redis(): Redis | null {
   return new Redis({ url, token });
 }
 
-export type RateBucket = "login" | "reset" | "intake";
+export type RateBucket = "login" | "reset" | "intake" | "farming";
 
 const cache = new Map<RateBucket, Ratelimit>();
 
@@ -31,6 +31,7 @@ function limiterFor(bucket: RateBucket): Ratelimit | null {
     const algo =
       bucket === "login" ? Ratelimit.slidingWindow(30, "10 m") :   // 30 / 10 min per IP (safe for shared office IP)
       bucket === "reset" ? Ratelimit.slidingWindow(10, "15 m") :   // 10 / 15 min per IP
+      bucket === "farming" ? Ratelimit.slidingWindow(20, "10 m") : // unsubscribe clicks: 20 / 10 min per IP
       Ratelimit.slidingWindow(15, "10 m");                         // intake: 15 / 10 min per IP
     cache.set(bucket, new Ratelimit({ redis: r, limiter: algo, prefix: `rl:${bucket}`, analytics: false }));
   }

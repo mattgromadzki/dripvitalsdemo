@@ -36,6 +36,7 @@ import { useSms } from "@/lib/hooks/useSms";
 import { useIntake } from "@/lib/hooks/useIntake";
 import { useNotifications } from "@/lib/hooks/useNotifications";
 import { useMarketing } from "@/lib/hooks/useMarketing";
+import { useFarming } from "@/lib/hooks/useFarming";
 
 const CATALOG_POLL = 30000; // config/reference data changes rarely
 
@@ -85,6 +86,10 @@ export function PersistHydrator() {
     // lists, so they stay seed-only.
     serverPersist(useMarketing, "marketing-campaigns", "campaigns", CATALOG_POLL);
     serverPersist(useMarketing, "marketing-automations", "automations", CATALOG_POLL);
+    // Farming (cold outreach): separate contact base, groups, and campaigns.
+    serverPersist(useFarming, "farming-contacts", "contacts", CATALOG_POLL);
+    serverPersist(useFarming, "farming-groups", "groups", CATALOG_POLL);
+    serverPersist(useFarming, "farming-campaigns", "campaigns", CATALOG_POLL);
     serverPersist(useReferrals, "referrals", "referrals", CATALOG_POLL);
     serverPersist(useAdverse, "adverse", "reports", CATALOG_POLL);
     serverPersist(useCampaigns, "campaigns", "campaigns", CATALOG_POLL);

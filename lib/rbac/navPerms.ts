@@ -24,6 +24,7 @@ export const NAV_PERM: Record<string, string> = {
   "/payments": "payments.charge",
   "/billing": "payments.charge",
   "/marketing": "campaigns.send", "/automations": "campaigns.send", "/pipeline": "campaigns.send", "/affiliate": "campaigns.send",
+  "/farming": "farming.manage",
   // Records
   "/audit-log": "settings.manage",
   // Settings / administration
