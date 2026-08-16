@@ -12,10 +12,11 @@ export const recordDelivered = (campaignId: string, contactId: string) => sends.
 export const recordFailure = (campaignId: string, contactId: string) => sends.markFailed(campaignId, contactId);
 
 // SendGrid delivery/bounce → correlate by recipient email → their last campaign.
-export async function recordEmailEvent(email: string, kind: "delivered" | "failed"): Promise<void> {
+export async function recordEmailEvent(email: string, kind: "delivered" | "bounced" | "failed"): Promise<void> {
   const c = await findByEmail(email);
   if (!c || !c.lastCampaignId) return;
   if (kind === "delivered") await sends.markDelivered(c.lastCampaignId, c.id);
+  else if (kind === "bounced") await sends.markBounced(c.lastCampaignId, c.id);
   else await sends.markFailed(c.lastCampaignId, c.id);
 }
 

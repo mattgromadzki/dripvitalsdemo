@@ -22,7 +22,7 @@ export async function POST(req: Request) {
         const ev = String(e?.event || "").toLowerCase();
         if (!email) continue;
         if (ev === "delivered") await recordEmailEvent(email, "delivered");
-        else if (ev === "bounce" || ev === "dropped" || ev === "blocked") await recordEmailEvent(email, "failed");
+        else if (ev === "bounce" || ev === "dropped" || ev === "blocked") await recordEmailEvent(email, "bounced");
       }
     }
   } catch { /* ack anyway so SendGrid doesn't retry forever */ }

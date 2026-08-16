@@ -64,17 +64,22 @@ create index if not exists farming_contacts_city_idx   on farming_contacts ((low
 -- maps that used to live on the campaign blob, so campaigning to millions and
 -- its open/click/delivery/reply tracking stay row-scoped and idempotent.
 create table if not exists farming_sends (
-  campaign_id   text not null,
-  contact_id    text not null,
-  status        text not null default 'sent',
-  sent_at       timestamptz,
-  delivered_at  timestamptz,
-  opened_at     timestamptz,
-  clicked_at    timestamptz,
-  replied_at    timestamptz,
+  campaign_id     text not null,
+  contact_id      text not null,
+  status          text not null default 'sent',
+  sent_at         timestamptz,
+  delivered_at    timestamptz,
+  opened_at       timestamptz,
+  clicked_at      timestamptz,
+  replied_at      timestamptz,
+  bounced_at      timestamptz,
+  unsubscribed_at timestamptz,
   primary key (campaign_id, contact_id)
 );
 create index if not exists farming_sends_campaign_idx on farming_sends (campaign_id);
+-- Added later — safe on existing installs.
+alter table farming_sends add column if not exists bounced_at timestamptz;
+alter table farming_sends add column if not exists unsubscribed_at timestamptz;
 
 -- Daily backups of the Upstash Redis store (all EMR/app data lives in Redis).
 -- A cron snapshots every Redis key into `data` (jsonb, auto-compressed by TOAST)

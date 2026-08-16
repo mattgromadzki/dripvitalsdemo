@@ -463,44 +463,109 @@ function audienceLabel(c: FarmCampaign, groupById: Record<string, FarmGroup>): s
   return `${(a.contactIds || []).length} selected contacts`;
 }
 
+const SEND_FILTERS: { key: api.SendFilter; label: string; count: (c: api.SendCounts) => number }[] = [
+  { key: "all", label: "All", count: (c) => c.sent },
+  { key: "delivered", label: "Delivered", count: (c) => c.delivered },
+  { key: "opened", label: "Opened", count: (c) => c.opened },
+  { key: "clicked", label: "Clicked", count: (c) => c.clicked },
+  { key: "replied", label: "Replied", count: (c) => c.replied },
+  { key: "bounced", label: "Bounced", count: (c) => c.bounced },
+  { key: "unsubscribed", label: "Unsub", count: (c) => c.unsubscribed },
+  { key: "not_opened", label: "Not opened", count: (c) => Math.max(0, c.sent - c.opened - c.bounced) },
+];
+
 function CampaignDetails({ campaign: c, onClose }: { campaign: FarmCampaign; onClose: () => void }) {
-  const [data, setData] = useState<{ counts: api.SendCounts; sends: api.SendRow[] } | null>(null);
-  useEffect(() => { api.campaignSends(c.id, 0, 100).then(setData).catch(() => setData({ counts: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0 }, sends: [] })); }, [c.id]);
-  const cc = data?.counts;
+  const [counts, setCounts] = useState<api.SendCounts>(api.ZERO_SEND_COUNTS);
+  const [filter, setFilter] = useState<api.SendFilter>("all");
+  const [rows, setRows] = useState<api.SendRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const RPAGE = 100;
+
+  const load = useCallback(async (f: api.SendFilter, off: number) => {
+    setLoading(true);
+    try {
+      const d = await api.campaignSends(c.id, off, RPAGE, f);
+      setCounts(d.counts); setTotal(d.total);
+      setRows((prev) => (off === 0 ? d.sends : [...prev, ...d.sends]));
+    } catch { if (!rows.length) setRows([]); } finally { setLoading(false); }
+  }, [c.id, rows.length]);
+  useEffect(() => { load(filter, 0); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter, c.id]);
+
+  const pct = (n: number) => (counts.sent > 0 ? ((n / counts.sent) * 100).toFixed(1) + "%" : "—");
+  const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+  const Ev = ({ ts, cls }: { ts?: string; cls: string }) => ts ? <span title={fmt(ts)} className={`font-bold ${cls}`}>✓</span> : <span className="text-ink-muted-2">–</span>;
+  const statusIntent = (s: string) => (s === "bounced" || s === "failed" ? "red" : s === "delivered" ? "teal" : "green");
+
+  const TILES: { label: string; value: number; rate?: string; intent?: string }[] = [
+    { label: "Recipients", value: counts.sent },
+    { label: "Delivered", value: counts.delivered, rate: pct(counts.delivered) },
+    { label: "Opened", value: counts.opened, rate: pct(counts.opened), intent: "text-blue" },
+    { label: "Clicked", value: counts.clicked, rate: pct(counts.clicked), intent: "text-brand" },
+    { label: "Replied", value: counts.replied, rate: pct(counts.replied), intent: "text-green" },
+    { label: "Bounced", value: counts.bounced, rate: pct(counts.bounced), intent: counts.bounced ? "text-red" : "" },
+    { label: "Unsub", value: counts.unsubscribed, rate: pct(counts.unsubscribed), intent: counts.unsubscribed ? "text-red" : "" },
+  ];
+
   return (
     <div className="modal-overlay show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface rounded-2xl border border-border w-[560px] max-w-[94vw] max-h-[86vh] overflow-hidden flex flex-col">
-        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2"><span className="text-[17px]">{c.channel === "email" ? "📧" : "📱"}</span><div className="font-bold flex-1">{c.name}</div><button onClick={onClose} className="text-ink-muted hover:text-ink">✕</button></div>
+      <div className="bg-surface rounded-2xl border border-border w-[820px] max-w-[96vw] max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+          <span className="text-[17px]">{c.channel === "email" ? "📧" : "📱"}</span>
+          <div className="flex-1 min-w-0"><div className="font-bold truncate">{c.name}</div>{c.subject && <div className="text-[11.5px] text-ink-muted truncate">{c.subject}</div>}</div>
+          <Pill intent={(CAMPAIGN_INTENT[c.status] || "muted") as never}>{c.status}</Pill>
+          <a className="btn btn-ghost btn-sm" href={api.campaignSendsExportUrl(c.id)}>📥 Export</a>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink ml-1">✕</button>
+        </div>
         <div className="p-5 overflow-y-auto">
-          <div className="grid grid-cols-4 gap-2 mb-2 text-center">
-            {[["Recipients", c.totalRecipients], ["Sent", cc?.sent ?? 0], ["Delivered", cc?.delivered ?? 0], ["Status", c.status]].map(([l, v]) => (
-              <div key={l as string} className="bg-surface-2 rounded-lg py-2"><div className="text-[15px] font-extrabold">{typeof v === "number" ? v.toLocaleString() : String(v)}</div><div className="text-[10px] text-ink-muted">{l}</div></div>
+          <div className="grid grid-cols-7 gap-2 mb-4 max-[720px]:grid-cols-4">
+            {TILES.map((t) => (
+              <div key={t.label} className="bg-surface-2 rounded-lg py-2.5 px-1 text-center">
+                <div className={`text-[17px] font-extrabold leading-none ${t.intent || ""}`}>{t.value.toLocaleString()}</div>
+                {t.rate && <div className="text-[10.5px] text-ink-muted mt-0.5">{t.rate}</div>}
+                <div className="text-[10px] text-ink-muted-2 mt-0.5">{t.label}</div>
+              </div>
             ))}
           </div>
-          <div className="grid grid-cols-4 gap-2 mb-4 text-center">
-            {[["Opened", cc?.opened ?? 0], ["Clicked", cc?.clicked ?? 0], ["Replied", cc?.replied ?? 0], ["Failed", c.failed]].map(([l, v]) => (
-              <div key={l as string} className="bg-surface-2 rounded-lg py-2"><div className="text-[15px] font-extrabold">{typeof v === "number" ? v.toLocaleString() : String(v)}</div><div className="text-[10px] text-ink-muted">{l}</div></div>
+
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {SEND_FILTERS.map((f) => (
+              <button key={f.key} onClick={() => setFilter(f.key)}
+                className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${filter === f.key ? "bg-brand text-white border-brand" : "bg-surface border-border text-ink-2 hover:border-border-2"}`}>
+                {f.label} <span className={filter === f.key ? "opacity-80" : "text-ink-muted"}>{f.count(counts).toLocaleString()}</span>
+              </button>
             ))}
           </div>
-          {c.subject && <div className="text-[12.5px] mb-1"><span className="text-ink-muted">Subject:</span> {c.subject}</div>}
-          <div className="text-[12.5px] whitespace-pre-wrap bg-surface-2 border border-border rounded-md p-3 mb-4">{c.body}</div>
-          <div className="text-[10px] uppercase tracking-widest text-ink-muted font-bold mb-1.5">Recent recipients</div>
-          {!data ? <div className="text-[12px] text-ink-muted">Loading…</div> : data.sends.length === 0 ? <div className="text-[12px] text-ink-muted">No sends recorded yet.</div> : (
-            <div className="max-h-[220px] overflow-y-auto border border-border rounded-md">
-              {data.sends.map((s) => (
-                <div key={s.contactId} className="flex items-center justify-between px-3 py-1.5 border-b border-border last:border-none text-[12px]">
-                  <span>{s.name}</span>
-                  <div className="flex items-center gap-1">
-                    <Pill intent={s.status === "failed" ? "red" : "green"}>{s.status}</Pill>
-                    {s.deliveredAt && <Pill intent="teal">delivered</Pill>}
-                    {s.openedAt && <Pill intent="blue">opened</Pill>}
-                    {s.clickedAt && <Pill intent="purple">clicked</Pill>}
-                    {s.repliedAt && <Pill intent="green">replied</Pill>}
-                  </div>
-                </div>
-              ))}
+
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[12px] min-w-[640px]">
+                <thead className="bg-surface-2">
+                  <tr>{["Recipient", "Status", "Delivered", "Opened", "Clicked", "Replied", "Bounced", "Unsub"].map((h) => <th key={h} className="text-left px-3 py-2 text-[9.5px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {rows.map((s) => (
+                    <tr key={s.contactId} className="border-t border-border">
+                      <td className="px-3 py-1.5"><div className="font-semibold">{s.name}</div>{s.email && <div className="text-[10.5px] text-ink-muted">{s.email}</div>}</td>
+                      <td className="px-3 py-1.5"><Pill intent={statusIntent(s.status) as never}>{s.status}</Pill></td>
+                      <td className="px-3 py-1.5"><Ev ts={s.deliveredAt} cls="text-teal" /></td>
+                      <td className="px-3 py-1.5"><Ev ts={s.openedAt} cls="text-blue" /></td>
+                      <td className="px-3 py-1.5"><Ev ts={s.clickedAt} cls="text-brand" /></td>
+                      <td className="px-3 py-1.5"><Ev ts={s.repliedAt} cls="text-green" /></td>
+                      <td className="px-3 py-1.5"><Ev ts={s.bouncedAt} cls="text-red" /></td>
+                      <td className="px-3 py-1.5"><Ev ts={s.unsubscribedAt} cls="text-red" /></td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && !loading && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted text-[12px]">No recipients in this view yet.</td></tr>}
+                  {loading && rows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted text-[12px]">Loading…</td></tr>}
+                </tbody>
+              </table>
             </div>
-          )}
+            <div className="py-1.5 px-3 border-t border-border bg-surface-2 flex items-center justify-between text-[11px] text-ink-muted">
+              <span>Showing {rows.length.toLocaleString()} of {total.toLocaleString()}</span>
+              {rows.length < total && <button className="btn btn-ghost btn-sm" onClick={() => load(filter, rows.length)} disabled={loading}>{loading ? "Loading…" : "Load more"}</button>}
+            </div>
+          </div>
         </div>
       </div>
     </div>

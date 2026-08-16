@@ -8,7 +8,8 @@ export interface ListParams { search?: string; status?: string; group?: string; 
 export interface ContactPage { contacts: FarmContact[]; nextCursor: string | null; }
 export interface Counts { total: number; suppressed: number; reachableEmail: number; reachablePhone: number; byStatus: Record<string, number>; groups: Record<string, number>; filtered?: number; }
 export interface Filter { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; }
-export interface SendCounts { sent: number; delivered: number; opened: number; clicked: number; replied: number; }
+export interface SendCounts { sent: number; delivered: number; opened: number; clicked: number; replied: number; bounced: number; unsubscribed: number; failed: number; }
+export type SendFilter = "all" | "delivered" | "opened" | "clicked" | "replied" | "bounced" | "unsubscribed" | "not_opened";
 
 function qs(params: Record<string, string | number | boolean | null | undefined>): string {
   const u = new URLSearchParams();
@@ -69,11 +70,15 @@ export async function campaignAnalytics(): Promise<Record<string, SendCounts>> {
   const r = await fetch("/api/farming/campaigns/analytics", { cache: "no-store" });
   const d = await r.json(); return d.counts || {};
 }
-export interface SendRow { contactId: string; name: string; status: string; deliveredAt?: string; openedAt?: string; clickedAt?: string; repliedAt?: string }
-export async function campaignSends(id: string, offset = 0, limit = 100): Promise<{ counts: SendCounts; sends: SendRow[] }> {
-  const r = await fetch(`/api/farming/campaigns/${id}/sends?${qs({ offset, limit })}`, { cache: "no-store" });
+export interface SendRow { contactId: string; name: string; email?: string; status: string; sentAt?: string; deliveredAt?: string; openedAt?: string; clickedAt?: string; repliedAt?: string; bouncedAt?: string; unsubscribedAt?: string }
+export const ZERO_SEND_COUNTS: SendCounts = { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0, unsubscribed: 0, failed: 0 };
+export async function campaignSends(id: string, offset = 0, limit = 100, filter: SendFilter = "all"): Promise<{ counts: SendCounts; sends: SendRow[]; total: number }> {
+  const r = await fetch(`/api/farming/campaigns/${id}/sends?${qs({ offset, limit, filter })}`, { cache: "no-store" });
   const d = await r.json();
-  return { counts: d.counts || { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0 }, sends: d.sends || [] };
+  return { counts: d.counts || ZERO_SEND_COUNTS, sends: d.sends || [], total: d.total || 0 };
+}
+export function campaignSendsExportUrl(id: string): string {
+  return `/api/farming/campaigns/${id}/sends/export`;
 }
 export function exportUrl(f: Filter): string {
   return `/api/farming/contacts/export?${qs({ ...f })}`;

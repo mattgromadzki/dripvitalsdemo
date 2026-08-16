@@ -1,6 +1,7 @@
 import { rateLimit } from "@/lib/security/ratelimit";
 import { verifyOptOut } from "@/lib/farming/optout";
 import { getContact, setOptedOutById } from "@/lib/farming/contactsDb";
+import { markUnsubscribed } from "@/lib/farming/sendsDb";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
     return page("You're unsubscribed", "You will no longer receive outreach messages from us.", true);
   }
   if (!c.optedOut) await setOptedOutById(contactId, true, "email");
+  if (c.lastCampaignId) await markUnsubscribed(c.lastCampaignId, contactId); // attribute the unsub to their last campaign
   return page("You're unsubscribed", "You've been removed from our outreach list and won't receive further emails.", true);
 }
 
@@ -50,5 +52,6 @@ export async function POST(req: Request) {
   }
   const c = await getContact(contactId);
   if (c && !c.optedOut) await setOptedOutById(contactId, true, "email");
+  if (c?.lastCampaignId) await markUnsubscribed(c.lastCampaignId, contactId);
   return new Response("Unsubscribed", { status: 200 });
 }
