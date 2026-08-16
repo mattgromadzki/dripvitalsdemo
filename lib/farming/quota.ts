@@ -32,3 +32,18 @@ export async function addSentToday(n: number): Promise<void> {
   await r.incrby(key, n);
   await r.expire(key, 60 * 60 * 72); // keep 3 days, then auto-clear
 }
+
+// Per-sender variants — the sender pool caps each identity independently.
+export async function sentTodayFor(senderKey: string): Promise<number> {
+  const r = redis(); if (!r) return 0;
+  const v = await r.get(`${dayKey()}:${senderKey}`);
+  const n = typeof v === "number" ? v : parseInt(String(v ?? "0"), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export async function addSentTodayFor(senderKey: string, n: number): Promise<void> {
+  const r = redis(); if (!r || n <= 0) return;
+  const key = `${dayKey()}:${senderKey}`;
+  await r.incrby(key, n);
+  await r.expire(key, 60 * 60 * 72);
+}

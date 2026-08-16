@@ -4,8 +4,8 @@ import { personalize } from "./personalize";
 import { signOptOut, signTrack } from "./optout";
 import { pageAudience, audienceCount, updateContactFields } from "./contactsDb";
 import { recordSent } from "./sendsDb";
-import { getFarmingSettings, resolveFrom, dailyCapOf } from "./settings";
-import { sentToday, addSentToday } from "./quota";
+import { getFarmingSettings, resolveSenders } from "./settings";
+import { sentTodayFor, addSentTodayFor } from "./quota";
 import { sendEmail } from "@/lib/email/provider";
 import { sendSms } from "@/lib/sms/provider";
 import type { FarmCampaign } from "@/lib/types/farming";
@@ -70,15 +70,26 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
 
   const summary: DispatchSummary = { processedCampaigns: 0, sent: 0, failed: 0, skipped: 0, details: [] };
 
-  // Dedicated cold-outreach sender (dripvitals.net) — isolated from the clinical domain.
+  // Cold-outreach SENDER POOL (dripvitals.net subdomains) — isolated from the
+  // clinical domain. The dispatcher round-robins recipients across senders and
+  // honors each one's daily cap (already ramped for warm-up in resolveSenders).
   const settings = await getFarmingSettings();
-  const farmingFrom = resolveFrom(settings);
-
-  // Daily email cap (warm-up + plan-volume protection). Remaining budget for
-  // THIS run = cap − already-sent-today; Infinity when no cap is configured.
-  const dailyCap = dailyCapOf(settings);
-  let emailBudget = dailyCap > 0 ? Math.max(0, dailyCap - (await sentToday())) : Infinity;
-  let emailsSentThisRun = 0;
+  const pool = await Promise.all(resolveSenders(settings).map(async (s) => ({
+    from: s.from, key: s.key,
+    // remaining email budget today for this sender (Infinity = uncapped)
+    remaining: s.cap > 0 ? Math.max(0, s.cap - (await sentTodayFor(s.key))) : Infinity,
+    usedThisRun: 0,
+  })));
+  const capped = pool.some((p) => p.remaining !== Infinity) && pool.every((p) => p.remaining !== Infinity);
+  const totalRemaining = () => (pool.some((p) => p.remaining === Infinity) ? Infinity : pool.reduce((a, p) => a + p.remaining, 0));
+  let rr = 0; // round-robin pointer
+  const pickSender = () => {
+    for (let i = 0; i < pool.length; i++) {
+      const idx = (rr + i) % pool.length;
+      if (pool[idx].remaining > 0) { rr = idx + 1; return pool[idx]; }
+    }
+    return null;
+  };
 
   const due = campaigns.filter((c) =>
     (opts.campaignId ? c.id === opts.campaignId : true) &&
@@ -87,8 +98,8 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
   );
 
   for (const camp of due) {
-    // Daily email cap reached — leave the campaign "sending" and resume tomorrow.
-    if (camp.channel === "email" && dailyCap > 0 && emailBudget <= 0) continue;
+    // All senders hit their daily cap — leave the campaign "sending", resume tomorrow.
+    if (camp.channel === "email" && capped && totalRemaining() <= 0) continue;
     if (!camp.startedAt) {
       camp.totalRecipients = await audienceCount(camp.audience || { kind: "all" }, camp.channel);
       camp.cursor = 0; // reused as an opaque audience cursor (string) below
@@ -96,8 +107,8 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
     }
     camp.status = "sending";
     let limit = Math.max(1, Math.min(MAX_BATCH, camp.throttlePerMin || MAX_BATCH));
-    // Never fetch more email recipients than the remaining daily budget allows.
-    if (camp.channel === "email" && dailyCap > 0) limit = Math.min(limit, emailBudget);
+    // Never fetch more email recipients than the pool's remaining daily budget.
+    if (camp.channel === "email" && capped) { limit = Math.min(limit, totalRemaining()); if (limit <= 0) continue; }
     // `cursor` is stored as a string keyset token (or 0 on first run).
     const cursor: string | null = typeof camp.cursor === "string" ? camp.cursor : null;
     const page = await pageAudience(camp.audience || { kind: "all" }, camp.channel, cursor, limit);
@@ -109,14 +120,18 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
       const body = personalize(camp.body || "", c);
       let ok = false;
       if (camp.channel === "email") {
+        const sndr = pickSender();
+        if (!sndr) break; // pool exhausted mid-page (page was sized to budget, so rare)
         // RFC 8058 one-click unsubscribe — required by Gmail/Yahoo for bulk senders.
         const unsub = unsubUrl(c.id);
         const res = await sendEmail({
           to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "),
-          subject: subject || camp.name, html: emailHtml(body, c.id, camp.id), from: farmingFrom,
+          subject: subject || camp.name, html: emailHtml(body, c.id, camp.id), from: sndr.from,
           headers: { "List-Unsubscribe": `<${unsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
         });
         ok = res.ok;
+        if (sndr.remaining !== Infinity) sndr.remaining -= 1;
+        sndr.usedThisRun += 1;
       } else {
         const statusCallback = `${appBase()}/api/farming/webhook/sms-status?m=${camp.id}&c=${encodeURIComponent(c.id)}`;
         const res = await sendSms({ to: c.phone, body: smsBody(body), statusCallback });
@@ -126,9 +141,6 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
       if (ok) { sent++; await updateContactFields(c.id, { lastContactedAt: new Date().toISOString(), lastCampaignId: camp.id, ...(c.status === "new" ? { status: "contacted" } : {}) }); }
       else failed++;
     }
-
-    // Spend the daily email budget by the number of emails attempted this batch.
-    if (camp.channel === "email" && dailyCap > 0) { const used = sent + failed; emailBudget -= used; emailsSentThisRun += used; }
 
     // Advance the keyset cursor. A null next cursor means the audience is
     // exhausted → campaign complete.
@@ -144,7 +156,8 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
     summary.details.push({ id: camp.id, sent, failed, done });
   }
 
-  if (emailsSentThisRun > 0) await addSentToday(emailsSentThisRun);
+  // Persist each sender's emails-sent-today so caps carry across cron runs.
+  for (const p of pool) if (p.usedThisRun > 0) await addSentTodayFor(p.key, p.usedThisRun);
   if (summary.processedCampaigns) await writeDomain(CAMPAIGNS, campaigns);
   return summary;
 }

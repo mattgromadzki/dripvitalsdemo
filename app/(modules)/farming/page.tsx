@@ -49,10 +49,10 @@ export default function FarmingPage() {
   const [cityOpts, setCityOpts] = useState<string[]>([]);
   const [showSuppressed, setShowSuppressed] = useState(false);
 
-  // Cold-outreach sender (dripvitals.net) — persisted to the farming-settings store.
-  const [senderName, setSenderName] = useState("DripVitals");
-  const [senderEmail, setSenderEmail] = useState("");
-  const [dailyCap, setDailyCap] = useState("");
+  // Cold-outreach sender POOL (dripvitals.net subdomains) — farming-settings store.
+  const [senders, setSenders] = useState<{ name: string; email: string; dailyCap: string }[]>([{ name: "DripVitals", email: "", dailyCap: "1500" }]);
+  const [warmup, setWarmup] = useState(true);
+  const [warmupStart, setWarmupStart] = useState("");
 
   const [rows, setRows] = useState<FarmContact[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -100,21 +100,42 @@ export default function FarmingPage() {
   // Campaign engagement counts (Overview + list progress).
   useEffect(() => { api.campaignAnalytics().then(setCampCounts).catch(() => {}); }, [campaigns.length]);
 
-  // Load the saved outreach sender.
+  // Load the saved sender pool.
   useEffect(() => {
     fetch("/api/store/farming-settings", { cache: "no-store" }).then((r) => r.json()).then((d) => {
       const s = d?.data || {};
-      if (s.fromName) setSenderName(s.fromName);
-      if (s.fromEmail) setSenderEmail(s.fromEmail);
-      if (s.dailyCap) setDailyCap(String(s.dailyCap));
+      if (Array.isArray(s.senders) && s.senders.length) {
+        setSenders(s.senders.map((x: { name?: string; email?: string; dailyCap?: number }) => ({ name: x.name || "DripVitals", email: x.email || "", dailyCap: String(x.dailyCap ?? 1500) })));
+      } else if (s.fromEmail) {
+        setSenders([{ name: s.fromName || "DripVitals", email: s.fromEmail, dailyCap: String(s.dailyCap ?? 1500) }]);
+      }
+      setWarmup(!!s.warmupStart);
+      if (s.warmupStart) setWarmupStart(s.warmupStart);
     }).catch(() => {});
   }, []);
+  const setSender = (i: number, k: "name" | "email" | "dailyCap", v: string) => setSenders((prev) => prev.map((s, idx) => (idx === i ? { ...s, [k]: v } : s)));
+  const addSender = () => setSenders((prev) => [...prev, { name: prev[0]?.name || "DripVitals", email: "", dailyCap: "1500" }]);
+  const removeSender = (i: number) => setSenders((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   async function saveSender() {
-    if (senderEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(senderEmail.trim())) { toast("⚠️ Enter a valid from email"); return; }
-    const cap = Math.max(0, Math.floor(Number(dailyCap) || 0));
-    const r = await fetch("/api/store/farming-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: { fromName: senderName.trim(), fromEmail: senderEmail.trim(), dailyCap: cap } }) });
-    if ((await r.json()).ok) toast("✓ Outreach settings saved"); else toast("⚠️ Couldn't save settings");
+    const cleaned = senders.map((s) => ({ name: s.name.trim(), email: s.email.trim(), dailyCap: Math.max(0, Math.floor(Number(s.dailyCap) || 0)) })).filter((s) => s.email);
+    if (!cleaned.length) { toast("⚠️ Add at least one sender"); return; }
+    for (const s of cleaned) if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.email)) { toast(`⚠️ Invalid email: ${s.email}`); return; }
+    const start = warmup ? (warmupStart || new Date().toISOString().slice(0, 10)) : undefined;
+    const data = { senders: cleaned, warmupStart: start, fromName: cleaned[0].name, fromEmail: cleaned[0].email };
+    const r = await fetch("/api/store/farming-settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data }) });
+    if ((await r.json()).ok) { toast("✓ Sender pool saved"); if (start) setWarmupStart(start); } else toast("⚠️ Couldn't save senders");
   }
+  // Warm-up ramp info for the hint (mirrors server WARMUP_STEPS).
+  const WARMUP_STEPS = [0.13, 0.27, 0.47, 0.67, 0.83, 1];
+  const warmupInfo = (() => {
+    if (!warmup || !warmupStart) return null;
+    const start = Date.parse(`${warmupStart}T00:00:00Z`); if (!Number.isFinite(start)) return null;
+    const day = Math.floor((Date.now() - start) / 86_400_000) + 1;
+    const frac = day > WARMUP_STEPS.length ? 1 : WARMUP_STEPS[Math.max(0, day - 1)];
+    return { day, frac, done: day > WARMUP_STEPS.length };
+  })();
+  const targetTotal = senders.reduce((a, s) => a + (Number(s.dailyCap) || 0), 0);
+  const todayTotal = warmupInfo ? senders.reduce((a, s) => a + Math.max(50, Math.round(((Number(s.dailyCap) || 0) * warmupInfo.frac) / 50) * 50), 0) : targetTotal;
 
   // Location filter facets — dependent dropdowns (state → county → city).
   useEffect(() => { api.getFacet("state").then(setStateOpts).catch(() => {}); }, []);
@@ -201,17 +222,30 @@ export default function FarmingPage() {
         <>
           <div className="bg-surface border border-border rounded-xl p-4 mb-3">
             <div className="flex items-center justify-between mb-1">
-              <div className="text-[13px] font-bold">📧 Outreach sender</div>
-              <span className="text-[11px] text-ink-muted">Separate from your clinical email</span>
+              <div className="text-[13px] font-bold">📧 Outreach senders</div>
+              <span className="text-[11px] text-ink-muted">Rotated round-robin · separate from clinical email</span>
             </div>
-            <div className="text-[11.5px] text-ink-muted mb-3">Cold campaigns send from this address on <b>dripvitals.net</b>, isolated from patient/clinical email. Authenticate this domain in SendGrid (SPF/DKIM) before sending, or messages won&rsquo;t deliver.</div>
-            <div className="flex gap-3 items-end flex-wrap">
-              <div><label className="fl">Sender name</label><input className="fi !w-[160px]" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="DripVitals" /></div>
-              <div><label className="fl">From email</label><input className="fi !w-[260px]" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="outreach@dripvitals.net" /></div>
-              <div><label className="fl">Daily send cap</label><input className="fi !w-[120px]" type="number" min={0} value={dailyCap} onChange={(e) => setDailyCap(e.target.value)} placeholder="0 = no cap" /></div>
-              <button className="btn btn-primary btn-sm" onClick={saveSender}>Save</button>
+            <div className="text-[11.5px] text-ink-muted mb-3">Each sender should be an authenticated (sub)domain in SendGrid (SPF/DKIM). Volume is spread evenly across all senders; each honors its own daily cap.</div>
+            <div className="flex flex-col gap-2">
+              {senders.map((s, i) => (
+                <div key={i} className="flex gap-2 items-end flex-wrap">
+                  <div><label className="fl">Name</label><input className="fi !w-[140px]" value={s.name} onChange={(e) => setSender(i, "name", e.target.value)} placeholder="DripVitals" /></div>
+                  <div><label className="fl">From email</label><input className="fi !w-[250px]" value={s.email} onChange={(e) => setSender(i, "email", e.target.value)} placeholder="outreach@go.dripvitals.net" /></div>
+                  <div><label className="fl">Daily cap</label><input className="fi !w-[100px]" type="number" min={0} value={s.dailyCap} onChange={(e) => setSender(i, "dailyCap", e.target.value)} placeholder="1500" /></div>
+                  {senders.length > 1 && <button className="btn btn-ghost btn-sm" onClick={() => removeSender(i)} title="Remove sender">✕</button>}
+                </div>
+              ))}
             </div>
-            <div className="text-[11px] text-ink-muted mt-2">Sends as <b>{(senderName || "DripVitals")} &lt;{senderEmail || "outreach@dripvitals.net"}&gt;</b>{Number(dailyCap) > 0 ? <> · max <b>{Number(dailyCap).toLocaleString()}</b> emails/day (≈ {(Number(dailyCap) * 30).toLocaleString()}/mo) — paced across days, resumes automatically.</> : <> · no daily cap set.</>}</div>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <button className="btn btn-ghost btn-sm" onClick={addSender}>+ Add sender</button>
+              <label className="flex items-center gap-1.5 text-[12px] font-semibold text-ink-2 cursor-pointer"><input type="checkbox" checked={warmup} onChange={(e) => setWarmup(e.target.checked)} /> Warm-up ramp (climb to cap over ~1 week)</label>
+              <div className="flex-1" />
+              <button className="btn btn-primary btn-sm" onClick={saveSender}>Save senders</button>
+            </div>
+            <div className="text-[11px] text-ink-muted mt-2">
+              {senders.length} sender{senders.length === 1 ? "" : "s"} · target <b>{targetTotal.toLocaleString()}</b> emails/day
+              {warmupInfo && (warmupInfo.done ? <> · warm-up complete ✅</> : <> · warm-up day <b>{warmupInfo.day}</b> → sending ~<b>{todayTotal.toLocaleString()}</b>/day today</>)}
+            </div>
           </div>
           <div className="grid grid-cols-4 gap-2.5 mb-3 max-[900px]:grid-cols-2">
             <Metric label="Reachable" value={`${((counts?.reachableEmail ?? 0) + (counts?.reachablePhone ?? 0)).toLocaleString()}`} sub={`${(counts?.reachableEmail ?? 0).toLocaleString()} email · ${(counts?.reachablePhone ?? 0).toLocaleString()} SMS`} />
