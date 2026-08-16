@@ -21,6 +21,9 @@ async function sendgrid(key: string, from: string, input: SendEmailInput): Promi
       from: parseFrom(from), subject: input.subject,
       content: [{ type: "text/html", value: input.html }],
       ...(input.headers && Object.keys(input.headers).length ? { headers: input.headers } : {}),
+      // Disable SendGrid's own click/open tracking (its link-branding rewrite
+      // was breaking links). We do our own tracking with a valid-cert domain.
+      ...(input.disableProviderTracking ? { tracking_settings: { click_tracking: { enable: false, enable_text: false }, open_tracking: { enable: false } } } : {}),
     }),
   });
   if (r.status === 202 || r.ok) return { ok: true, id: r.headers.get("x-message-id") || undefined, provider: "sendgrid" };

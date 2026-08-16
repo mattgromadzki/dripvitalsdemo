@@ -37,15 +37,18 @@ function trackLinks(html: string, campaignId: string, contactId: string): string
 // Wrap a personalized email body (plain text or HTML) with click tracking, a
 // compliant unsubscribe footer, and an open-tracking pixel.
 function emailHtml(body: string, contactId: string, campaignId: string): string {
-  const safe = /<[a-z][\s\S]*>/i.test(body) ? body : `<p>${body.replace(/\n/g, "<br>")}</p>`;
+  const isHtml = /<[a-z][\s\S]*>/i.test(body);
+  const safe = isHtml ? body : `<p>${body.replace(/\n/g, "<br>")}</p>`;
   const tracked = trackLinks(safe, campaignId, contactId);
   const link = unsubUrl(contactId);
-  return `<div style="font-family:system-ui,-apple-system,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a">
-${tracked}
-<hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px">
-<p style="font-size:11.5px;color:#8a8a8a">You received this because you were added to a DripVitals outreach list. <a href="${link}" style="color:#8a8a8a">Unsubscribe</a>.</p>
-<img src="${pixelUrl(campaignId, contactId)}" width="1" height="1" alt="" style="display:none">
-</div>`;
+  // Footer carries its own explicit styles so it renders the same regardless of wrapper.
+  const footer = `<hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px">
+<p style="font-family:system-ui,-apple-system,Arial,sans-serif;font-size:11.5px;color:#8a8a8a;text-align:center">You received this because you were added to a DripVitals outreach list. <a href="${link}" style="color:#8a8a8a">Unsubscribe</a>.</p>
+<img src="${pixelUrl(campaignId, contactId)}" width="1" height="1" alt="" style="display:none">`;
+  // Rich HTML (a designed email) keeps its OWN inline fonts/sizes — the wrapper
+  // must not impose font-family/size/line-height. Plain-text gets a readable default.
+  if (isHtml) return `<div>${tracked}${footer}</div>`;
+  return `<div style="font-family:system-ui,-apple-system,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1a1a1a">${tracked}${footer}</div>`;
 }
 
 // SMS: append a one-time opt-out hint if the body doesn't already mention STOP.
@@ -128,6 +131,7 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
           to: c.email, toName: [c.firstName, c.lastName].filter(Boolean).join(" "),
           subject: subject || camp.name, html: emailHtml(body, c.id, camp.id), from: sndr.from,
           headers: { "List-Unsubscribe": `<${unsub}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+          disableProviderTracking: true, // we track ourselves; avoids SendGrid's broken link-branding rewrite
         });
         ok = res.ok;
         if (sndr.remaining !== Infinity) sndr.remaining -= 1;
