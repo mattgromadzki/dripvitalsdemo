@@ -379,7 +379,12 @@ export default function FarmingPage() {
         </>
       )}
 
-      {tab === "campaigns" && (
+      {tab === "campaigns" && resultsFor && (
+        <CampaignDetails campaign={resultsFor} groups={groups} onBack={() => setResultsFor(null)}
+          onCampaignTo={(ids) => { setResultsFor(null); setComposerSelection(ids); setComposerOpen(true); }} />
+      )}
+
+      {tab === "campaigns" && !resultsFor && (
         <>
           <div className="flex justify-end mb-3"><button className="btn btn-primary btn-sm" onClick={() => { setComposerSelection(undefined); setComposerOpen(true); }}>+ New campaign</button></div>
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
@@ -465,7 +470,6 @@ export default function FarmingPage() {
       <ConfirmModal open={!!groupDelete} onClose={() => setGroupDelete(null)} onConfirm={async () => { if (groupDelete) { f.removeGroup(groupDelete.id); await api.stripGroupFromContacts(groupDelete.id); toast("🗑 Deleted group"); afterMutation(); } }} title="Delete group?" message={`Delete "${groupDelete?.name}"? Contacts stay, but lose this group tag.`} confirmLabel="Delete" />
       <ConfirmModal open={!!campaignDelete} onClose={() => setCampaignDelete(null)} onConfirm={() => { if (campaignDelete) { f.removeCampaign(campaignDelete.id); toast("🗑 Deleted campaign"); } }} title="Delete campaign?" message={`Delete "${campaignDelete?.name}"?`} confirmLabel="Delete" />
 
-      {resultsFor && <CampaignDetails campaign={resultsFor} onClose={() => setResultsFor(null)} />}
       <Toast />
     </div>
   );
@@ -490,12 +494,13 @@ const SEND_FILTERS: { key: api.SendFilter; label: string; count: (c: api.SendCou
   { key: "not_opened", label: "Not opened", count: (c) => Math.max(0, c.sent - c.opened - c.bounced) },
 ];
 
-function CampaignDetails({ campaign: c, onClose }: { campaign: FarmCampaign; onClose: () => void }) {
+function CampaignDetails({ campaign: c, groups, onBack, onCampaignTo }: { campaign: FarmCampaign; groups: FarmGroup[]; onBack: () => void; onCampaignTo: (ids: string[]) => void }) {
   const [counts, setCounts] = useState<api.SendCounts>(api.ZERO_SEND_COUNTS);
   const [filter, setFilter] = useState<api.SendFilter>("all");
   const [rows, setRows] = useState<api.SendRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [sel, setSel] = useState<Set<string>>(new Set());
   const RPAGE = 100;
 
   const load = useCallback(async (f: api.SendFilter, off: number) => {
@@ -506,12 +511,19 @@ function CampaignDetails({ campaign: c, onClose }: { campaign: FarmCampaign; onC
       setRows((prev) => (off === 0 ? d.sends : [...prev, ...d.sends]));
     } catch { if (!rows.length) setRows([]); } finally { setLoading(false); }
   }, [c.id, rows.length]);
-  useEffect(() => { load(filter, 0); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter, c.id]);
+  useEffect(() => { setSel(new Set()); load(filter, 0); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter, c.id]);
 
   const pct = (n: number) => (counts.sent > 0 ? ((n / counts.sent) * 100).toFixed(1) + "%" : "—");
   const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
   const Ev = ({ ts, cls }: { ts?: string; cls: string }) => ts ? <span title={fmt(ts)} className={`font-bold ${cls}`}>✓</span> : <span className="text-ink-muted-2">–</span>;
   const statusIntent = (s: string) => (s === "bounced" || s === "failed" ? "red" : s === "delivered" ? "teal" : "green");
+  const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allChecked = rows.length > 0 && rows.every((r) => sel.has(r.contactId));
+
+  async function bulk(action: "setStatus" | "addGroup", value: string, label: string) {
+    const n = await api.bulkAction(action, { ids: [...sel] }, value);
+    toast(`✓ ${label} · ${n.toLocaleString()} contact${n === 1 ? "" : "s"}`);
+  }
 
   const TILES: { label: string; value: number; rate?: string; intent?: string }[] = [
     { label: "Recipients", value: counts.sent },
@@ -524,66 +536,87 @@ function CampaignDetails({ campaign: c, onClose }: { campaign: FarmCampaign; onC
   ];
 
   return (
-    <div className="modal-overlay show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface rounded-2xl border border-border w-[820px] max-w-[96vw] max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
-          <span className="text-[17px]">{c.channel === "email" ? "📧" : "📱"}</span>
-          <div className="flex-1 min-w-0"><div className="font-bold truncate">{c.name}</div>{c.subject && <div className="text-[11.5px] text-ink-muted truncate">{c.subject}</div>}</div>
-          <Pill intent={(CAMPAIGN_INTENT[c.status] || "muted") as never}>{c.status}</Pill>
-          <a className="btn btn-ghost btn-sm" href={api.campaignSendsExportUrl(c.id)}>📥 Export</a>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink ml-1">✕</button>
+    <div>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <button onClick={onBack} className="text-[13px] text-brand font-semibold hover:underline">‹ Campaigns</button>
+        <span className="text-ink-muted-2">/</span>
+        <span className="text-[15px] font-bold flex items-center gap-1.5 min-w-0"><span>{c.channel === "email" ? "📧" : "📱"}</span><span className="truncate">{c.name}</span></span>
+        <Pill intent={(CAMPAIGN_INTENT[c.status] || "muted") as never}>{c.status}</Pill>
+        <div className="flex-1" />
+        <a className="btn btn-ghost btn-sm" href={api.campaignSendsExportUrl(c.id)}>📥 Export</a>
+      </div>
+      {c.subject && <div className="text-[12px] text-ink-muted mb-3"><span className="font-semibold text-ink-2">Subject:</span> {c.subject}</div>}
+
+      <div className="grid grid-cols-7 gap-2 mb-4 max-[720px]:grid-cols-4">
+        {TILES.map((t) => (
+          <div key={t.label} className="bg-surface border border-border rounded-xl py-3 px-1 text-center">
+            <div className={`text-[19px] font-extrabold leading-none ${t.intent || ""}`}>{t.value.toLocaleString()}</div>
+            {t.rate && <div className="text-[11px] text-ink-muted mt-1">{t.rate}</div>}
+            <div className="text-[10px] text-ink-muted-2 mt-0.5">{t.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {SEND_FILTERS.map((f) => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${filter === f.key ? "bg-brand text-white border-brand" : "bg-surface border-border text-ink-2 hover:border-border-2"}`}>
+            {f.label} <span className={filter === f.key ? "opacity-80" : "text-ink-muted"}>{f.count(counts).toLocaleString()}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-[12px] min-w-[720px]">
+            <thead className="bg-surface-2">
+              <tr>
+                <th className="px-3 py-2.5 w-8"><input type="checkbox" checked={allChecked} onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.contactId)) : new Set())} /></th>
+                {["Recipient", "Email", "Status", "Delivered", "Opened", "Clicked", "Replied", "Bounced", "Unsub"].map((h) => <th key={h} className="text-left px-3 py-2.5 text-[9.5px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <tr key={s.contactId} className={`border-t border-border hover:bg-surface-2 ${sel.has(s.contactId) ? "bg-brand-soft/40" : ""}`}>
+                  <td className="px-3 py-1.5"><input type="checkbox" checked={sel.has(s.contactId)} onChange={() => toggle(s.contactId)} /></td>
+                  <td className="px-3 py-1.5 font-semibold">{s.name}</td>
+                  <td className="px-3 py-1.5 text-ink-muted">{s.email || "—"}</td>
+                  <td className="px-3 py-1.5"><Pill intent={statusIntent(s.status) as never}>{s.status}</Pill></td>
+                  <td className="px-3 py-1.5"><Ev ts={s.deliveredAt} cls="text-teal" /></td>
+                  <td className="px-3 py-1.5"><Ev ts={s.openedAt} cls="text-blue" /></td>
+                  <td className="px-3 py-1.5"><Ev ts={s.clickedAt} cls="text-brand" /></td>
+                  <td className="px-3 py-1.5"><Ev ts={s.repliedAt} cls="text-green" /></td>
+                  <td className="px-3 py-1.5"><Ev ts={s.bouncedAt} cls="text-red" /></td>
+                  <td className="px-3 py-1.5"><Ev ts={s.unsubscribedAt} cls="text-red" /></td>
+                </tr>
+              ))}
+              {rows.length === 0 && !loading && <tr><td colSpan={10} className="px-3 py-10 text-center text-ink-muted text-[12px]">No recipients in this view yet.</td></tr>}
+              {loading && rows.length === 0 && <tr><td colSpan={10} className="px-3 py-10 text-center text-ink-muted text-[12px]">Loading…</td></tr>}
+            </tbody>
+          </table>
         </div>
-        <div className="p-5 overflow-y-auto">
-          <div className="grid grid-cols-7 gap-2 mb-4 max-[720px]:grid-cols-4">
-            {TILES.map((t) => (
-              <div key={t.label} className="bg-surface-2 rounded-lg py-2.5 px-1 text-center">
-                <div className={`text-[17px] font-extrabold leading-none ${t.intent || ""}`}>{t.value.toLocaleString()}</div>
-                {t.rate && <div className="text-[10.5px] text-ink-muted mt-0.5">{t.rate}</div>}
-                <div className="text-[10px] text-ink-muted-2 mt-0.5">{t.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {SEND_FILTERS.map((f) => (
-              <button key={f.key} onClick={() => setFilter(f.key)}
-                className={`text-[11.5px] font-semibold px-2.5 py-1 rounded-full border transition-colors ${filter === f.key ? "bg-brand text-white border-brand" : "bg-surface border-border text-ink-2 hover:border-border-2"}`}>
-                {f.label} <span className={filter === f.key ? "opacity-80" : "text-ink-muted"}>{f.count(counts).toLocaleString()}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="border border-border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[12px] min-w-[640px]">
-                <thead className="bg-surface-2">
-                  <tr>{["Recipient", "Status", "Delivered", "Opened", "Clicked", "Replied", "Bounced", "Unsub"].map((h) => <th key={h} className="text-left px-3 py-2 text-[9.5px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {rows.map((s) => (
-                    <tr key={s.contactId} className="border-t border-border">
-                      <td className="px-3 py-1.5"><div className="font-semibold">{s.name}</div>{s.email && <div className="text-[10.5px] text-ink-muted">{s.email}</div>}</td>
-                      <td className="px-3 py-1.5"><Pill intent={statusIntent(s.status) as never}>{s.status}</Pill></td>
-                      <td className="px-3 py-1.5"><Ev ts={s.deliveredAt} cls="text-teal" /></td>
-                      <td className="px-3 py-1.5"><Ev ts={s.openedAt} cls="text-blue" /></td>
-                      <td className="px-3 py-1.5"><Ev ts={s.clickedAt} cls="text-brand" /></td>
-                      <td className="px-3 py-1.5"><Ev ts={s.repliedAt} cls="text-green" /></td>
-                      <td className="px-3 py-1.5"><Ev ts={s.bouncedAt} cls="text-red" /></td>
-                      <td className="px-3 py-1.5"><Ev ts={s.unsubscribedAt} cls="text-red" /></td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && !loading && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted text-[12px]">No recipients in this view yet.</td></tr>}
-                  {loading && rows.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted text-[12px]">Loading…</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div className="py-1.5 px-3 border-t border-border bg-surface-2 flex items-center justify-between text-[11px] text-ink-muted">
-              <span>Showing {rows.length.toLocaleString()} of {total.toLocaleString()}</span>
-              {rows.length < total && <button className="btn btn-ghost btn-sm" onClick={() => load(filter, rows.length)} disabled={loading}>{loading ? "Loading…" : "Load more"}</button>}
-            </div>
-          </div>
+        <div className="py-2 px-4 border-t border-border bg-surface-2 flex items-center justify-between text-[11.5px] text-ink-muted">
+          <span>Showing {rows.length.toLocaleString()} of {total.toLocaleString()}</span>
+          {rows.length < total && <button className="btn btn-ghost btn-sm" onClick={() => load(filter, rows.length)} disabled={loading}>{loading ? "Loading…" : "Load more"}</button>}
         </div>
       </div>
+
+      {/* Selection action bar — act on recipients right from the report */}
+      {sel.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-ink text-white rounded-xl shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap max-w-[95vw]">
+          <span className="text-[12.5px] font-semibold px-1">{sel.size} selected</span>
+          <button className="text-[12px] font-semibold bg-white/15 hover:bg-white/25 rounded-md px-2.5 py-1" onClick={() => onCampaignTo([...sel])}>📣 New campaign</button>
+          <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" defaultValue="" onChange={(e) => { if (e.target.value) bulk("addGroup", e.target.value, "added to group"); e.target.value = ""; }}>
+            <option value="" disabled>Add to group…</option>
+            {groups.map((g) => <option key={g.id} value={g.id} className="text-ink">{g.name}</option>)}
+          </select>
+          <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" defaultValue="" onChange={(e) => { if (e.target.value) bulk("setStatus", e.target.value, "status set"); e.target.value = ""; }}>
+            <option value="" disabled>Set status…</option>
+            {FARM_STATUSES.map((s) => <option key={s.key} value={s.key} className="text-ink">{s.label}</option>)}
+          </select>
+          <button className="text-[12px] font-semibold hover:bg-white/15 rounded-md px-2 py-1" onClick={() => setSel(new Set())}>Clear</button>
+        </div>
+      )}
     </div>
   );
 }
