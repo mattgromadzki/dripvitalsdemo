@@ -1,5 +1,5 @@
 "use client";
-import type { FarmContact, ContactInput, FarmAudience, FarmChannel } from "@/lib/types/farming";
+import type { FarmContact, ContactInput, FarmAudience, FarmChannel, FarmTemplate } from "@/lib/types/farming";
 
 // Client fetch wrappers for the server-paginated contacts API. The browser never
 // holds the full contact set — only the current page.
@@ -56,6 +56,14 @@ export async function importChunk(rows: ContactInput[], groupId?: string): Promi
 export async function audienceCount(audience: FarmAudience, channel: FarmChannel): Promise<number> {
   const r = await fetch("/api/farming/contacts/audience-count", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ audience, channel }) });
   const d = await r.json(); return d.ok ? (d.count || 0) : 0;
+}
+export async function getTemplates(): Promise<FarmTemplate[]> {
+  const r = await fetch("/api/store/farming-templates", { cache: "no-store" });
+  const d = await r.json(); return Array.isArray(d?.data) ? d.data : [];
+}
+export async function saveTemplates(list: FarmTemplate[]): Promise<boolean> {
+  const r = await fetch("/api/store/farming-templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: list }) });
+  return (await r.json()).ok;
 }
 export async function campaignAnalytics(): Promise<Record<string, SendCounts>> {
   const r = await fetch("/api/farming/campaigns/analytics", { cache: "no-store" });

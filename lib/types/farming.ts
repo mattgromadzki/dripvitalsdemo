@@ -39,6 +39,16 @@ export interface FarmContact {
 export type ContactInput = Omit<FarmContact, "id" | "createdAt" | "optedOut" | "groupIds" | "status"> &
   Partial<Pick<FarmContact, "groupIds" | "status" | "optedOut">>;
 
+// Reusable message template — pick one in the composer to prefill subject/body.
+export interface FarmTemplate {
+  id: string;                 // "FTPL-###"
+  name: string;
+  channel: FarmChannel;
+  subject?: string;           // email only
+  body: string;               // HTML for email, text for SMS
+  createdAt?: string;
+}
+
 export interface FarmGroup {
   id: string;                 // "FG-###"
   name: string;

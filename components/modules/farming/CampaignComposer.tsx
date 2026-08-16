@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { personalize, MERGE_TOKENS } from "@/lib/farming/personalize";
 import { FARM_STATUSES } from "@/lib/types/farming";
-import { audienceCount } from "@/lib/farming/contactsClient";
-import type { FarmGroup, FarmChannel, FarmAudience, FarmStatus, AudienceKind } from "@/lib/types/farming";
+import { audienceCount, getTemplates, saveTemplates } from "@/lib/farming/contactsClient";
+import { toast } from "@/lib/hooks/useToast";
+import type { FarmGroup, FarmChannel, FarmAudience, FarmStatus, AudienceKind, FarmTemplate } from "@/lib/types/farming";
 
 export interface ComposerSubmit {
   name: string; channel: FarmChannel; subject?: string; body: string;
@@ -32,6 +33,30 @@ export function CampaignComposer({ open, onClose, groups, initialSelectionIds, o
   const [throttle, setThrottle] = useState(30);
   const [scheduledLocal, setScheduledLocal] = useState("");
   const [err, setErr] = useState("");
+  const [templates, setTemplates] = useState<FarmTemplate[]>([]);
+  const [templateId, setTemplateId] = useState("");
+
+  useEffect(() => { if (open) getTemplates().then(setTemplates).catch(() => {}); }, [open]);
+  useEffect(() => { if (open) setTemplateId(""); }, [open]);
+
+  function applyTemplate(id: string) {
+    setTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (!t) return; // "— Blank —"
+    setChannel(t.channel);
+    setSubject(t.subject || "");
+    setBody(t.body);
+    if (!name.trim()) setName(t.name);
+  }
+  async function saveAsTemplate() {
+    if (!body.trim()) { setErr("Add a message body before saving a template."); return; }
+    if (channel === "email" && !subject.trim()) { setErr("Email templates need a subject."); return; }
+    const nm = name.trim() || subject.trim() || "Untitled template";
+    const tpl: FarmTemplate = { id: "FTPL-" + Date.now().toString(36), name: nm, channel, subject: channel === "email" ? subject.trim() : undefined, body: body.trim(), createdAt: new Date().toISOString() };
+    const next = [tpl, ...templates];
+    if (await saveTemplates(next)) { setTemplates(next); setTemplateId(tpl.id); toast(`✓ Saved template “${nm}”`); }
+    else toast("⚠️ Couldn't save template");
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -99,6 +124,16 @@ export function CampaignComposer({ open, onClose, groups, initialSelectionIds, o
       </>}>
       {err && <div className="mb-3 px-3 py-2.5 rounded-md bg-red-soft text-red text-[12px] font-medium">⚠ {err}</div>}
 
+      {templates.length > 0 && (
+        <div className="mb-3">
+          <label className="fl">Start from template</label>
+          <select className="fsel" value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
+            <option value="">— Blank —</option>
+            {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.channel === "sms" ? " · SMS" : ""}</option>)}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div><label className="fl">Campaign name</label><input className="fi" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Med spa intro — August" /></div>
         <div>
@@ -147,8 +182,9 @@ export function CampaignComposer({ open, onClose, groups, initialSelectionIds, o
 
       <div className="mb-1 flex items-center justify-between">
         <label className="fl !mb-0">Message</label>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {MERGE_TOKENS.map((t) => <button key={t} type="button" onClick={() => insertToken(t)} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-surface-3 text-ink-2 hover:bg-brand-soft hover:text-brand-dk">{`{{${t}}}`}</button>)}
+          <button type="button" onClick={saveAsTemplate} className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded bg-surface-3 text-ink-2 hover:bg-brand-soft hover:text-brand-dk">💾 Save as template</button>
         </div>
       </div>
       <textarea className="fi min-h-[120px] resize-y" value={body} onChange={(e) => setBody(e.target.value)} placeholder={channel === "email" ? "Hi {{firstName}},\n\n…" : "Hi {{firstName}}, …"} />
@@ -156,7 +192,9 @@ export function CampaignComposer({ open, onClose, groups, initialSelectionIds, o
       {body.trim() && (
         <div className="mt-2 p-3 rounded-md bg-surface-2 border border-border">
           <div className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1">Preview · sample contact</div>
-          <div className="text-[12.5px] whitespace-pre-wrap text-ink-2">{preview}</div>
+          {channel === "email" && /<[a-z][\s\S]*>/i.test(body)
+            ? <div className="bg-white rounded-md border border-border max-h-[380px] overflow-auto" dangerouslySetInnerHTML={{ __html: preview }} />
+            : <div className="text-[12.5px] whitespace-pre-wrap text-ink-2">{preview}</div>}
           {channel === "sms" && <div className="text-[10.5px] text-ink-muted mt-1.5">+ "Txt STOP to opt out" appended automatically</div>}
           {channel === "email" && <div className="text-[10.5px] text-ink-muted mt-1.5">+ an unsubscribe link is appended to every email</div>}
         </div>
