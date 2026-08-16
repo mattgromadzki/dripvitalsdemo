@@ -55,9 +55,7 @@ export default function FarmingPage() {
   const [dailyCap, setDailyCap] = useState("");
 
   const [rows, setRows] = useState<FarmContact[]>([]);
-  const [page, setPage] = useState(0);            // 0-based page index
-  const [hasNext, setHasNext] = useState(false);
-  const pageCursors = useRef<(string | null)[]>([null]); // keyset cursor to fetch each page
+  const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [counts, setCounts] = useState<api.Counts | null>(null);
   const [campCounts, setCampCounts] = useState<Record<string, api.SendCounts>>({});
@@ -80,25 +78,17 @@ export default function FarmingPage() {
   const filteredTotal = counts ? (counts.filtered ?? counts.total) : 0;
 
   const refreshCounts = useCallback(() => { api.getCounts(filter).then(setCounts).catch(() => {}); }, [filter]);
-  // Fetch one discrete page. Keyset cursors are cached per page in pageCursors
-  // so Prev/Next never uses a slow OFFSET — page N is reached by its saved cursor.
-  const loadPage = useCallback(async (idx: number) => {
-    setLoading(true); setSel(new Set()); setSelectAllMatching(false);
-    try {
-      const cur = pageCursors.current[idx] ?? null;
-      const p = await api.listContacts({ ...filter, cursor: cur, limit: PAGE });
-      setRows(p.contacts);
-      setHasNext(!!p.nextCursor);
-      pageCursors.current[idx + 1] = p.nextCursor; // remember how to fetch the next page
-      setPage(idx);
-    } finally { setLoading(false); }
-  }, [filter]);
   const reload = useCallback(async () => {
-    pageCursors.current = [null]; // filters changed → restart from page 1
-    await loadPage(0);
-  }, [loadPage]);
-  const nextPage = useCallback(() => { if (hasNext && !loading) loadPage(page + 1); }, [hasNext, loading, page, loadPage]);
-  const prevPage = useCallback(() => { if (page > 0 && !loading) loadPage(page - 1); }, [page, loading, loadPage]);
+    setLoading(true); setSel(new Set()); setSelectAllMatching(false);
+    try { const p = await api.listContacts({ ...filter, cursor: null, limit: PAGE }); setRows(p.contacts); setCursor(p.nextCursor); }
+    finally { setLoading(false); }
+  }, [filter]);
+  const loadMore = useCallback(async () => {
+    if (!cursor || loading) return;
+    setLoading(true);
+    try { const p = await api.listContacts({ ...filter, cursor, limit: PAGE }); setRows((r) => [...r, ...p.contacts]); setCursor(p.nextCursor); }
+    finally { setLoading(false); }
+  }, [cursor, loading, filter]);
 
   // Debounced reload on filter change.
   const firstRun = useRef(true);
@@ -323,14 +313,8 @@ export default function FarmingPage() {
               </table>
             </div>
             <div className="py-2 px-4 border-t border-border bg-surface-2 flex items-center justify-between text-[11.5px] text-ink-muted">
-              <span>
-                {filteredTotal > 0 ? <>Showing <b>{(page * PAGE + (rows.length ? 1 : 0)).toLocaleString()}–{(page * PAGE + rows.length).toLocaleString()}</b> of {filteredTotal.toLocaleString()}</> : "No contacts"}
-              </span>
-              <div className="flex items-center gap-2">
-                <span>Page {page + 1}{filteredTotal > 0 ? ` of ${Math.max(1, Math.ceil(filteredTotal / PAGE)).toLocaleString()}` : ""}</span>
-                <button className="btn btn-ghost btn-sm" onClick={prevPage} disabled={page === 0 || loading}>‹ Prev</button>
-                <button className="btn btn-ghost btn-sm" onClick={nextPage} disabled={!hasNext || loading}>Next ›</button>
-              </div>
+              <span>Showing {rows.length.toLocaleString()} of {filteredTotal.toLocaleString()}</span>
+              {cursor && <button className="btn btn-ghost btn-sm" onClick={loadMore} disabled={loading}>{loading ? "Loading…" : "Load more"}</button>}
             </div>
           </div>
         </>
@@ -402,7 +386,7 @@ export default function FarmingPage() {
       {tab === "contacts" && (sel.size > 0 || selectAllMatching) && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-ink text-white rounded-xl shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap max-w-[95vw]">
           <span className="text-[12.5px] font-semibold px-1">{selectAllMatching ? `All ${filteredTotal.toLocaleString()} matching` : `${sel.size} selected`}</span>
-          {!selectAllMatching && filteredTotal > rows.length && <button className="text-[11.5px] underline" onClick={() => setSelectAllMatching(true)}>Select all {filteredTotal.toLocaleString()}</button>}
+          {!selectAllMatching && cursor && <button className="text-[11.5px] underline" onClick={() => setSelectAllMatching(true)}>Select all {filteredTotal.toLocaleString()}</button>}
           <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" defaultValue="" onChange={(e) => { if (e.target.value) bulk("setStatus", e.target.value, "status set"); e.target.value = ""; }}>
             <option value="" disabled>Set status…</option>
             {FARM_STATUSES.map((s) => <option key={s.key} value={s.key} className="text-ink">{s.label}</option>)}
