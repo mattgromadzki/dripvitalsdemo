@@ -382,36 +382,52 @@ export default function FarmingPage() {
       {tab === "campaigns" && (
         <>
           <div className="flex justify-end mb-3"><button className="btn btn-primary btn-sm" onClick={() => { setComposerSelection(undefined); setComposerOpen(true); }}>+ New campaign</button></div>
-          <div className="space-y-2.5">
-            {campaigns.map((c) => {
-              const cc = campCounts[c.id]; const total = c.totalRecipients || 0;
-              const done = cc ? cc.sent : c.sent; const pct = total ? Math.round((done / total) * 100) : 0;
-              return (
-                <div key={c.id} className="bg-surface border border-border rounded-xl p-4">
-                  <div className="flex items-start gap-3 flex-wrap">
-                    <div className="text-[18px]">{c.channel === "email" ? "📧" : "📱"}</div>
-                    <div className="flex-1 min-w-[180px]">
-                      <div className="flex items-center gap-2 flex-wrap"><span className="font-bold text-[14px]">{c.name}</span><Pill intent={CAMPAIGN_INTENT[c.status] as never} dot>{c.status}</Pill></div>
-                      <div className="text-[11.5px] text-ink-muted mt-0.5">{audienceLabel(c, groupById)}{c.scheduledAt && c.status === "scheduled" ? ` · scheduled ${new Date(c.scheduledAt).toLocaleString()}` : ""}</div>
-                    </div>
-                    <div className="text-right text-[12px]">
-                      {total > 0 ? <><div className="font-semibold">{done.toLocaleString()}/{total.toLocaleString()} sent</div><div className="w-[140px] h-1.5 bg-surface-3 rounded-full overflow-hidden mt-1"><div className="h-full bg-brand rounded-full" style={{ width: `${pct}%` }} /></div></> : <span className="text-ink-muted">Not sent yet</span>}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-border flex-wrap">
-                    {c.status === "draft" && <button className="btn btn-primary btn-sm" onClick={() => campaignAction(c, "send")}>🚀 Send now</button>}
-                    {(c.status === "sending" || c.status === "scheduled") && <button className="btn btn-ghost btn-sm" onClick={() => campaignAction(c, "pause")}>⏸ Pause</button>}
-                    {c.status === "paused" && <button className="btn btn-ghost btn-sm" onClick={() => campaignAction(c, "resume")}>▶ Resume</button>}
-                    {c.status !== "sent" && c.status !== "canceled" && <button className="btn btn-ghost btn-sm text-red" onClick={() => campaignAction(c, "cancel")}>🚫 Cancel</button>}
-                    <button className="btn btn-ghost btn-sm" onClick={() => setResultsFor(c)}>📊 Details</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => { const copy = f.duplicateCampaign(c.id); if (copy) toast(`📋 Duplicated`); }}>📋 Duplicate</button>
-                    <div className="flex-1" />
-                    <button className="btn btn-ghost btn-sm text-red" onClick={() => setCampaignDelete(c)}>🗑 Delete</button>
-                  </div>
-                </div>
-              );
-            })}
-            {campaigns.length === 0 && <div className="text-[12.5px] text-ink-muted py-8 text-center">No campaigns yet.</div>}
+          <div className="bg-surface border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[12.5px] min-w-[960px]">
+                <thead className="bg-surface-2">
+                  <tr>{["Campaign", "Created", "Status", "Recipients", "Sent", "Opens", "Clicks", "Unsubs", "Bounces", ""].map((h, i) => <th key={i} className="text-left px-3 py-2.5 text-[9.5px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => {
+                    const cc = campCounts[c.id] || api.ZERO_SEND_COUNTS;
+                    const total = c.totalRecipients || cc.sent || 0;
+                    const sent = cc.sent || c.sent || 0;
+                    const p = (n: number) => (sent > 0 ? `${Math.round((n / sent) * 100)}%` : "—");
+                    const cell = (n: number, cls = "") => sent > 0 ? <><span className={`font-semibold ${cls}`}>{n.toLocaleString()}</span> <span className="text-ink-muted-2 text-[11px]">({p(n)})</span></> : <span className="text-ink-muted-2">—</span>;
+                    return (
+                      <tr key={c.id} className="border-t border-border hover:bg-surface-2">
+                        <td className="px-3 py-2.5">
+                          <button className="text-left" onClick={() => setResultsFor(c)}>
+                            <div className="font-semibold text-ink hover:text-brand flex items-center gap-1.5">{c.channel === "email" ? "📧" : "📱"} {c.name}</div>
+                            <div className="text-[10.5px] text-ink-muted">{audienceLabel(c, groupById)}</div>
+                          </button>
+                        </td>
+                        <td className="px-3 py-2.5 text-ink-muted whitespace-nowrap">{c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}</td>
+                        <td className="px-3 py-2.5"><Pill intent={CAMPAIGN_INTENT[c.status] as never} dot>{c.status}</Pill></td>
+                        <td className="px-3 py-2.5 font-semibold">{total ? total.toLocaleString() : "—"}</td>
+                        <td className="px-3 py-2.5 font-semibold">{sent ? sent.toLocaleString() : "—"}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">{cell(cc.opened, "text-blue")}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">{cell(cc.clicked, "text-brand")}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">{cell(cc.unsubscribed, cc.unsubscribed ? "text-red" : "")}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">{cell(cc.bounced, cc.bounced ? "text-red" : "")}</td>
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1 justify-end">
+                            {c.status === "draft" && <button title="Send now" className="btn btn-primary btn-sm !px-2" onClick={() => campaignAction(c, "send")}>🚀</button>}
+                            {(c.status === "sending" || c.status === "scheduled") && <button title="Pause" className="btn btn-ghost btn-sm !px-2" onClick={() => campaignAction(c, "pause")}>⏸</button>}
+                            {c.status === "paused" && <button title="Resume" className="btn btn-ghost btn-sm !px-2" onClick={() => campaignAction(c, "resume")}>▶</button>}
+                            <button title="Details" className="btn btn-ghost btn-sm !px-2" onClick={() => setResultsFor(c)}>📊</button>
+                            <button title="Duplicate" className="btn btn-ghost btn-sm !px-2" onClick={() => { const copy = f.duplicateCampaign(c.id); if (copy) toast("📋 Duplicated"); }}>📋</button>
+                            <button title="Delete" className="btn btn-ghost btn-sm !px-2 text-red" onClick={() => setCampaignDelete(c)}>🗑</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {campaigns.length === 0 && <tr><td colSpan={10} className="px-3 py-12 text-center text-ink-muted text-[12px]">No campaigns yet. Create one to start reporting.</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}
