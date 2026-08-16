@@ -43,7 +43,7 @@ function emailHtml(body: string, contactId: string, campaignId: string): string 
   const link = unsubUrl(contactId);
   // Footer carries its own explicit styles so it renders the same regardless of wrapper.
   const footer = `<hr style="border:none;border-top:1px solid #eee;margin:24px 0 12px">
-<p style="font-family:system-ui,-apple-system,Arial,sans-serif;font-size:11.5px;color:#8a8a8a;text-align:center">You received this because you were added to a DripVitals outreach list. <a href="${link}" style="color:#8a8a8a">Unsubscribe</a>.</p>
+<p style="font-family:system-ui,-apple-system,Arial,sans-serif;font-size:11.5px;color:#8a8a8a;text-align:center"><a href="${link}" style="color:#8a8a8a">Unsubscribe</a></p>
 <img src="${pixelUrl(campaignId, contactId)}" width="1" height="1" alt="" style="display:none">`;
   // Rich HTML (a designed email) keeps its OWN inline fonts/sizes — the wrapper
   // must not impose font-family/size/line-height. Plain-text gets a readable default.
