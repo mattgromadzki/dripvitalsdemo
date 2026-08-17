@@ -114,7 +114,7 @@ export async function dispatchDueCampaigns(opts: { campaignId?: string; now?: nu
     if (camp.channel === "email" && capped) { limit = Math.min(limit, totalRemaining()); if (limit <= 0) continue; }
     // `cursor` is stored as a string keyset token (or 0 on first run).
     const cursor: string | null = typeof camp.cursor === "string" ? camp.cursor : null;
-    const page = await pageAudience(camp.audience || { kind: "all" }, camp.channel, cursor, limit);
+    const page = await pageAudience(camp.audience || { kind: "all" }, camp.channel, cursor, limit, camp.id);
 
     let sent = 0, failed = 0;
     for (const c of page.contacts) {

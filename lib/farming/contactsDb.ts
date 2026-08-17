@@ -125,11 +125,11 @@ export async function listContacts(f: ContactFilter, cursor: string | null, limi
     const sql = db()!;
     const where = whereFor(sql, f);
     const cur = cursor ? decodeCursor(cursor) : null;
-    const keyset = cur ? sql`and (created_at, id) < (${cur.iso}, ${cur.id})` : sql``;
-    const rows = await sql<{ data: FarmContact; created_at: Date; id: string }[]>`select data, created_at, id from farming_contacts where ${where} ${keyset} order by created_at desc, id desc limit ${limit + 1}`;
+    const keyset = cur ? sql`and (created_at::text, id) < (${cur.iso}, ${cur.id})` : sql``;
+    const rows = await sql<{ data: FarmContact; created_at: Date; id: string; cat: string }[]>`select data, created_at, id, created_at::text as cat from farming_contacts where ${where} ${keyset} order by created_at desc, id desc limit ${limit + 1}`;
     const more = rows.length > limit;
     const page = rows.slice(0, limit);
-    const next = more ? encodeCursor(page[page.length - 1].created_at, page[page.length - 1].id) : null;
+    const next = more ? encodeCursor(page[page.length - 1].cat, page[page.length - 1].id) : null;
     return { contacts: page.map((r) => r.data), nextCursor: next };
   }
   const all = (await blobAll()).filter((c) => blobMatch(c, f)).sort(bySort);
@@ -365,7 +365,9 @@ function reachableInMemory(c: FarmContact, a: FarmAudience, channel: "email" | "
 }
 
 // A page of reachable recipients for a campaign audience (+ opaque cursor).
-export async function pageAudience(a: FarmAudience, channel: "email" | "sms", cursor: string | null, limit: number): Promise<ContactPage> {
+// `excludeSentFor` (a campaign id) skips recipients already recorded in
+// farming_sends for that campaign — makes dispatch idempotent + safe to resume.
+export async function pageAudience(a: FarmAudience, channel: "email" | "sms", cursor: string | null, limit: number, excludeSentFor?: string): Promise<ContactPage> {
   if (a.kind === "selection") {
     const ids = a.contactIds || [];
     const off = cursor ? parseInt(cursor, 10) || 0 : 0;
@@ -374,7 +376,8 @@ export async function pageAudience(a: FarmAudience, channel: "email" | "sms", cu
     if (contactsUseDb() && slice.length) {
       const sql = db()!;
       const chan = channel === "email" ? sql`email is not null and email <> ''` : sql`phone is not null and phone <> ''`;
-      const rows = await sql<{ data: FarmContact }[]>`select data from farming_contacts where id = any(${slice}) and opted_out = false and ${chan}`;
+      const notSent = excludeSentFor ? sql`and not exists (select 1 from farming_sends fs where fs.campaign_id = ${excludeSentFor} and fs.contact_id = farming_contacts.id)` : sql``;
+      const rows = await sql<{ data: FarmContact }[]>`select data from farming_contacts where id = any(${slice}) and opted_out = false and ${chan} ${notSent}`;
       return { contacts: rows.map((r) => r.data), nextCursor: next };
     }
     const out: FarmContact[] = [];
@@ -385,10 +388,11 @@ export async function pageAudience(a: FarmAudience, channel: "email" | "sms", cu
     const sql = db()!;
     const where = audienceWhere(sql, a, channel);
     const cur = cursor ? decodeCursor(cursor) : null;
-    const keyset = cur ? sql`and (created_at, id) < (${cur.iso}, ${cur.id})` : sql``;
-    const rows = await sql<{ data: FarmContact; created_at: Date; id: string }[]>`select data, created_at, id from farming_contacts where ${where} ${keyset} order by created_at desc, id desc limit ${limit + 1}`;
+    const keyset = cur ? sql`and (created_at::text, id) < (${cur.iso}, ${cur.id})` : sql``;
+    const notSent = excludeSentFor ? sql`and not exists (select 1 from farming_sends fs where fs.campaign_id = ${excludeSentFor} and fs.contact_id = farming_contacts.id)` : sql``;
+    const rows = await sql<{ data: FarmContact; created_at: Date; id: string; cat: string }[]>`select data, created_at, id, created_at::text as cat from farming_contacts where ${where} ${notSent} ${keyset} order by created_at desc, id desc limit ${limit + 1}`;
     const more = rows.length > limit; const page = rows.slice(0, limit);
-    const next = more ? encodeCursor(page[page.length - 1].created_at, page[page.length - 1].id) : null;
+    const next = more ? encodeCursor(page[page.length - 1].cat, page[page.length - 1].id) : null;
     return { contacts: page.map((r) => r.data), nextCursor: next };
   }
   // blob fallback: keyset by offset.
