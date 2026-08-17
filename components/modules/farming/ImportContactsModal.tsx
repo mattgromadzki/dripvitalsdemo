@@ -14,28 +14,32 @@ interface Props {
 
 const CHUNK = 5000; // rows per server insert
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-type ScalarField = "firstName" | "lastName" | "fullName" | "email" | "phone" | "company" | "title";
+type ScalarField = "firstName" | "lastName" | "fullName" | "company" | "title";
 const HEADER_KEYS: Record<ScalarField, string[]> = {
   firstName: ["first", "firstname", "fname", "givenname"],
   lastName: ["last", "lastname", "lname", "surname", "familyname"],
   fullName: ["name", "fullname", "contact", "contactname", "licenseename", "licensee", "agentname"],
-  email: ["email", "emailaddress", "mail", "e"],
-  phone: ["phone", "mobile", "cell", "number", "phonenumber", "mobilephone", "tel", "telephone"],
   company: ["company", "organization", "org", "business", "practice", "clinic", "dba", "brokerage", "office"],
   title: ["title", "role", "jobtitle", "position", "profession"],
 };
+// Email/phone can be numbered (Email 1, Phone 2…) as in Follow Up Boss / CRM
+// exports. Collect EVERY matching column in order; the first non-empty value
+// wins. The anchored \d* excludes the companion "- Type" columns (email1type).
+const isEmailCol = (n: string) => /^e?mail\d*$/.test(n) || n === "emailaddress";
+const isPhoneCol = (n: string) => /^(phone|mobile|cell|tel|telephone)\d*$/.test(n) || n === "mobilephone" || n === "phonenumber";
 // Extra columns captured into the contact's `custom` map (usable as merge
-// fields and for geo-targeted farming). Key → header aliases.
+// fields and for geo-targeted farming). Key → header aliases (incl. FUB's
+// "Address 1 - City" → address1city style).
 const CUSTOM_KEYS: Record<string, string[]> = {
-  address: ["address1", "address", "street", "addr", "mailingaddress"],
-  city: ["city", "town"],
-  state: ["state", "province"],
-  zip: ["zip", "zipcode", "postalcode", "postcode"],
+  address: ["address1", "address", "street", "addr", "mailingaddress", "address1street"],
+  city: ["city", "town", "address1city"],
+  state: ["state", "province", "address1state"],
+  zip: ["zip", "zipcode", "postalcode", "postcode", "address1zip"],
   county: ["county"],
   licenseType: ["licensetype"],
   licenseNumber: ["licensenumber", "licenseno", "license"],
 };
-interface RowMap { firstName: number; lastName: number; fullName: number; email: number; phone: number; company: number; title: number; custom: Record<string, number> }
+interface RowMap { firstName: number; lastName: number; fullName: number; emailCols: number[]; phoneCols: number[]; company: number; title: number; custom: Record<string, number> }
 
 // Blank markers used by many government/CRM exports (this file uses "-").
 const clean = (v: string | undefined) => { const t = (v || "").trim(); return t === "-" || t === "—" || t.toLowerCase() === "n/a" ? "" : t; };
@@ -43,13 +47,17 @@ const clean = (v: string | undefined) => { const t = (v || "").trim(); return t 
 const titleCase = (s: string) => (s && s === s.toUpperCase() ? s.toLowerCase().replace(/(^|[\s'\-.])([a-z])/g, (_m, sep, c) => sep + c.toUpperCase()) : s);
 
 function mapHeader(header: string[]): RowMap {
-  const idx = (keys: string[]) => header.findIndex((h) => keys.includes(norm(h)));
+  const N = header.map(norm);
+  const idx = (keys: string[]) => N.findIndex((h) => keys.includes(h));
   const custom: Record<string, number> = {};
   for (const [key, aliases] of Object.entries(CUSTOM_KEYS)) { const i = idx(aliases); if (i >= 0) custom[key] = i; }
-  return { firstName: idx(HEADER_KEYS.firstName), lastName: idx(HEADER_KEYS.lastName), fullName: idx(HEADER_KEYS.fullName), email: idx(HEADER_KEYS.email), phone: idx(HEADER_KEYS.phone), company: idx(HEADER_KEYS.company), title: idx(HEADER_KEYS.title), custom };
+  const emailCols: number[] = []; const phoneCols: number[] = [];
+  N.forEach((h, i) => { if (isEmailCol(h)) emailCols.push(i); else if (isPhoneCol(h)) phoneCols.push(i); });
+  return { firstName: idx(HEADER_KEYS.firstName), lastName: idx(HEADER_KEYS.lastName), fullName: idx(HEADER_KEYS.fullName), emailCols, phoneCols, company: idx(HEADER_KEYS.company), title: idx(HEADER_KEYS.title), custom };
 }
 function toContact(cells: string[], m: RowMap): ContactInput | null {
   const at = (i: number) => (i >= 0 ? clean(cells[i]) : "");
+  const firstOf = (cols: number[]) => { for (const i of cols) { const v = at(i); if (v) return v; } return ""; };
   let firstName = at(m.firstName), lastName = at(m.lastName);
   const full = at(m.fullName);
   if (!firstName && !lastName && full) {
@@ -64,8 +72,10 @@ function toContact(cells: string[], m: RowMap): ContactInput | null {
       firstName = p[0]; lastName = p.slice(1).join(" ");
     }
   }
+  // Some exports drop the whole name into "First Name" with an empty last name.
+  if (!lastName && /\s/.test(firstName)) { const p = firstName.split(/\s+/); firstName = p[0]; lastName = p.slice(1).join(" "); }
   firstName = titleCase(firstName); lastName = titleCase(lastName);
-  const email = at(m.email), phone = at(m.phone);
+  const email = firstOf(m.emailCols), phone = firstOf(m.phoneCols);
   if (!email && !phone) return null;
   let custom: Record<string, string> | undefined;
   for (const [key, i] of Object.entries(m.custom)) { const v = at(i); if (v) (custom ||= {})[key] = v; }
