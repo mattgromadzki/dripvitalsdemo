@@ -72,6 +72,7 @@ export default function FarmingPage() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerSelection, setComposerSelection] = useState<string[] | undefined>(undefined);
   const [composerFilter, setComposerFilter] = useState<api.Filter | undefined>(undefined);
+  const [groupConfirm, setGroupConfirm] = useState<{ action: "addGroup" | "moveGroup"; groupId: string; label: string } | null>(null);
   const [campaignDelete, setCampaignDelete] = useState<FarmCampaign | null>(null);
   const [resultsFor, setResultsFor] = useState<FarmCampaign | null>(null);
   const [templates, setTemplates] = useState<FarmTemplate[]>([]);
@@ -486,11 +487,11 @@ export default function FarmingPage() {
             <option value="" disabled>Set status…</option>
             {FARM_STATUSES.map((s) => <option key={s.key} value={s.key} className="text-ink">{s.label}</option>)}
           </select>
-          <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" defaultValue="" onChange={(e) => { if (e.target.value) bulk("addGroup", e.target.value, "added to group"); e.target.value = ""; }}>
+          <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" value="" onChange={(e) => { if (e.target.value) setGroupConfirm({ action: "addGroup", groupId: e.target.value, label: "Added to group" }); }}>
             <option value="" disabled>Add to group…</option>
             {groups.map((g) => <option key={g.id} value={g.id} className="text-ink">{g.name}</option>)}
           </select>
-          <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" defaultValue="" onChange={(e) => { if (e.target.value) bulk("moveGroup", e.target.value, "moved to group"); e.target.value = ""; }}>
+          <select className="text-[12px] rounded-md bg-white/10 border border-white/20 px-2 py-1 outline-none" value="" onChange={(e) => { if (e.target.value) setGroupConfirm({ action: "moveGroup", groupId: e.target.value, label: "Moved to group" }); }}>
             <option value="" disabled>Move to group…</option>
             {groups.map((g) => <option key={g.id} value={g.id} className="text-ink">{g.name}</option>)}
           </select>
@@ -508,6 +509,11 @@ export default function FarmingPage() {
       <TemplateModal open={templateModal.open} onClose={() => setTemplateModal({ open: false, editing: null })} template={templateModal.editing} onSave={saveTemplate} onDelete={deleteTemplate} />
 
       <ConfirmModal open={deleteSel} onClose={() => setDeleteSel(false)} onConfirm={async () => { const n = await api.bulkAction("delete", bulkTarget()); setSel(new Set()); setSelectAllMatching(false); toast(`🗑 Deleted ${n.toLocaleString()}`); afterMutation(); }} title="Delete contacts?" message={`Permanently remove ${bulkLabel().toLocaleString()} contact${bulkLabel() === 1 ? "" : "s"}? This can't be undone.`} confirmLabel="Delete" />
+      <ConfirmModal open={!!groupConfirm} onClose={() => setGroupConfirm(null)} destructive={false} icon="🏷️"
+        onConfirm={() => { const gc = groupConfirm; if (gc) bulk(gc.action, gc.groupId, gc.label); }}
+        title={groupConfirm?.action === "moveGroup" ? "Move to group?" : "Add to group?"}
+        message={groupConfirm ? `${groupConfirm.action === "moveGroup" ? "Move" : "Add"} ${bulkLabel().toLocaleString()} contact${bulkLabel() === 1 ? "" : "s"} to “${groupById[groupConfirm.groupId]?.name || groupConfirm.groupId}”?${groupConfirm.action === "moveGroup" ? " This replaces any groups they’re already in." : ""}` : ""}
+        confirmLabel={groupConfirm?.action === "moveGroup" ? "Move to group" : "Add to group"} />
       <ConfirmModal open={!!groupDelete} onClose={() => setGroupDelete(null)} onConfirm={async () => { if (groupDelete) { f.removeGroup(groupDelete.id); await api.stripGroupFromContacts(groupDelete.id); toast("🗑 Deleted group"); afterMutation(); } }} title="Delete group?" message={`Delete "${groupDelete?.name}"? Contacts stay, but lose this group tag.`} confirmLabel="Delete" />
       <ConfirmModal open={!!campaignDelete} onClose={() => setCampaignDelete(null)} onConfirm={() => { if (campaignDelete) { f.removeCampaign(campaignDelete.id); toast("🗑 Deleted campaign"); } }} title="Delete campaign?" message={`Delete "${campaignDelete?.name}"?`} confirmLabel="Delete" />
 
