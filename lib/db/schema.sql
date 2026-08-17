@@ -59,6 +59,15 @@ create index if not exists farming_contacts_search_loc_idx on farming_contacts u
 create index if not exists farming_contacts_state_idx  on farming_contacts ((lower(data->'custom'->>'state')));
 create index if not exists farming_contacts_county_idx on farming_contacts ((lower(data->'custom'->>'county')));
 create index if not exists farming_contacts_city_idx   on farming_contacts ((lower(data->'custom'->>'city')));
+-- Column sorting (name/email/phone/state/county/city/status) — (expr, id) so the
+-- keyset paginator can order + resume by any column. Coalesced so NULLs sort cleanly.
+create index if not exists farming_contacts_sort_name   on farming_contacts ((lower(coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName',''))), id);
+create index if not exists farming_contacts_sort_email  on farming_contacts ((lower(coalesce(email,''))), id);
+create index if not exists farming_contacts_sort_phone  on farming_contacts ((coalesce(phone,'')), id);
+create index if not exists farming_contacts_sort_state  on farming_contacts ((lower(coalesce(data->'custom'->>'state',''))), id);
+create index if not exists farming_contacts_sort_county on farming_contacts ((lower(coalesce(data->'custom'->>'county',''))), id);
+create index if not exists farming_contacts_sort_city   on farming_contacts ((lower(coalesce(data->'custom'->>'city',''))), id);
+create index if not exists farming_contacts_sort_status on farming_contacts (status, id);
 
 -- Farming sends: one row per (campaign, recipient). Replaces the per-recipient
 -- maps that used to live on the campaign blob, so campaigning to millions and

@@ -49,6 +49,8 @@ export default function FarmingPage() {
   const [countyOpts, setCountyOpts] = useState<string[]>([]);
   const [cityOpts, setCityOpts] = useState<string[]>([]);
   const [showSuppressed, setShowSuppressed] = useState(false);
+  const [sortCol, setSortCol] = useState<api.SortKey>("created");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   // Cold-outreach sender POOL (dripvitals.net subdomains) — farming-settings store.
   const [senders, setSenders] = useState<{ name: string; email: string; dailyCap: string }[]>([{ name: "DripVitals", email: "", dailyCap: "1500" }]);
@@ -85,15 +87,19 @@ export default function FarmingPage() {
   const refreshCounts = useCallback(() => { api.getCounts(filter).then(setCounts).catch(() => {}); }, [filter]);
   const reload = useCallback(async () => {
     setLoading(true); setSel(new Set()); setSelectAllMatching(false);
-    try { const p = await api.listContacts({ ...filter, cursor: null, limit: PAGE }); setRows(p.contacts); setCursor(p.nextCursor); }
+    try { const p = await api.listContacts({ ...filter, cursor: null, limit: PAGE, sort: sortCol, dir: sortDir }); setRows(p.contacts); setCursor(p.nextCursor); }
     finally { setLoading(false); }
-  }, [filter]);
+  }, [filter, sortCol, sortDir]);
   const loadMore = useCallback(async () => {
     if (!cursor || loading) return;
     setLoading(true);
-    try { const p = await api.listContacts({ ...filter, cursor, limit: PAGE }); setRows((r) => [...r, ...p.contacts]); setCursor(p.nextCursor); }
+    try { const p = await api.listContacts({ ...filter, cursor, limit: PAGE, sort: sortCol, dir: sortDir }); setRows((r) => [...r, ...p.contacts]); setCursor(p.nextCursor); }
     finally { setLoading(false); }
-  }, [cursor, loading, filter]);
+  }, [cursor, loading, filter, sortCol, sortDir]);
+  const toggleSort = (col: api.SortKey) => {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir(col === "created" ? "desc" : "asc"); }
+  };
 
   // Debounced reload on filter change.
   const firstRun = useRef(true);
@@ -342,7 +348,13 @@ export default function FarmingPage() {
                 <thead className="bg-surface-2">
                   <tr>
                     <th className="px-3 py-2.5 w-8"><input type="checkbox" checked={rows.length > 0 && rows.every((c) => sel.has(c.id))} onChange={(e) => { setSelectAllMatching(false); setSel(e.target.checked ? new Set(rows.map((c) => c.id)) : new Set()); }} /></th>
-                    {["Name", "Email", "Phone", "State", "County", "City", "Groups", "Status"].map((h) => <th key={h} className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wide text-ink-muted font-bold">{h}</th>)}
+                    {([{ l: "Name", k: "name" }, { l: "Email", k: "email" }, { l: "Phone", k: "phone" }, { l: "State", k: "state" }, { l: "County", k: "county" }, { l: "City", k: "city" }, { l: "Groups" }, { l: "Status", k: "status" }] as { l: string; k?: api.SortKey }[]).map((c) => (
+                      <th key={c.l} className="text-left px-3 py-2.5 text-[10px] uppercase tracking-wide text-ink-muted font-bold">
+                        {c.k
+                          ? <button onClick={() => toggleSort(c.k!)} className={`flex items-center gap-1 hover:text-ink ${sortCol === c.k ? "text-ink" : ""}`}>{c.l}<span className="text-[8px]">{sortCol === c.k ? (sortDir === "asc" ? "▲" : "▼") : "↕"}</span></button>
+                          : c.l}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>

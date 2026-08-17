@@ -119,20 +119,55 @@ export async function distinctFacet(field: "state" | "county" | "city", parent: 
 }
 const bySort = (a: FarmContact, b: FarmContact) => (b.createdAt || "").localeCompare(a.createdAt || "") || (b.id).localeCompare(a.id);
 
-// ── list ──────────────────────────────────────────────────────────────────
-export async function listContacts(f: ContactFilter, cursor: string | null, limit = 50): Promise<ContactPage> {
+// ── list (sortable) ─────────────────────────────────────────────────────────
+export type SortKey = "created" | "name" | "email" | "phone" | "state" | "county" | "city" | "status";
+// Sort expressions per column. `order` drives ORDER BY (index-friendly); `key`
+// is the text value used for the keyset cursor (kept text so comparison is exact).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sortExprs(sql: any, sort: SortKey): { order: any; key: any } {
+  switch (sort) {
+    case "name":   { const e = sql`lower(coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName',''))`; return { order: e, key: e }; }
+    case "email":  { const e = sql`lower(coalesce(email,''))`; return { order: e, key: e }; }
+    case "phone":  { const e = sql`coalesce(phone,'')`; return { order: e, key: e }; }
+    case "state":  { const e = sql`lower(coalesce(data->'custom'->>'state',''))`; return { order: e, key: e }; }
+    case "county": { const e = sql`lower(coalesce(data->'custom'->>'county',''))`; return { order: e, key: e }; }
+    case "city":   { const e = sql`lower(coalesce(data->'custom'->>'city',''))`; return { order: e, key: e }; }
+    case "status": { const e = sql`status`; return { order: e, key: e }; }
+    default:       return { order: sql`created_at`, key: sql`created_at::text` };
+  }
+}
+function blobSortVal(c: FarmContact, sort: SortKey): string {
+  switch (sort) {
+    case "name":   return `${c.firstName || ""} ${c.lastName || ""}`.toLowerCase();
+    case "email":  return (c.email || "").toLowerCase();
+    case "phone":  return c.phone || "";
+    case "state":  return (c.custom?.state || "").toLowerCase();
+    case "county": return (c.custom?.county || "").toLowerCase();
+    case "city":   return (c.custom?.city || "").toLowerCase();
+    case "status": return c.status;
+    default:       return c.createdAt || "";
+  }
+}
+export async function listContacts(f: ContactFilter, cursor: string | null, limit = 50, sort: SortKey = "created", dir: "asc" | "desc" = "desc"): Promise<ContactPage> {
   if (contactsUseDb()) {
     const sql = db()!;
     const where = whereFor(sql, f);
+    const { order, key } = sortExprs(sql, sort);
     const cur = cursor ? decodeCursor(cursor) : null;
-    const keyset = cur ? sql`and (created_at::text, id) < (${cur.iso}, ${cur.id})` : sql``;
-    const rows = await sql<{ data: FarmContact; created_at: Date; id: string; cat: string }[]>`select data, created_at, id, created_at::text as cat from farming_contacts where ${where} ${keyset} order by created_at desc, id desc limit ${limit + 1}`;
+    const ord = dir === "asc" ? sql`asc` : sql`desc`;
+    const cmp = dir === "asc" ? sql`>` : sql`<`;
+    const keyset = cur ? sql`and ((${key}), id) ${cmp} (${cur.iso}, ${cur.id})` : sql``;
+    const rows = await sql<{ data: FarmContact; sv: string; id: string }[]>`select data, id, (${key})::text as sv from farming_contacts where ${where} ${keyset} order by ${order} ${ord}, id ${ord} limit ${limit + 1}`;
     const more = rows.length > limit;
     const page = rows.slice(0, limit);
-    const next = more ? encodeCursor(page[page.length - 1].cat, page[page.length - 1].id) : null;
+    const next = more ? encodeCursor(page[page.length - 1].sv, page[page.length - 1].id) : null;
     return { contacts: page.map((r) => r.data), nextCursor: next };
   }
-  const all = (await blobAll()).filter((c) => blobMatch(c, f)).sort(bySort);
+  const asc = dir === "asc" ? 1 : -1;
+  const all = (await blobAll()).filter((c) => blobMatch(c, f)).sort((a, b) => {
+    const av = blobSortVal(a, sort), bv = blobSortVal(b, sort);
+    return (av < bv ? -1 : av > bv ? 1 : a.id < b.id ? -1 : 1) * asc;
+  });
   const off = cursor ? parseInt(cursor, 10) || 0 : 0;
   const page = all.slice(off, off + limit);
   const next = off + limit < all.length ? String(off + limit) : null;

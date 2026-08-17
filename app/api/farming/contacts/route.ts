@@ -1,8 +1,10 @@
 import { requirePerm } from "@/lib/auth/authorize";
-import { listContacts, buildContact, upsertContact, type ContactFilter } from "@/lib/farming/contactsDb";
+import { listContacts, buildContact, upsertContact, type ContactFilter, type SortKey } from "@/lib/farming/contactsDb";
 import type { ContactInput } from "@/lib/types/farming";
 
 export const dynamic = "force-dynamic";
+
+const SORTS = new Set(["created", "name", "email", "phone", "state", "county", "city", "status"]);
 
 function filterFrom(url: URL): ContactFilter {
   return {
@@ -21,8 +23,11 @@ export async function GET(req: Request) {
   const gate = await requirePerm(req, "farming.manage"); if (gate) return gate;
   const url = new URL(req.url);
   const cursor = url.searchParams.get("cursor");
-  const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
-  const page = await listContacts(filterFrom(url), cursor, limit);
+  const limit = Math.min(250, Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)));
+  const sp = url.searchParams.get("sort") || "created";
+  const sort = (SORTS.has(sp) ? sp : "created") as SortKey;
+  const dir = url.searchParams.get("dir") === "asc" ? "asc" : "desc";
+  const page = await listContacts(filterFrom(url), cursor, limit, sort, dir);
   return Response.json({ ok: true, ...page });
 }
 

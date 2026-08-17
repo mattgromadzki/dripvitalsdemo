@@ -4,7 +4,8 @@ import type { FarmContact, ContactInput, FarmAudience, FarmChannel, FarmTemplate
 // Client fetch wrappers for the server-paginated contacts API. The browser never
 // holds the full contact set — only the current page.
 
-export interface ListParams { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; cursor?: string | null; limit?: number; }
+export type SortKey = "created" | "name" | "email" | "phone" | "state" | "county" | "city" | "status";
+export interface ListParams { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; cursor?: string | null; limit?: number; sort?: SortKey; dir?: "asc" | "desc"; }
 export interface ContactPage { contacts: FarmContact[]; nextCursor: string | null; }
 export interface Counts { total: number; suppressed: number; reachableEmail: number; reachablePhone: number; byStatus: Record<string, number>; groups: Record<string, number>; filtered?: number; }
 export interface Filter { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean; }
@@ -18,7 +19,7 @@ function qs(params: Record<string, string | number | boolean | null | undefined>
 }
 
 export async function listContacts(p: ListParams): Promise<ContactPage> {
-  const r = await fetch(`/api/farming/contacts?${qs({ search: p.search, status: p.status, group: p.group, state: p.state, county: p.county, city: p.city, includeSuppressed: p.includeSuppressed, cursor: p.cursor, limit: p.limit })}`, { cache: "no-store" });
+  const r = await fetch(`/api/farming/contacts?${qs({ search: p.search, status: p.status, group: p.group, state: p.state, county: p.county, city: p.city, includeSuppressed: p.includeSuppressed, cursor: p.cursor, limit: p.limit, sort: p.sort, dir: p.dir })}`, { cache: "no-store" });
   const d = await r.json();
   return { contacts: d.contacts || [], nextCursor: d.nextCursor ?? null };
 }
