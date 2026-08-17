@@ -9,14 +9,15 @@ import { KpiCard, KpiGrid } from "@/components/ui/Kpi";
 import { toast } from "@/lib/hooks/useToast";
 import { useFarming } from "@/lib/hooks/useFarming";
 import { FARM_STATUSES } from "@/lib/types/farming";
-import type { FarmContact, FarmGroup, FarmCampaign, FarmStatus, CampaignStatus } from "@/lib/types/farming";
+import type { FarmContact, FarmGroup, FarmCampaign, FarmStatus, CampaignStatus, FarmTemplate } from "@/lib/types/farming";
 import { ContactModal } from "@/components/modules/farming/ContactModal";
 import { GroupModal } from "@/components/modules/farming/GroupModal";
 import { ImportContactsModal } from "@/components/modules/farming/ImportContactsModal";
+import { TemplateModal } from "@/components/modules/farming/TemplateModal";
 import { CampaignComposer, type ComposerSubmit } from "@/components/modules/farming/CampaignComposer";
 import * as api from "@/lib/farming/contactsClient";
 
-type Tab = "overview" | "contacts" | "groups" | "campaigns";
+type Tab = "overview" | "contacts" | "groups" | "campaigns" | "templates";
 const pctStr = (n: number) => (n * 100).toFixed(1) + "%";
 const rate = (n: number, d: number) => (d > 0 ? n / d : 0);
 const STATUS_META = Object.fromEntries(FARM_STATUSES.map((s) => [s.key, s])) as Record<FarmStatus, (typeof FARM_STATUSES)[number]>;
@@ -73,6 +74,8 @@ export default function FarmingPage() {
   const [composerFilter, setComposerFilter] = useState<api.Filter | undefined>(undefined);
   const [campaignDelete, setCampaignDelete] = useState<FarmCampaign | null>(null);
   const [resultsFor, setResultsFor] = useState<FarmCampaign | null>(null);
+  const [templates, setTemplates] = useState<FarmTemplate[]>([]);
+  const [templateModal, setTemplateModal] = useState<{ open: boolean; editing: FarmTemplate | null }>({ open: false, editing: null });
 
   const groupById = useMemo(() => Object.fromEntries(groups.map((g) => [g.id, g])) as Record<string, FarmGroup>, [groups]);
   const filter = useMemo<api.Filter>(() => ({ search: search.trim() || undefined, status: statusFilter === "all" ? undefined : statusFilter, group: groupFilter === "all" ? undefined : groupFilter, state: stateFilter === "all" ? undefined : stateFilter, county: countyFilter === "all" ? undefined : countyFilter, city: cityFilter === "all" ? undefined : cityFilter, includeSuppressed: showSuppressed }), [search, statusFilter, groupFilter, stateFilter, countyFilter, cityFilter, showSuppressed]);
@@ -100,6 +103,18 @@ export default function FarmingPage() {
   }, [reload, refreshCounts]);
   // Campaign engagement counts (Overview + list progress).
   useEffect(() => { api.campaignAnalytics().then(setCampCounts).catch(() => {}); }, [campaigns.length]);
+  // Templates (managed in the Templates tab; also feed the composer picker).
+  useEffect(() => { api.getTemplates().then(setTemplates).catch(() => {}); }, []);
+  async function saveTemplate(t: FarmTemplate) {
+    const next = templates.some((x) => x.id === t.id) ? templates.map((x) => (x.id === t.id ? t : x)) : [t, ...templates];
+    setTemplates(next);
+    if (await api.saveTemplates(next)) toast("✓ Template saved"); else toast("⚠️ Couldn't save template");
+  }
+  async function deleteTemplate(id: string) {
+    const next = templates.filter((x) => x.id !== id);
+    setTemplates(next);
+    if (await api.saveTemplates(next)) toast("🗑 Template deleted");
+  }
 
   // Load the saved sender pool.
   useEffect(() => {
@@ -217,6 +232,7 @@ export default function FarmingPage() {
         <TabBtn active={tab === "contacts"} onClick={() => setTab("contacts")}>Contacts <Count n={counts?.total ?? 0} /></TabBtn>
         <TabBtn active={tab === "groups"} onClick={() => setTab("groups")}>Groups <Count n={groups.length} /></TabBtn>
         <TabBtn active={tab === "campaigns"} onClick={() => setTab("campaigns")}>Campaigns <Count n={campaigns.length} /></TabBtn>
+        <TabBtn active={tab === "templates"} onClick={() => setTab("templates")}>Templates <Count n={templates.length} /></TabBtn>
       </div>
 
       {tab === "overview" && (
@@ -438,6 +454,29 @@ export default function FarmingPage() {
         </>
       )}
 
+      {tab === "templates" && (
+        <>
+          <div className="flex justify-end mb-3"><button className="btn btn-primary btn-sm" onClick={() => setTemplateModal({ open: true, editing: null })}>+ New template</button></div>
+          <div className="grid grid-cols-3 gap-3 max-[1000px]:grid-cols-2 max-[640px]:grid-cols-1">
+            {templates.map((t) => (
+              <div key={t.id} className="bg-surface border border-border rounded-xl p-4 flex flex-col">
+                <div className="flex items-center gap-2 mb-1"><span>{t.channel === "email" ? "📧" : "📱"}</span><div className="font-bold text-[14px] flex-1 truncate">{t.name}</div></div>
+                {t.subject && <div className="text-[12px] text-ink-muted mb-2 line-clamp-1"><span className="font-semibold text-ink-2">Subject:</span> {t.subject}</div>}
+                <div className="text-[11px] text-ink-muted-2 bg-surface-2 border border-border rounded-md p-2 h-[64px] overflow-hidden mb-3">{t.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180) || "—"}</div>
+                <div className="flex gap-2 mt-auto">
+                  <button className="btn btn-ghost btn-sm" onClick={() => setTemplateModal({ open: true, editing: t })}>Edit</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setComposerSelection(undefined); setComposerFilter(undefined); setComposerOpen(true); setTimeout(() => toast(`Pick “${t.name}” in the composer’s template dropdown`), 300); }}>Use</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => saveTemplate({ ...t, id: "FTPL-" + Date.now().toString(36), name: `${t.name} (copy)`, createdAt: new Date().toISOString() })}>Duplicate</button>
+                  <div className="flex-1" />
+                  <button className="btn btn-ghost btn-sm text-red" onClick={() => deleteTemplate(t.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+            {templates.length === 0 && <div className="text-[12.5px] text-ink-muted col-span-full py-8 text-center">No templates yet. Create one to reuse across campaigns.</div>}
+          </div>
+        </>
+      )}
+
       {/* Bulk action bar */}
       {tab === "contacts" && (sel.size > 0 || selectAllMatching) && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-ink text-white rounded-xl shadow-lg px-3 py-2 flex items-center gap-2 flex-wrap max-w-[95vw]">
@@ -466,6 +505,7 @@ export default function FarmingPage() {
       <GroupModal open={groupModal.open} onClose={() => setGroupModal({ open: false, editing: null })} group={groupModal.editing} onSave={(input, id) => { if (id) { f.updateGroup(id, input); toast("✓ Group updated"); } else { f.addGroup(input); toast("✓ Group created"); } }} />
       <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} defaultGroupId={groupFilter !== "all" ? groupFilter : undefined} onDone={(s) => { toast(`✓ Imported ${s.inserted.toLocaleString()} · ${s.duplicates.toLocaleString()} dupes`); afterMutation(); }} />
       <CampaignComposer open={composerOpen} onClose={() => setComposerOpen(false)} groups={groups} initialSelectionIds={composerSelection} initialFilter={composerFilter} onSubmit={submitComposer} />
+      <TemplateModal open={templateModal.open} onClose={() => setTemplateModal({ open: false, editing: null })} template={templateModal.editing} onSave={saveTemplate} onDelete={deleteTemplate} />
 
       <ConfirmModal open={deleteSel} onClose={() => setDeleteSel(false)} onConfirm={async () => { const n = await api.bulkAction("delete", bulkTarget()); setSel(new Set()); setSelectAllMatching(false); toast(`🗑 Deleted ${n.toLocaleString()}`); afterMutation(); }} title="Delete contacts?" message={`Permanently remove ${bulkLabel().toLocaleString()} contact${bulkLabel() === 1 ? "" : "s"}? This can't be undone.`} confirmLabel="Delete" />
       <ConfirmModal open={!!groupDelete} onClose={() => setGroupDelete(null)} onConfirm={async () => { if (groupDelete) { f.removeGroup(groupDelete.id); await api.stripGroupFromContacts(groupDelete.id); toast("🗑 Deleted group"); afterMutation(); } }} title="Delete group?" message={`Delete "${groupDelete?.name}"? Contacts stay, but lose this group tag.`} confirmLabel="Delete" />
