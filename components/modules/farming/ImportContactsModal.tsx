@@ -1,14 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { importChunk } from "@/lib/farming/contactsClient";
-import type { ContactInput } from "@/lib/types/farming";
+import type { ContactInput, FarmGroup } from "@/lib/types/farming";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   defaultGroupId?: string;          // import straight into a group
+  groups?: FarmGroup[];             // existing groups to assign into
+  onCreateGroup?: (name: string) => string; // create a group, returns its id
   onDone: (summary: { inserted: number; duplicates: number; invalid: number }) => void;
 }
 
@@ -105,18 +107,24 @@ async function* streamCsvRows(file: File): AsyncGenerator<string[]> {
   if (field.length || row.length) { push(); yield row; }
 }
 
-export function ImportContactsModal({ open, onClose, defaultGroupId, onDone }: Props) {
+export function ImportContactsModal({ open, onClose, defaultGroupId, groups = [], onCreateGroup, onDone }: Props) {
   const [fileName, setFileName] = useState("");
   const [phase, setPhase] = useState<"idle" | "running" | "done" | "error">("idle");
   const [prog, setProg] = useState({ processed: 0, inserted: 0, duplicates: 0, invalid: 0 });
   const [err, setErr] = useState("");
+  // Group assignment: "" (none), an existing group id, or "__new__" (+ a name).
+  const [groupChoice, setGroupChoice] = useState<string>("");
+  const [newGroupName, setNewGroupName] = useState("");
   const cancelRef = useRef(false);
+  const groupRef = useRef<string | undefined>(undefined); // resolved target group id for this run
+
+  useEffect(() => { if (open) { setGroupChoice(defaultGroupId || ""); setNewGroupName(""); } }, [open, defaultGroupId]);
 
   function reset() { setFileName(""); setPhase("idle"); setProg({ processed: 0, inserted: 0, duplicates: 0, invalid: 0 }); setErr(""); cancelRef.current = false; }
   function close() { cancelRef.current = true; reset(); onClose(); }
 
   async function pushBatch(batch: ContactInput[], acc: typeof prog) {
-    const res = await importChunk(batch, defaultGroupId);
+    const res = await importChunk(batch, groupRef.current);
     acc.inserted += res.inserted; acc.duplicates += res.duplicates; acc.invalid += res.invalid; acc.processed += batch.length;
     setProg({ ...acc });
   }
@@ -154,6 +162,16 @@ export function ImportContactsModal({ open, onClose, defaultGroupId, onDone }: P
   }
 
   async function onFile(file: File) {
+    // Resolve the target group before streaming (create it if "new").
+    let groupId: string | undefined;
+    if (groupChoice === "__new__") {
+      const name = newGroupName.trim();
+      if (!name) { setErr("Enter a name for the new group."); return; }
+      groupId = onCreateGroup?.(name);
+    } else if (groupChoice) {
+      groupId = groupChoice;
+    }
+    groupRef.current = groupId;
     setErr(""); setFileName(file.name); setPhase("running"); cancelRef.current = false;
     const acc = { processed: 0, inserted: 0, duplicates: 0, invalid: 0 };
     try {
@@ -173,12 +191,27 @@ export function ImportContactsModal({ open, onClose, defaultGroupId, onDone }: P
         Upload a <b>CSV</b> or <b>XLSX</b>. Columns are matched automatically (name/first/last, email, phone, company/DBA, title; city/state/zip/county are captured too). A single <b>&ldquo;Last, First&rdquo;</b> name column is split into first + last, and ALL-CAPS names are cleaned to normal case. Duplicate emails are skipped server-side. CSV streams in constant memory — best for very large lists (millions); XLSX is loaded fully, so keep those under a few hundred thousand rows.
       </div>
       {phase === "idle" && (
-        <label className="block border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-brand transition-colors">
-          <input type="file" accept=".csv,.xlsx,.xls,.txt,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
-          <div className="text-[26px] mb-1">📄</div>
-          <div className="text-[13px] font-semibold">Choose a CSV / XLSX file</div>
-          {defaultGroupId && <div className="text-[11px] text-brand-dk mt-1">Imported into the selected group</div>}
-        </label>
+        <>
+          <div className="mb-3">
+            <label className="fl">Assign to group (optional)</label>
+            <select className="fsel" value={groupChoice} onChange={(e) => setGroupChoice(e.target.value)}>
+              <option value="">No group</option>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              {onCreateGroup && <option value="__new__">＋ Create new group…</option>}
+            </select>
+            {groupChoice === "__new__" && (
+              <input className="fi mt-2" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="New group name (e.g. FUB Contacts)" autoFocus />
+            )}
+            <div className="text-[11px] text-ink-muted mt-1">Every imported contact is added to this group.</div>
+          </div>
+          <label className="block border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-brand transition-colors">
+            <input type="file" accept=".csv,.xlsx,.xls,.txt,text/csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
+            <div className="text-[26px] mb-1">📄</div>
+            <div className="text-[13px] font-semibold">Choose a CSV / XLSX file</div>
+            {groupChoice && groupChoice !== "__new__" && <div className="text-[11px] text-brand-dk mt-1">Imported into “{groups.find((g) => g.id === groupChoice)?.name || "group"}”</div>}
+            {groupChoice === "__new__" && newGroupName.trim() && <div className="text-[11px] text-brand-dk mt-1">Creates &amp; imports into “{newGroupName.trim()}”</div>}
+          </label>
+        </>
       )}
       {(phase === "running" || phase === "done") && (
         <div className="p-4 rounded-lg bg-surface-2 border border-border">

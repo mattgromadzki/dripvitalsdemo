@@ -504,7 +504,10 @@ export default function FarmingPage() {
       {/* Modals */}
       <ContactModal open={contactModal.open} onClose={() => setContactModal({ open: false, editing: null })} contact={contactModal.editing} groups={groups} onSave={saveContact} />
       <GroupModal open={groupModal.open} onClose={() => setGroupModal({ open: false, editing: null })} group={groupModal.editing} onSave={(input, id) => { if (id) { f.updateGroup(id, input); toast("✓ Group updated"); } else { f.addGroup(input); toast("✓ Group created"); } }} />
-      <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} defaultGroupId={groupFilter !== "all" ? groupFilter : undefined} onDone={(s) => { toast(`✓ Imported ${s.inserted.toLocaleString()} · ${s.duplicates.toLocaleString()} dupes`); afterMutation(); }} />
+      <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} defaultGroupId={groupFilter !== "all" ? groupFilter : undefined}
+        groups={groups}
+        onCreateGroup={(name) => { const palette = ["#6650e0", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"]; const g = f.addGroup({ name, color: palette[groups.length % palette.length] }); toast(`✓ Group “${name}” created`); return g.id; }}
+        onDone={(s) => { toast(`✓ Imported ${s.inserted.toLocaleString()} · ${s.duplicates.toLocaleString()} dupes`); afterMutation(); }} />
       <CampaignComposer open={composerOpen} onClose={() => setComposerOpen(false)} groups={groups} initialSelectionIds={composerSelection} initialFilter={composerFilter} onSubmit={submitComposer} />
       <TemplateModal open={templateModal.open} onClose={() => setTemplateModal({ open: false, editing: null })} template={templateModal.editing} onSave={saveTemplate} onDelete={deleteTemplate} />
 
