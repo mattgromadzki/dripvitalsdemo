@@ -51,8 +51,8 @@ create index if not exists farming_contacts_groups_idx on farming_contacts using
 create index if not exists farming_contacts_keyset_idx on farming_contacts (created_at desc, id desc);
 -- Fast substring search at scale (name/email/company).
 create extension if not exists pg_trgm;
-create index if not exists farming_contacts_search_idx on farming_contacts using gin ((lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company',''))) gin_trgm_ops);
 -- Search including location (city/county/state) — matches the whereFor() expression.
+-- (Superset of the old name/email/company-only index, which was dropped to save space.)
 create index if not exists farming_contacts_search_loc_idx on farming_contacts using gin ((lower(coalesce(email,'') || ' ' || coalesce(data->>'firstName','') || ' ' || coalesce(data->>'lastName','') || ' ' || coalesce(data->>'company','') || ' ' || coalesce(data->'custom'->>'city','') || ' ' || coalesce(data->'custom'->>'county','') || ' ' || coalesce(data->'custom'->>'state',''))) gin_trgm_ops);
 -- Location filter dropdowns (State/County/City) — btree on lowered expressions
 -- accelerates equality filtering + facet narrowing.
