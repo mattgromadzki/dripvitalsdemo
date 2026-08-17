@@ -60,12 +60,14 @@ export type FarmChannel = "email" | "sms";
 export type CampaignStatus =
   | "draft" | "scheduled" | "sending" | "sent" | "paused" | "canceled";
 
-export type AudienceKind = "all" | "group" | "status" | "selection";
+export type AudienceKind = "all" | "group" | "status" | "selection" | "filter";
+export interface AudienceFilter { search?: string; status?: string; group?: string; state?: string; county?: string; city?: string; includeSuppressed?: boolean }
 export interface FarmAudience {
   kind: AudienceKind;
   groupIds?: string[];        // kind === "group"
   statuses?: FarmStatus[];    // kind === "status"
   contactIds?: string[];      // kind === "selection"
+  filter?: AudienceFilter;    // kind === "filter" — everyone matching a contact filter (scales to millions)
 }
 
 export type SendResult = "sent" | "failed" | "delivered" | "opted_out";

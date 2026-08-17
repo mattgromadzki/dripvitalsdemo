@@ -349,6 +349,7 @@ function audienceWhere(sql: any, a: FarmAudience, channel: "email" | "sms") {
   conds.push(channel === "email" ? sql`email is not null and email <> ''` : sql`phone is not null and phone <> ''`);
   if (a.kind === "group") conds.push(sql`group_ids && ${a.groupIds || []}`);
   else if (a.kind === "status") conds.push(sql`status = any(${a.statuses || []})`);
+  else if (a.kind === "filter") conds.push(whereFor(sql, { ...(a.filter || {}), includeSuppressed: false })); // "everyone matching a filter" — reuses the contacts WHERE builder
   // "all" adds nothing; "selection" handled separately (id paging).
   let frag = conds[0];
   for (let i = 1; i < conds.length; i++) frag = sql`${frag} and ${conds[i]}`;
@@ -359,6 +360,7 @@ function reachableInMemory(c: FarmContact, a: FarmAudience, channel: "email" | "
   if (channel === "email" ? !c.email : !c.phone) return false;
   if (a.kind === "group") return (c.groupIds || []).some((g) => (a.groupIds || []).includes(g));
   if (a.kind === "status") return (a.statuses || []).includes(c.status);
+  if (a.kind === "filter") return blobMatch(c, { ...(a.filter || {}), includeSuppressed: false });
   return true;
 }
 
@@ -368,9 +370,16 @@ export async function pageAudience(a: FarmAudience, channel: "email" | "sms", cu
     const ids = a.contactIds || [];
     const off = cursor ? parseInt(cursor, 10) || 0 : 0;
     const slice = ids.slice(off, off + limit);
+    const next = off + limit < ids.length ? String(off + limit) : null;
+    if (contactsUseDb() && slice.length) {
+      const sql = db()!;
+      const chan = channel === "email" ? sql`email is not null and email <> ''` : sql`phone is not null and phone <> ''`;
+      const rows = await sql<{ data: FarmContact }[]>`select data from farming_contacts where id = any(${slice}) and opted_out = false and ${chan}`;
+      return { contacts: rows.map((r) => r.data), nextCursor: next };
+    }
     const out: FarmContact[] = [];
     for (const id of slice) { const c = await getContact(id); if (c && reachableInMemory(c, a, channel)) out.push(c); }
-    return { contacts: out, nextCursor: off + limit < ids.length ? String(off + limit) : null };
+    return { contacts: out, nextCursor: next };
   }
   if (contactsUseDb()) {
     const sql = db()!;
@@ -391,7 +400,15 @@ export async function pageAudience(a: FarmAudience, channel: "email" | "sms", cu
 
 export async function audienceCount(a: FarmAudience, channel: "email" | "sms"): Promise<number> {
   if (a.kind === "selection") {
-    let n = 0; for (const id of a.contactIds || []) { const c = await getContact(id); if (c && reachableInMemory(c, a, channel)) n++; } return n;
+    const ids = a.contactIds || [];
+    if (!ids.length) return 0;
+    if (contactsUseDb()) {
+      const sql = db()!;
+      const chan = channel === "email" ? sql`email is not null and email <> ''` : sql`phone is not null and phone <> ''`;
+      const [r] = await sql`select count(*)::int n from farming_contacts where id = any(${ids}) and opted_out = false and ${chan}`;
+      return r.n;
+    }
+    let n = 0; for (const id of ids) { const c = await getContact(id); if (c && reachableInMemory(c, a, channel)) n++; } return n;
   }
   if (contactsUseDb()) { const sql = db()!; const [r] = await sql`select count(*)::int n from farming_contacts where ${audienceWhere(sql, a, channel)}`; return r.n; }
   return (await blobAll()).filter((c) => reachableInMemory(c, a, channel)).length;

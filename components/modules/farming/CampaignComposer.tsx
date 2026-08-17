@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { personalize, MERGE_TOKENS } from "@/lib/farming/personalize";
 import { FARM_STATUSES } from "@/lib/types/farming";
-import { audienceCount, getTemplates, saveTemplates } from "@/lib/farming/contactsClient";
+import { audienceCount, getTemplates, saveTemplates, type Filter } from "@/lib/farming/contactsClient";
 import { toast } from "@/lib/hooks/useToast";
 import type { FarmGroup, FarmChannel, FarmAudience, FarmStatus, AudienceKind, FarmTemplate } from "@/lib/types/farming";
 
@@ -19,10 +19,11 @@ interface Props {
   onClose: () => void;
   groups: FarmGroup[];
   initialSelectionIds?: string[];   // pre-fill audience = current bulk selection
+  initialFilter?: Filter;           // pre-fill audience = everyone matching a contact filter
   onSubmit: (data: ComposerSubmit) => void;
 }
 
-export function CampaignComposer({ open, onClose, groups, initialSelectionIds, onSubmit }: Props) {
+export function CampaignComposer({ open, onClose, groups, initialSelectionIds, initialFilter, onSubmit }: Props) {
   const [name, setName] = useState("");
   const [channel, setChannel] = useState<FarmChannel>("email");
   const [subject, setSubject] = useState("");
@@ -62,17 +63,19 @@ export function CampaignComposer({ open, onClose, groups, initialSelectionIds, o
     if (!open) return;
     setErr(""); setName(""); setChannel("email"); setSubject(""); setBody("");
     setThrottle(30); setScheduledLocal("");
-    if (initialSelectionIds && initialSelectionIds.length) { setKind("selection"); }
+    if (initialFilter) { setKind("filter"); }
+    else if (initialSelectionIds && initialSelectionIds.length) { setKind("selection"); }
     else { setKind("all"); }
     setGroupIds([]); setStatuses([]);
-  }, [open, initialSelectionIds]);
+  }, [open, initialSelectionIds, initialFilter]);
 
   const audience: FarmAudience = useMemo(() => {
     if (kind === "group") return { kind, groupIds };
     if (kind === "status") return { kind, statuses };
     if (kind === "selection") return { kind, contactIds: initialSelectionIds || [] };
+    if (kind === "filter") return { kind, filter: initialFilter };
     return { kind: "all" };
-  }, [kind, groupIds, statuses, initialSelectionIds]);
+  }, [kind, groupIds, statuses, initialSelectionIds, initialFilter]);
 
   // Reachable-recipient count comes from the server (contacts aren't in memory).
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
@@ -151,6 +154,7 @@ export function CampaignComposer({ open, onClose, groups, initialSelectionIds, o
 
       <label className="fl">Audience</label>
       <div className="flex flex-wrap gap-1.5 mb-2">
+        {initialFilter && <AudBtn k="filter" label="Matching filter" />}
         <AudBtn k="all" label="All contacts" />
         <AudBtn k="group" label="By group" />
         <AudBtn k="status" label="By status" />

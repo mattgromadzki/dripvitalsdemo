@@ -70,6 +70,7 @@ export default function FarmingPage() {
   const [groupDelete, setGroupDelete] = useState<FarmGroup | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerSelection, setComposerSelection] = useState<string[] | undefined>(undefined);
+  const [composerFilter, setComposerFilter] = useState<api.Filter | undefined>(undefined);
   const [campaignDelete, setCampaignDelete] = useState<FarmCampaign | null>(null);
   const [resultsFor, setResultsFor] = useState<FarmCampaign | null>(null);
 
@@ -381,12 +382,12 @@ export default function FarmingPage() {
 
       {tab === "campaigns" && resultsFor && (
         <CampaignDetails campaign={resultsFor} groups={groups} onBack={() => setResultsFor(null)}
-          onCampaignTo={(ids) => { setResultsFor(null); setComposerSelection(ids); setComposerOpen(true); }} />
+          onCampaignTo={(ids) => { setResultsFor(null); setComposerFilter(undefined); setComposerSelection(ids); setComposerOpen(true); }} />
       )}
 
       {tab === "campaigns" && !resultsFor && (
         <>
-          <div className="flex justify-end mb-3"><button className="btn btn-primary btn-sm" onClick={() => { setComposerSelection(undefined); setComposerOpen(true); }}>+ New campaign</button></div>
+          <div className="flex justify-end mb-3"><button className="btn btn-primary btn-sm" onClick={() => { setComposerSelection(undefined); setComposerFilter(undefined); setComposerOpen(true); }}>+ New campaign</button></div>
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[12.5px] min-w-[960px]">
@@ -454,7 +455,7 @@ export default function FarmingPage() {
             <option value="" disabled>Move to group…</option>
             {groups.map((g) => <option key={g.id} value={g.id} className="text-ink">{g.name}</option>)}
           </select>
-          {!selectAllMatching && <button className="text-[12px] font-semibold bg-white/15 hover:bg-white/25 rounded-md px-2.5 py-1" onClick={() => { setComposerSelection([...sel]); setComposerOpen(true); }}>📣 Campaign</button>}
+          <button className="text-[12px] font-semibold bg-white/15 hover:bg-white/25 rounded-md px-2.5 py-1" onClick={() => { if (selectAllMatching) { setComposerSelection(undefined); setComposerFilter(filter); } else { setComposerFilter(undefined); setComposerSelection([...sel]); } setComposerOpen(true); }}>📣 Campaign</button>
           <button className="text-[12px] font-semibold bg-red/80 hover:bg-red rounded-md px-2.5 py-1" onClick={() => setDeleteSel(true)}>🗑 Delete</button>
           <button className="text-[12px] font-semibold hover:bg-white/15 rounded-md px-2 py-1" onClick={() => { setSel(new Set()); setSelectAllMatching(false); }}>Clear</button>
         </div>
@@ -464,7 +465,7 @@ export default function FarmingPage() {
       <ContactModal open={contactModal.open} onClose={() => setContactModal({ open: false, editing: null })} contact={contactModal.editing} groups={groups} onSave={saveContact} />
       <GroupModal open={groupModal.open} onClose={() => setGroupModal({ open: false, editing: null })} group={groupModal.editing} onSave={(input, id) => { if (id) { f.updateGroup(id, input); toast("✓ Group updated"); } else { f.addGroup(input); toast("✓ Group created"); } }} />
       <ImportContactsModal open={importOpen} onClose={() => setImportOpen(false)} defaultGroupId={groupFilter !== "all" ? groupFilter : undefined} onDone={(s) => { toast(`✓ Imported ${s.inserted.toLocaleString()} · ${s.duplicates.toLocaleString()} dupes`); afterMutation(); }} />
-      <CampaignComposer open={composerOpen} onClose={() => setComposerOpen(false)} groups={groups} initialSelectionIds={composerSelection} onSubmit={submitComposer} />
+      <CampaignComposer open={composerOpen} onClose={() => setComposerOpen(false)} groups={groups} initialSelectionIds={composerSelection} initialFilter={composerFilter} onSubmit={submitComposer} />
 
       <ConfirmModal open={deleteSel} onClose={() => setDeleteSel(false)} onConfirm={async () => { const n = await api.bulkAction("delete", bulkTarget()); setSel(new Set()); setSelectAllMatching(false); toast(`🗑 Deleted ${n.toLocaleString()}`); afterMutation(); }} title="Delete contacts?" message={`Permanently remove ${bulkLabel().toLocaleString()} contact${bulkLabel() === 1 ? "" : "s"}? This can't be undone.`} confirmLabel="Delete" />
       <ConfirmModal open={!!groupDelete} onClose={() => setGroupDelete(null)} onConfirm={async () => { if (groupDelete) { f.removeGroup(groupDelete.id); await api.stripGroupFromContacts(groupDelete.id); toast("🗑 Deleted group"); afterMutation(); } }} title="Delete group?" message={`Delete "${groupDelete?.name}"? Contacts stay, but lose this group tag.`} confirmLabel="Delete" />
@@ -480,6 +481,11 @@ function audienceLabel(c: FarmCampaign, groupById: Record<string, FarmGroup>): s
   if (a.kind === "all") return "All contacts";
   if (a.kind === "group") return "Groups: " + (a.groupIds || []).map((g) => groupById[g]?.name || g).join(", ");
   if (a.kind === "status") return "Status: " + (a.statuses || []).join(", ");
+  if (a.kind === "filter") {
+    const f = a.filter || {};
+    const parts = [f.search && `“${f.search}”`, f.status, f.group && (groupById[f.group]?.name || f.group), f.city, f.county, f.state].filter(Boolean);
+    return parts.length ? `Matching: ${parts.join(" · ")}` : "All matching filter";
+  }
   return `${(a.contactIds || []).length} selected contacts`;
 }
 
