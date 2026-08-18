@@ -12,7 +12,6 @@ import { usePatientAuth } from "@/lib/hooks/usePatientAuth";
 import { sendChat, pullChat } from "@/lib/chat/client";
 import { seedRecordFromPatient, emptyRecord, formatShotDate } from "@/lib/data/portalRecords";
 import type { ShotEntry } from "@/lib/data/portalRecords";
-import { SEED_DEMO } from "@/lib/config/runtime";
 import { SHOP_CATEGORY_LABEL } from "@/lib/data/shopProducts";
 import type { ShopProduct, ShopCategory } from "@/lib/types";
 import { validateAddress } from "@/lib/usps/validateAddress";
@@ -111,8 +110,10 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
   const setupPassword = usePatientAuth((s) => s.setupPassword);
   const me = patients.find((p) => p.id === sessionPid) ?? authPatient ?? null;
   const pid = me?.id ?? "";
-  const extra = useMemo(() => (me ? getPatientExtra(me) : null), [me]);
-  const seed = useMemo(() => (me && extra ? seedRecordFromPatient(me, extra) : emptyRecord()), [me, extra]);
+  // Patient-facing portal: NEVER fabricate demo data — real patients see only
+  // their real chart (empty states where nothing real exists yet).
+  const extra = useMemo(() => (me ? getPatientExtra(me, { demo: false }) : null), [me]);
+  const seed = useMemo(() => (me && extra ? seedRecordFromPatient(me, extra, false) : emptyRecord()), [me, extra]);
 
   const records = usePortalRecords((s) => s.records);
   const chatReads = usePortalRecords((s) => s.chatReads);
@@ -405,11 +406,6 @@ export default function PortalApp({ initialAuthed = false }: { initialAuthed?: b
                 <div className="login-helpers">
                   <a href="#" onClick={(e) => { e.preventDefault(); setAuthErr(null); setResetSent(false); setAuthView("forgot"); }}>Forgot password?</a>
                 </div>
-                {SEED_DEMO && (
-                  <div style={{ fontSize: 12, color: "var(--ink-muted, #6b7890)", marginTop: 10 }}>
-                    Demo account: <b>mattgromadzki@gmail.com</b> · password <b>demo1234</b>
-                  </div>
-                )}
               </>
             )}
 

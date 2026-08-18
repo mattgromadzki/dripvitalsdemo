@@ -5,7 +5,7 @@ import type { Patient, PatientExtra } from "@/lib/types";
  * In production this would come from your database. Here it's deterministic
  * per-patient so the chart looks consistent across renders.
  */
-export function getPatientExtra(pIn: Patient): PatientExtra {
+export function getPatientExtra(pIn: Patient, opts?: { demo?: boolean }): PatientExtra {
   // Live patients created through real intake can be missing demo-era fields
   // (plan, dose, sub, phone, wt, week, …). Default them here so none of the
   // derivations below can crash on undefined — this function must never throw,
@@ -25,10 +25,11 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   };
   // Stable pseudo-random based on patient ID — same patient gets same numbers
   const seed = p.id.charCodeAt(p.id.length - 1) + p.id.charCodeAt(p.id.length - 2);
-  // DEMO GATE: every synthesized/fabricated field below is emitted ONLY in demo
-  // mode. In production (NEXT_PUBLIC_SEED_DEMO_DATA=false) a real patient's chart
-  // must show ONLY real data — never invented visits/labs/orders/messages/SSNs.
-  const FAB = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+  // DEMO GATE: every synthesized/fabricated field below is emitted ONLY when
+  // demo mode is on. Callers can force it off (the patient PORTAL passes
+  // { demo: false } so a real patient's chart never shows invented
+  // visits/labs/orders/messages/SSNs); staff views default to the app flag.
+  const FAB = opts?.demo ?? (process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false");
   const goalWt = p.goalWt ?? (p.wt > 0 ? Math.max(p.wt - 20, Math.round(p.wt * 0.85)) : 0);
   const streakWeeks = Math.max(1, Math.min(p.week, (seed % 12) + 4));
   const riskScore = p.status === "active"

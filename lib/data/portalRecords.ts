@@ -50,7 +50,9 @@ export function formatShotDate(d: string): string {
 
 // Build a patient's starting record from their EMR data, so both the portal
 // and Patient View show real history immediately (new entries append to this).
-export function seedRecordFromPatient(p: Patient, extra: PatientExtra): PortalRecord {
+// `demo` defaults to the app flag (staff views keep demo); the patient PORTAL
+// passes false so real patients never get a fabricated shot history.
+export function seedRecordFromPatient(p: Patient, extra: PatientExtra, demo = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false"): PortalRecord {
   const med = p.plan ? p.plan.split(" ").slice(-1)[0] : "Semaglutide";
   const strength = String(p.dose || "").replace(/[^0-9.]/g, "") || "0.5";
   const sites = ["Stomach - Upper Left", "Stomach - Upper Right", "Thigh - Left", "Thigh - Right", "Arm - Left"];
@@ -65,8 +67,7 @@ export function seedRecordFromPatient(p: Patient, extra: PatientExtra): PortalRe
   };
   // Weekly shots ending ~today (oldest first), then newest-first for display.
   // DEMO ONLY — real patients start with an empty shot log and add their own.
-  const FAB = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
-  const shots: ShotEntry[] = !FAB ? [] : Array.from({ length: weeks }).map((_, i) => ({
+  const shots: ShotEntry[] = !demo ? [] : Array.from({ length: weeks }).map((_, i) => ({
     id: `seed-shot-${p.id}-${i}`,
     date: isoDaysAgo((weeks - 1 - i) * 7),
     medication: med,
