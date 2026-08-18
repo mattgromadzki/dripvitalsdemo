@@ -64,7 +64,9 @@ export function seedRecordFromPatient(p: Patient, extra: PatientExtra): PortalRe
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   };
   // Weekly shots ending ~today (oldest first), then newest-first for display.
-  const shots: ShotEntry[] = Array.from({ length: weeks }).map((_, i) => ({
+  // DEMO ONLY — real patients start with an empty shot log and add their own.
+  const FAB = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
+  const shots: ShotEntry[] = !FAB ? [] : Array.from({ length: weeks }).map((_, i) => ({
     id: `seed-shot-${p.id}-${i}`,
     date: isoDaysAgo((weeks - 1 - i) * 7),
     medication: med,

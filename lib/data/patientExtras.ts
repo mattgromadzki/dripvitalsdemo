@@ -25,6 +25,10 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   };
   // Stable pseudo-random based on patient ID — same patient gets same numbers
   const seed = p.id.charCodeAt(p.id.length - 1) + p.id.charCodeAt(p.id.length - 2);
+  // DEMO GATE: every synthesized/fabricated field below is emitted ONLY in demo
+  // mode. In production (NEXT_PUBLIC_SEED_DEMO_DATA=false) a real patient's chart
+  // must show ONLY real data — never invented visits/labs/orders/messages/SSNs.
+  const FAB = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
   const goalWt = p.goalWt ?? (p.wt > 0 ? Math.max(p.wt - 20, Math.round(p.wt * 0.85)) : 0);
   const streakWeeks = Math.max(1, Math.min(p.week, (seed % 12) + 4));
   const riskScore = p.status === "active"
@@ -42,7 +46,6 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   // must never show an invented street/city/zip — a fabricated address on a
   // medical record can end up on a pharmacy label. In production, blank means
   // blank.
-  const FAB = process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false";
   const street = p.address || (FAB ? `${100 + (seed * 7) % 9900} ${STREETS[seed % STREETS.length]}` : "");
   const city = p.city || (FAB ? (CITIES[p.state] || "Miami") : "");
   const zip = p.zip || (FAB ? String(10000 + (seed * 131) % 89999).slice(0, 5) : "");
@@ -255,29 +258,29 @@ export function getPatientExtra(pIn: Patient): PatientExtra {
   }
 
   return {
-    dob: p.dob || (process.env.NEXT_PUBLIC_SEED_DEMO_DATA !== "false" ? deriveDOB(p.age) : ""),
+    dob: p.dob || (FAB ? deriveDOB(p.age) : ""),
     gender: p.gender === "F" ? "Female" : p.gender === "M" ? "Male" : "Non-binary",
-    careCoordinator: p.week === 0 ? "Unassigned" : ["Jordan Blake", "Taylor Nguyen", "Sam Rivera", "Casey Morgan", "Riley Chen"][seed % 5],
-    lastLogin: p.week === 0 ? "Never" : ["Today, 9:14 AM", "Yesterday, 7:02 PM", "May 29, 2026", "May 27, 2026", "May 24, 2026"][seed % 5],
-    govId: `***-**-${String(seed * 7).padStart(4, "0").slice(0, 4)}`,
-    idVerified: p.status === "active" || p.status === "inactive",
+    careCoordinator: !FAB ? "Unassigned" : (p.week === 0 ? "Unassigned" : ["Jordan Blake", "Taylor Nguyen", "Sam Rivera", "Casey Morgan", "Riley Chen"][seed % 5]),
+    lastLogin: !FAB ? "—" : (p.week === 0 ? "Never" : ["Today, 9:14 AM", "Yesterday, 7:02 PM", "May 29, 2026", "May 27, 2026", "May 24, 2026"][seed % 5]),
+    govId: FAB ? `***-**-${String(seed * 7).padStart(4, "0").slice(0, 4)}` : "",
+    idVerified: FAB ? (p.status === "active" || p.status === "inactive") : false,
     goalWt,
-    streakWeeks,
-    riskScore,
-    riskLabel,
-    sideEffects,
+    streakWeeks: FAB ? streakWeeks : 0,
+    riskScore: FAB ? riskScore : 0,
+    riskLabel: FAB ? riskLabel : "—",
+    sideEffects: FAB ? sideEffects : [],
     address: { street, line2: p.apt || "", city, state: p.state, zip },
-    insurance: p.status === "active" ? {
+    insurance: FAB && p.status === "active" ? {
       carrier: ["BlueCross BlueShield", "Aetna", "United Healthcare", "Cigna"][seed % 4],
       memberId: `MEM${String(seed * 1337).slice(0, 9)}`,
       group: `GRP${(seed * 7) % 99999}`,
     } : undefined,
-    emergencyContact: { name: "Family Contact", relationship: ["Spouse","Parent","Sibling"][seed % 3], phone: p.phone.replace(/\d{2}\)/, "00)") },
-    visits, labs, prescriptions, orders,
-    scheduledVisits, soapNotes,
-    weightLog, weightDates, milestones, weeklyCheckins,
-    messages, supportNotes, invoices,
-    documents, consentHistory,
+    emergencyContact: FAB ? { name: "Family Contact", relationship: ["Spouse","Parent","Sibling"][seed % 3], phone: p.phone.replace(/\d{2}\)/, "00)") } : { name: "", relationship: "", phone: "" },
+    visits: FAB ? visits : [], labs: FAB ? labs : [], prescriptions: FAB ? prescriptions : [], orders: FAB ? orders : [],
+    scheduledVisits: FAB ? scheduledVisits : [], soapNotes: FAB ? soapNotes : [],
+    weightLog, weightDates, milestones: FAB ? milestones : [], weeklyCheckins: FAB ? weeklyCheckins : [],
+    messages: FAB ? messages : [], supportNotes: FAB ? supportNotes : [], invoices: FAB ? invoices : [],
+    documents: FAB ? documents : [], consentHistory: FAB ? consentHistory : [],
   };
 }
 
